@@ -29,31 +29,16 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <os_test.h>
-#include <os_private.h>
+#ifndef __ARCH_TEST_
+#define __ARCH_TEST_
 
-test_tick_clbck_t test_tick_clbck = NULL;
+#define test_assert(_cond) \
+   do \
+   { \
+      if( __builtin_expect(!(_cond), 0) ) { \
+         test_result(-1); \
+      } \
+   }while(0)
 
-void test_debug(const char* OS_UNUSED(format), ...)
-{
-   /* for mp430 we dont support this functionality */
-}
-
-void test_result(int OS_UNUSED(result))
-{
-   arch_halt();
-}
-
-void test_setupmain(void)
-{
-   test_assert(0); /* missing implementation */
-}
-
-void test_setuptick(void)
-{
-   test_assert(0); /* missing implementation */
-
-   if( NULL != test_tick_clbck )
-      test_tick_clbck();
-}
+#endif /* __ARCH_TEST_ */
 

@@ -1,2 +1,2 @@
-PORT = linux
-#PORT = msp430
+ARCH = linux
+#ARCH = msp430

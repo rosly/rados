@@ -29,23 +29,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __OS_TEST_
-#define __OS_TEST_
+#ifndef __ARCH_TEST_
+#define __ARCH_TEST_
 
-typedef void (*test_tick_clbck_t)(void);
+#include <assert.h>
+#define test_assert(_cond) assert(_cond)
 
-#define test_assert(_cond) \
-   do \
-   { \
-      if( __builtin_expect(!(_cond), 0) ) { \
-         test_result(-1); \
-      } \
-   }while(0)
-
-void test_debug(const char* format, ...);
-void test_result(int result);
-void test_setupmain(void);
-void test_setuptick(test_tick_clbck_t clbck, unsigned long nsec);
-
-#endif /* __OS_TEST_ */
+#endif /* __ARCH_TEST_ */
 

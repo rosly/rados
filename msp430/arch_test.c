@@ -29,20 +29,31 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __OS_TEST_
-#define __OS_TEST_
+#include <os_test.h>
+#include <os_private.h>
 
-#include <assert.h>
+test_tick_clbck_t test_tick_clbck = NULL;
 
-typedef void (*test_tick_clbck_t)(void);
+void test_debug(const char* OS_UNUSED(format), ...)
+{
+   /* for mp430 we dont support this functionality */
+}
 
-#define test_assert(_cond) assert(_cond)
+void test_result(int OS_UNUSED(result))
+{
+   arch_halt();
+}
 
-void test_debug(const char* format, ...);
-void test_result(int result);
-void test_setupmain(void);
-void test_setuptick(test_tick_clbck_t clbck, unsigned long nsec);
-void test_reqtick(void);
+void test_setupmain(void)
+{
+   test_assert(0); /* missing implementation */
+}
 
-#endif /* __OS_TEST_ */
+void test_setuptick(test_tick_clbck_t OS_UNUSED(clbck), unsigned long OS_UNUSED(nsec))
+{
+   test_assert(0); /* missing implementation */
+
+   if( NULL != test_tick_clbck )
+      test_tick_clbck();
+}
 

@@ -111,7 +111,7 @@ void arch_task_init(os_task_t *task, void* stack_param, size_t stack_size, os_ta
    task->ctx.context.uc_stack.ss_sp = ((char*)stack);
    task->ctx.context.uc_stack.ss_size = stack_size;
    task->ctx.context.uc_link = NULL;
-   makecontext(&(task->ctx.context), arch_task_start, 2, proc, param);
+   makecontext(&(task->ctx.context), (void(*)(void))arch_task_start, 2, proc, param);
 }
 
 void OS_NORETURN OS_COLD arch_halt(void)

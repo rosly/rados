@@ -15,10 +15,16 @@ CP       = cp -p
 RM       = rm -f
 MV       = mv
 
-CFLAGS   = -g -O0 -std=gnu99 -Wall -Wextra
+ifeq ($(DEBUG),)
+CFLAGS   = -O2
+else
+#for debug buld we use -O0 do not obstruct the generated code
+CFLAGS   = -O0
+endif
+CFLAGS   += -std=gnu99 
 LDFLAGS  = -lrt
 
-PORTSOURCES = \
-	os_port.c \
-	os_test.c
+ARCHSOURCES = \
+	arch_port.c \
+	arch_test.c
 

@@ -17,9 +17,11 @@ CP       = cp -p
 RM       = rm -f
 MV       = mv
 
-CFLAGS   = -mmcu=$(MCU) -g -Os -std=gnu99 -Wall -Wextra
+#on MSP430 even in DEBUG build -Os is most resonable
+CFLAGS   = -mmcu=$(MCU) -Os -std=gnu99 
 LDFLAGS  = -mmcu=$(MCU) -mdisable-watchdog
 
-PORTSOURCES = \
-	os_port.c \
-	os_test.c
+ARCHSOURCES = \
+	arch_port.c \
+	arch_test.c
+

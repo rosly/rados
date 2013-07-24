@@ -29,18 +29,17 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __OS_
-#define __OS_
+#ifndef __OS_TEST_
+#define __OS_TEST_
 
-#include "arch_port.h"
-#include "list.h"
-#include "os_config.h"
-#include "os_timer.h"
-#include "os_sched.h"
-#include "os_sem.h"
-#include "os_mtx.h"
+typedef void (*test_tick_clbck_t)(void);
+void test_debug(const char* format, ...);
+void test_result(int result);
+void test_setupmain(void);
+void test_setuptick(test_tick_clbck_t clbck, unsigned long nsec);
+void test_reqtick(void);
 
-extern os_task_t *task_current; /* need to be visiable for user because of arch_contextstore_i macros */
-extern volatile os_atomic_t isr_nesting; /* need to be visiable for user because of arch_contextstore_i macros */
+#include "arch_test.h"
 
-#endif
+#endif /* __OS_TEST_ */
+

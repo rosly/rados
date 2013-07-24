@@ -98,7 +98,10 @@ $(BUILDDIR)/%.d: %.c
 	@echo -e "[DEP]\t$<"
 	@$(CC) -M ${CFLAGS} $(addprefix -I, $(INCLUDES)) $< >$@
 
-.PHONY: clean
+.PHONY: clean testrun
+
+testrun: all
+	@$(addsuffix ;, $(TARGETS))
 
 clean:
 	@$(RM) $(TARGETS); echo -e "[RM]\t$(TARGETS)"

@@ -36,6 +36,9 @@
  * /{
  */
 
+#include <stdlib.h>
+#include <time.h>
+
 #include <os.h>
 #include <os_test.h>
 
@@ -141,6 +144,9 @@ int task_test3_proc(void* OS_UNUSED(param))
    struct timespec timer_curr;
    unsigned int tmp;
 
+   /* initialize */
+   memset(&timer_last, 0, sizeof(timer_last));
+
    /* create autoreaload timers in i periods */
    srand(0); /* we use rand with the same init number for pseudo-random stream, this should gice us predictable test enviroment */
    for(i = 10; i < TEST_TIMER_NBR; i++) {
@@ -195,6 +201,7 @@ int task_main_proc(void* OS_UNUSED(param))
 
    test_debug("Test timer: passed\n");
    test_result(0);
+   return 0;
 }
 
 void init(void)

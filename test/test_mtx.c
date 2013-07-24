@@ -36,6 +36,8 @@
  * /{
  */
 
+#include <stdlib.h>
+
 #include <os.h>
 #include <os_test.h>
 

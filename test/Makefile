@@ -29,15 +29,21 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
+#by defining ARCH enviroment variable, user can compile for different architectures
+#if no ARCH variable is defined, architecture is defined by target.mk
+ifeq ($(ARCH),)
 include ../target.mk
-include ../$(PORT)/target.mk
+endif
+#each architecture have its own target.mk file where CC, ARCHSOURCES, CFLAGS
+#variables are defined
+include ../$(ARCH)/target.mk
 
 TESTSOURCE = \
 	test1.c \
 	test2.c \
 	test3.c \
 	test4.c
-ifeq ("$(PORT)", "linux")
+ifeq ("$(ARCH)", "linux")
 TESTSOURCE += \
 	test_join.c \
 	test_sem.c \
@@ -45,10 +51,19 @@ TESTSOURCE += \
 	test_timer.c
 endif
 
-INCLUDES = . .. ../$(PORT)
-BUILDDIR = ../build
-LIBDIR = ../build
+INCLUDES = . .. ../$(ARCH)
+BUILDDIR = ../build/$(ARCH)
+LIBDIR = ../build/$(ARCH)
 LIBS = kernel
+
+#in target.mk for each source the optima optimization level (CFLAGS = -Ox) is defined
+#but here we add CFLAGS += -g if debug build
+ifeq ($(DEBUG),)
+CFLAGS += -g
+endif
+#regardles architecture we use highest warning level
+CFLAGS += -Wall -Wextra -Werror
+LDFLAGS +=
 
 vpath %.c .
 vpath %.o $(BUILDDIR)
@@ -89,3 +104,4 @@ clean:
 	@$(RM) $(TARGETS); echo -e "[RM]\t$(TARGETS)"
 	@$(RM) $(OBJECTS); echo -e "[RM]\t$(OBJECTS)"
 	@$(RM) $(DEPEND); echo -e "[RM]\t$(DEPEND)"
+

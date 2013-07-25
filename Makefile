@@ -28,6 +28,8 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
+ECHO = /bin/echo -e
+
 #by defining ARCH enviroment variable, user can compile for different architectures
 #if no ARCH variable is defined, architecture is defined by target.mk
 ifeq ($(ARCH),)
@@ -68,20 +70,20 @@ all: $(BUILDTARGET) size
 lst: $(LISTINGS)
 
 $(BUILDTARGET): $(OBJECTS)
-	@echo -e "[AR]\t$@"
+	@$(ECHO) "[AR]\t$@"
 	@$(RM) $@
 	@$(AR) -cq $@ $^
 
 $(BUILDDIR)/%.o: %.c
-	@echo -e "[CC]\t$<"
+	@$(ECHO) "[CC]\t$<"
 	@$(CC) -c $(CFLAGS) -o $@ $(addprefix -I, $(INCLUDES)) $<
 
 $(BUILDDIR)/%.lst: %.o
-	@echo -e "[LST]\t$<"
+	@$(ECHO) "[LST]\t$<"
 	@$(OBJDUMP) -dStw $< > $@
 
 size: $(BUILDTARGET)
-	@echo -e "[SIZE]\t$^"
+	@$(ECHO) "[SIZE]\t$^"
 	@$(SIZE) -t $^
 
 # include the dependencies unless we're going to clean, then forget about them.
@@ -92,16 +94,16 @@ endif
 # includes also considered, since some of these are our own
 # (otherwise use -MM instead of -M)
 $(BUILDDIR)/%.d: %.c
-	@echo -e "[DEP]\t$<"
+	@$(ECHO) "[DEP]\t$<"
 	@$(CC) -M ${CFLAGS} $(addprefix -I, $(INCLUDES)) $< >$@
 
 .PHONY: clean test testrun lst size
 
 clean:
-	@$(RM) $(BUILDTARGET); echo -e "[RM]\t$(BUILDTARGETS)"
-	@$(RM) $(OBJECTS); echo -e "[RM]\t$(OBJECTS)"
-	@$(RM) $(DEPEND); echo -e "[RM]\t$(DEPEND)"
-	@$(RM) $(LISTINGS); echo -e "[RM]\t$(LISTINGS)"
+	@$(RM) $(BUILDTARGET); $(ECHO) "[RM]\t$(BUILDTARGETS)"
+	@$(RM) $(OBJECTS); $(ECHO) "[RM]\t$(OBJECTS)"
+	@$(RM) $(DEPEND); $(ECHO) "[RM]\t$(DEPEND)"
+	@$(RM) $(LISTINGS); $(ECHO) "[RM]\t$(LISTINGS)"
 	@$(MAKE) --no-print-directory -C test clean
 
 test: $(BUILDTARGET)

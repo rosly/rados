@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is a part of RadOs project
  * Copyright (c) 2013, Radoslaw Biernaki <radoslaw.biernacki@gmail.com>
  * All rights reserved.
@@ -142,7 +142,6 @@ int task_main_proc(void* OS_UNUSED(param))
    }
 #endif
 
-   test_debug("Test semaphore: passed\n");
    test_result(0);
    return 0;
 }
@@ -159,7 +158,7 @@ void init(void)
 
 int main(void)
 {
-   test_setupmain();
+   test_setupmain("Test_Sem");
    os_start(init, idle);
    return 0;
 }

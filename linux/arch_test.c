@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is a part of RadOs project
  * Copyright (c) 2013, Radoslaw Biernaki <radoslaw.biernacki@gmail.com>
  * All rights reserved.
@@ -29,22 +29,25 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <os_test.h>
-#include <os_private.h>
-
 #include <stdlib.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <time.h>
 
-static timer_t timer;
-static test_tick_clbck_t test_tick_clbck = NULL;
+#include "os_test.h"
+#include "os_private.h"
+
+static timer_t timer; /**< linux POSIX timer used as an emulation of tick */
+static test_tick_clbck_t test_tick_clbck = NULL; /**< additional callback for emulated tick */
+static const char* test_name = NULL;
 
 static void OS_ISR sig_alrm(int OS_UNUSED(signum), siginfo_t * OS_UNUSED(siginfo), void *ucontext)
 {
    arch_contextstore_i(sig_alrm);
    if( NULL != test_tick_clbck )
+   {
       test_tick_clbck();
+   }
    os_tick();
    arch_contextrestore_i(sig_alrm);
 }
@@ -54,6 +57,7 @@ void test_debug(const char* format, ...)
    va_list ap;
 
    va_start(ap, format);
+   printf("%s: ", test_name);
    vprintf(format, ap);
    printf("\n");
    va_end(ap);
@@ -61,10 +65,19 @@ void test_debug(const char* format, ...)
 
 void test_result(int result)
 {
+   if(0 == result) {
+      printf("%s: Test PASSED\n", test_name);
+   } else {
+      printf("%s: Test FAILURE\n", test_name);
+   }
    exit(result);
 }
 
-void test_setupmain(void)
+/** Function setup the signal disposition used for tick but do not create the
+ * tick timer. This allows to handle the manual tick requests if needed but also
+ * can be used for periodic tick setup if needed (which is usual case). For
+ * periodick ticks see test_setuptick */
+void test_setupmain(const char* name)
 {
    int ret;
    struct sigaction tick_sigaction = {
@@ -75,13 +88,15 @@ void test_setupmain(void)
       /* SA_ONSTACK could be sed if we would like to use the signal stack instead of thread stack */
    };
 
-   /* set the signal disposition used for tick but do not create the tick timer
-      this will allow to handle the manual tick request but will not start the periodic kerel timer */
-
    ret = sigaction(SIGALRM, &tick_sigaction, NULL);
    test_assert(0 == ret);
+   test_name = name;
 }
 
+/** Function starts the periodic timer for tick emulation
+  *
+  * @precondition test_setupmain was called beforehand
+  */
 void test_setuptick(test_tick_clbck_t clbck, unsigned long nsec)
 {
    int ret;
@@ -112,6 +127,10 @@ void test_setuptick(test_tick_clbck_t clbck, unsigned long nsec)
    test_assert(0 == ret);
 }
 
+/** Function trigers manual tick
+  *
+  * @precondition test_setupmain was called beforehand
+  */
 void test_reqtick(void)
 {
    raise(SIGALRM);

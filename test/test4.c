@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is a part of RadOs project
  * Copyright (c) 2013, Radoslaw Biernaki <radoslaw.biernacki@gmail.com>
  * All rights reserved.
@@ -33,9 +33,14 @@
  * /file Test os OS port (step 4)
  * /ingroup tests
  *
- * Two tasks and two semaphores, tasks should block on sem, the semaphores should be signalized by timer ISR, by driving the timer freq all tree types of switching may be tested, intresting case is when timer is generated eah CPU cycle (can be used to test the critical sections)
- * Test in following services are implemented corecly:
- * - test is arch_context_switch fully working (from preemptive point of view) (will be called at each os_tick)
+ * Two tasks and two semaphores, tasks should block on sem, the semaphores
+ * should be signalized by timer ISR, by driving the timer freq all tree types
+ * of switching may be tested, intresting case is when timer is generated eah
+ * CPU cycle (can be used to test the critical sections)
+
+ * Test if following services are implemented corecly:
+ * - test is arch_context_switch fully working (from preemptive point of view)
+ * (will be called at each os_tick)
  * /{
  */
 
@@ -65,9 +70,11 @@ void tick_clbck(void)
 void idle(void)
 {
    if((TEST_CYCLES != task1_data.idx) || (TEST_CYCLES != task2_data.idx))
-      return; /* this is not the end, continue */
+   {
+     return; /* this is not the end, continue */
+   }
 
-   test_debug("Test4: passed\n");
+   /* both task reach its ends, finalize test */
    test_result(0);
 }
 
@@ -99,7 +106,7 @@ void init(void)
 
 int main(void)
 {
-   test_setupmain();
+   test_setupmain("Test4");
    os_start(init, idle);
    return 0;
 }

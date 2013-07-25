@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is a part of RadOs project
  * Copyright (c) 2013, Radoslaw Biernaki <radoslaw.biernacki@gmail.com>
  * All rights reserved.
@@ -49,7 +49,6 @@ static os_sem_t sem1;
 
 void idle(void)
 {
-   test_debug("Test1: passed");
    test_result(0);
 }
 
@@ -72,7 +71,7 @@ void init(void)
 
 int main(void)
 {
-   test_setupmain();
+   test_setupmain("Test1");
    os_start(init, idle);
    return 0;
 }

@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is a part of RadOs project
  * Copyright (c) 2013, Radoslaw Biernaki <radoslaw.biernacki@gmail.com>
  * All rights reserved.
@@ -344,7 +344,6 @@ int test_coordinator(void* OS_UNUSED(param))
    }
    test_assert(2 == test_atomic[0]); /* check if D was scheduled in time */
 
-   test_debug("Test mutex: passed\n");
    test_result(0);
    return 0;
 }
@@ -359,7 +358,7 @@ void init(void)
 
 int main(void)
 {
-   test_setupmain();
+   test_setupmain("Test_Mtx");
    os_start(init, idle);
    return 0;
 }

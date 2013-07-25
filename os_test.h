@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is a part of RadOs project
  * Copyright (c) 2013, Radoslaw Biernaki <radoslaw.biernacki@gmail.com>
  * All rights reserved.
@@ -35,7 +35,7 @@
 typedef void (*test_tick_clbck_t)(void);
 void test_debug(const char* format, ...);
 void test_result(int result);
-void test_setupmain(void);
+void test_setupmain(const char* test_name);
 void test_setuptick(test_tick_clbck_t clbck, unsigned long nsec);
 void test_reqtick(void);
 

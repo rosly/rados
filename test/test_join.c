@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is a part of RadOs project
  * Copyright (c) 2013, Radoslaw Biernaki <radoslaw.biernacki@gmail.com>
  * All rights reserved.
@@ -39,8 +39,8 @@
  * /{
  */
 
-#include <os.h>
-#include <os_test.h>
+#include "os.h"
+#include "os_test.h"
 
 #define TEST_TASKS ((size_t)10)
 #define TEST_CYCLES ((os_atomic_t)1000)
@@ -94,10 +94,10 @@ int task_proc_join(void* OS_UNUSED( param))
 
    /* first join the worker1
        waiting for finite number of ticks allow task_worker1 to be shceduled for enough amout of time it will be finished before we test_result from this blocking call
-       so for worker1 we will perform os_task_join in time when worker1 was allready finished */
+       so for worker1 we will perform os_task_join in time when worker1 was already finished */
    ret = os_sem_down(&sem, 1000); /* give wrker1 and worker2 enough time to be scheduled */
    test_assert(OS_TIMEOUT == ret);
-   ret = os_task_join(&task_worker1); /* join allready finished worker1 */
+   ret = os_task_join(&task_worker1); /* join already finished worker1 */
    test_assert(100 == ret); /* check the return code from worker1 */
 
    /* next join the worker2,
@@ -107,7 +107,7 @@ int task_proc_join(void* OS_UNUSED( param))
    ret = os_task_join(&task_worker2);
    test_assert(200 == ret);
 
-   test_debug("Test join: passed\n");
+   test_debug("Test join: passed");
    test_result(0);
    return 0;
 }
@@ -133,7 +133,6 @@ void init(void)
 
 int main(void)
 {
-   test_setupmain();
    os_start(init, idle);
    return 0;
 }

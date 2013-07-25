@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is a part of RadOs project
  * Copyright (c) 2013, Radoslaw Biernaki <radoslaw.biernacki@gmail.com>
  * All rights reserved.
@@ -48,24 +48,28 @@ static os_task_t task1;
 static os_task_t task2;
 static long int task1_stack[OS_STACK_MINSIZE];
 static long int task2_stack[OS_STACK_MINSIZE];
-static os_atomic_t task1_idx = 0;
-static os_atomic_t task2_idx = 0;
+static os_atomic_t counter[2] = { 0, 0 };
 
 void idle(void)
 {
-   test_assert(TEST_CYCLES == task1_idx);
-   test_assert(TEST_CYCLES == task2_idx);
-   test_debug("Test3: passed\n");
+   /* check if both task was run to the end */
+   test_assert(TEST_CYCLES == counter[0]);
+   test_assert(TEST_CYCLES == counter[1]);
+
    test_result(0);
 }
 
 int task_proc(void* param)
 {
-   os_atomic_t *idx = (os_atomic_t*)param;
+   size_t idx = (size_t)param;
 
-   while((*idx) < TEST_CYCLES) {
-      (*idx)++;
+   while((counter[idx]) < TEST_CYCLES) {
+      (counter[idx])++;
    }
+   /* check that second task was scheduled at least once while this task is
+    * still in working state, this will confirm that both tasks share the
+    * priority */
+   test_assert(0 != counter[(idx++) % 2]);
 
    return 0;
 }
@@ -74,13 +78,13 @@ void init(void)
 {
    test_setuptick(NULL, 1);
 
-   os_task_create(&task1, 1, task1_stack, sizeof(task1_stack), task_proc, &task1_idx);
-   os_task_create(&task2, 1, task2_stack, sizeof(task2_stack), task_proc, &task2_idx);
+   os_task_create(&task1, 1, task1_stack, sizeof(task1_stack), task_proc, (void*)0);
+   os_task_create(&task2, 1, task2_stack, sizeof(task2_stack), task_proc, (void*)1);
 }
 
 int main(void)
 {
-   test_setupmain();
+   test_setupmain("Test3");
    os_start(init, idle);
    return 0;
 }

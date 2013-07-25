@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is a part of RadOs project
  * Copyright (c) 2013, Radoslaw Biernaki <radoslaw.biernacki@gmail.com>
  * All rights reserved.
@@ -60,7 +60,6 @@ void idle(void)
    /* both task must run exacly 10000 times, smaller value means OS scheduling bug */
    test_assert(TEST_CYCLES == task1_idx);
    test_assert(TEST_CYCLES == task2_idx);
-   test_debug("Test2: passed\n");
    test_result(0);
 }
 
@@ -106,7 +105,7 @@ void init(void)
 
 int main(void)
 {
-   test_setupmain();
+   test_setupmain("Test2");
    os_start(init, idle);
    return 0;
 }

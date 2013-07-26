@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is a part of RadOs project
  * Copyright (c) 2013, Radoslaw Biernaki <radoslaw.biernacki@gmail.com>
  * All rights reserved.
@@ -43,6 +43,7 @@ typedef struct {
 } os_timer_t;
 
 void os_timer_create(os_timer_t* timer, timer_proc_t clbck, void* param, uint_fast16_t timeout_ticks, uint_fast16_t reload_ticks);
-void os_timer_destroy(os_timer_t* timer);;
+void os_timer_destroy(os_timer_t* timer);
 
 #endif
+

@@ -100,6 +100,75 @@ int task_test1_proc(void* OS_UNUSED(param))
 }
 
 /**
+ * Test1 task procedure
+ * Regresion test for itimer unsynch algorithm feature
+ */
+int task_test1a_proc(void* OS_UNUSED(param))
+{
+   /* clean the clbck mark table */
+   memset(timer_clbck, 0, sizeof(timer_clbck));
+
+   /* create timer with 2 tick timeout */
+   os_timer_create(&timers[0], timer_proc, (void*)0, 2, 0);
+
+   /* generate 1 tick */
+   test_reqtick();
+
+   /* create timer with 2 tick timeout */
+   os_timer_create(&timers[1], timer_proc, (void*)1, 2, 0);
+
+   /* generate 1 tick, timer[0] should expire but not timer[1] */
+   test_reqtick();
+   test_assert(true == timer_clbck[0]);
+   test_assert(false == timer_clbck[1]); /* here was a BUG!! */
+
+   /* generate 1 tick, timer[1] should expire */
+   test_reqtick();
+   test_assert(true == timer_clbck[1]);
+
+
+   /* clean up */
+   os_timer_destroy(&timers[0]);
+   os_timer_destroy(&timers[1]);
+
+   test_debug("subtest 1a OK");
+   return 0;
+}
+
+/**
+ * Test1 task procedure
+ * Check if unsynch implementation is able to handle loong timeout periods
+ */
+int task_test1b_proc(void* OS_UNUSED(param))
+{
+   size_t i;
+
+   /* clean the clbck mark table */
+   memset(timer_clbck, 0, sizeof(timer_clbck));
+
+   /* create timer with INT16_MAX tick timeout */
+   os_timer_create(&timers[0], timer_proc, (void*)0, INT16_MAX, 0);
+
+   /* generate INT16_MAX -1  ticks */
+   for(i = 0; i < INT16_MAX - 1; i++) {
+     test_reqtick();
+   }
+
+   /* check that this timer did not expired */
+   test_assert(false == timer_clbck[0]);
+
+   /* generate 1 additional tick, timer[0] should expire */
+   test_reqtick();
+   test_assert(true == timer_clbck[0]);
+
+   /* clean up */
+   os_timer_destroy(&timers[0]);
+
+   test_debug("subtest 1b OK");
+   return 0;
+}
+
+/**
  * Test2 task procedure
  * Check if timers are properly reloaded in defined periods
  * We test that by creating many timers and usinng both timeout and period, then
@@ -141,6 +210,8 @@ int task_test2_proc(void* OS_UNUSED(param))
 int task_main_proc(void* OS_UNUSED(param))
 {
    task_test1_proc(NULL);
+   task_test1a_proc(NULL);
+   task_test1b_proc(NULL);
    task_test2_proc(NULL);
 
    test_result(0);

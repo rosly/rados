@@ -34,7 +34,11 @@
 /* will be truncanced to register size */
 #define OS_STACK_FILLPATERN ((uint8_t)0xAB)
 
-os_task_t *task_current = NULL; /* not need to be volatile since we whant to optimize the access to it, while it only may change after os_schedule call, compiler asumes that after function call all data under the pointer may be changed (also ISR will not change it since interrupts are blocked by critical sections) */
+/** not need to be volatile since we whant to optimize the access to it, while
+ * it only may change after os_schedule call, compiler asumes that after
+ * function call all data under the pointer may be changed (also ISR will not
+ * change it since interrupts are blocked by critical sections) */
+/* intentionaly not volatile */ os_task_t *task_current = NULL; 
 os_taskqueue_t ready_queue;
 volatile os_atomic_t isr_nesting = 0;
 volatile os_atomic_t sched_lock = 0;
@@ -58,16 +62,23 @@ void os_start(
 
    /* create and switch to idle task, perform the remain app_init on idle_task */
    os_task_init(&task_idle, 0);
-   task_idle.state = TASKSTATE_RUNNING;
-   task_current = &task_idle; /* interrupt are not enabled, we can safely done this without ritical section */
-   /* from this point we can switch the context because we have at least task_idle in ready_queue, but for fast app_init we disable the scheduler until we will be fully ready */
+   task_idle.state = TASKSTATE_RUNNING; /* because state = TASKSTATE_READY after init */
+   /* interrupt are not enabled, critical section not needed for following */
+   task_current = &task_idle; 
+   /* from this point we can switch the context because we have at least
+    * task_idle in ready_queue, but for fast app_init we disable the scheduler
+    * until we will be fully ready */
 
    arch_os_start();
 
-   os_scheduler_lock(); /* disable the scheduler, so app_init will not switch for task which it will eventualy create */
-   app_init(); /* here app should create the remaining threads and start the interrupts (not only the tick) */
+   /* disable the scheduler for time of app_init() call, this is needed since we
+    * dont wont to switch tasks while we craete them in app_init() */
+   os_scheduler_lock(); 
+   /* here app should create the remaining threads and start the interrupts (not
+    * only the tick), we call app_init() user supplied function */
+   app_init(); 
    os_scheduler_unlock();
-   arch_eint(); /* enable the interrupts */
+   arch_eint(); /* we are ready for scheduler actions, enable the interrupts */
 
    do
    {
@@ -75,12 +86,16 @@ void os_start(
 
       arch_critical_enter(cristate);
       os_task_makeready(task_current); /* task_current means task_idle here */
-      arch_context_switch(os_task_dequeue(&ready_queue)); /* finaly we switch the context to first user task, (it will have the higher ptiority than idle) (need to be done under critical section) */
+      /* finaly we switch the context to first user task, (it will have the
+       * higher ptiority than idle) (need to be done under critical section) */
+      arch_context_switch(os_task_dequeue(&ready_queue)); 
       arch_critical_exit(cristate);
    }while(0);
 
+   /* after all initialization actions, idle task will spin in idle loop */
    while(1)
    {
+     /* user supplied idle function */
       app_idle();
    }
 }
@@ -110,7 +125,8 @@ void os_task_create(
    os_task_enqueue(&ready_queue, task);
    arch_critical_exit(cristate);
 
-   os_schedule(1); /* 1 as a param will couse a task switch only if created task has higher priority than task_curernt */
+   os_schedule(1); /* 1 as a param will cause a task-switch only if created task
+                      has higher priority than task_curernt */
 }
 
 int os_task_join(os_task_t *task)

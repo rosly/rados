@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is a part of RadOs project
  * Copyright (c) 2013, Radoslaw Biernaki <radoslaw.biernacki@gmail.com>
  * All rights reserved.
@@ -38,7 +38,7 @@
  * it only may change after os_schedule call, compiler asumes that after
  * function call all data under the pointer may be changed (also ISR will not
  * change it since interrupts are blocked by critical sections) */
-/* intentionaly not volatile */ os_task_t *task_current = NULL; 
+/* intentionaly not volatile */ os_task_t *task_current = NULL;
 os_taskqueue_t ready_queue;
 volatile os_atomic_t isr_nesting = 0;
 volatile os_atomic_t sched_lock = 0;
@@ -64,7 +64,7 @@ void os_start(
    os_task_init(&task_idle, 0);
    task_idle.state = TASKSTATE_RUNNING; /* because state = TASKSTATE_READY after init */
    /* interrupt are not enabled, critical section not needed for following */
-   task_current = &task_idle; 
+   task_current = &task_idle;
    /* from this point we can switch the context because we have at least
     * task_idle in ready_queue, but for fast app_init we disable the scheduler
     * until we will be fully ready */
@@ -73,10 +73,10 @@ void os_start(
 
    /* disable the scheduler for time of app_init() call, this is needed since we
     * dont wont to switch tasks while we craete them in app_init() */
-   os_scheduler_lock(); 
+   os_scheduler_lock();
    /* here app should create the remaining threads and start the interrupts (not
     * only the tick), we call app_init() user supplied function */
-   app_init(); 
+   app_init();
    os_scheduler_unlock();
    arch_eint(); /* we are ready for scheduler actions, enable the interrupts */
 
@@ -88,7 +88,7 @@ void os_start(
       os_task_makeready(task_current); /* task_current means task_idle here */
       /* finaly we switch the context to first user task, (it will have the
        * higher ptiority than idle) (need to be done under critical section) */
-      arch_context_switch(os_task_dequeue(&ready_queue)); 
+      arch_context_switch(os_task_dequeue(&ready_queue));
       arch_critical_exit(cristate);
    }while(0);
 
@@ -135,23 +135,28 @@ int os_task_join(os_task_t *task)
    os_sem_t join_sem;
    int ret;
 
-   OS_ASSERT(task_current->prio_current > 0); /* idle task cannot call blocking functions (will crash OS) */
+   OS_ASSERT(0 == isr_nesting); /* this function may be called only form user code */
+   OS_ASSERT(task_current->prio_current > 0); /* idle task cannot call blocking
+                                                 functions (will crash OS) */
 
    arch_critical_enter(cristate);
    OS_ASSERT(NULL == task->join_sem); /* only single task can wait for another task */
    OS_ASSERT(TASKSTATE_INVALID != task->state); /* task can be joined only once */
-   if(  task->state < TASKSTATE_DESTROYED )
+   /* check if task ended up in os_task_exit() */
+   if( task->state < TASKSTATE_DESTROYED )
    {
-      os_sem_create(&join_sem, 0); /* initialize the sem on which we will block */
+      /* it seems not, so we have to wait until it will finish
+       * we will wait for it by blocking on semaphore */
+      os_sem_create(&join_sem, 0);
       task->join_sem = &join_sem;
-
-      /* here we should wait on task exit semaphore */
       ret = os_sem_down(&join_sem, OS_SEMTIMEOUT_INFINITE);
       OS_ASSERT(OS_OK == ret);
       os_sem_destroy(&join_sem);
    }
-   OS_ASSERT(TASKSTATE_DESTROYED == task->state); /* now the task state has to be DESTROYED */
-   task->state = TASKSTATE_INVALID; /* mark that task is already joined */
+
+   OS_ASSERT(TASKSTATE_DESTROYED == task->state);
+   /* here we know for sure that task ended up in os_task_exit() */
+   task->state = TASKSTATE_INVALID; /* mark that task was joined */
    task->join_sem = NULL;
    arch_critical_exit(cristate);
 
@@ -163,12 +168,16 @@ void OS_HOT os_tick(void)
    OS_ASSERT(isr_nesting > 0); /* this function may be called only form ISR */
 
    os_timer_tick(); /* call the timer module mechanism */
-   os_schedule(0); /* switch to other READY task, if there is such (0 param in os_schedule means switch to other READY task which has the same or greater priority) */
+   /* switch to other READY task which has the same or greater priority (0 as
+    * param means just that) */
+   os_schedule(0);
 }
 
 /* --- private functions --- */
 
-void OS_HOT os_task_enqueue(os_taskqueue_t* restrict task_queue, os_task_t* restrict task)
+void OS_HOT os_task_enqueue(
+   os_taskqueue_t* restrict task_queue,
+   os_task_t* restrict task)
 {
    list_append(&(task_queue->tasks[task->prio_current]), &(task->list));
    task->task_queue = task_queue;
@@ -178,19 +187,22 @@ void OS_HOT os_task_enqueue(os_taskqueue_t* restrict task_queue, os_task_t* rest
 }
 
 /**
- *  Function realculate the priomax inside task_queue after task unlink operation
- *  Function does not unlink the task! this must be done before calling this function
+ *  Function realculate the priomax inside task_queue after task unlink
+ *  operation.Function does not unlink the task! this must be done before
+ *  calling this function
  */
 void OS_HOT os_task_queue_reprio(os_taskqueue_t* restrict task_queue)
 {
-   while( (0 != (task_queue->priomax)) && list_is_empty(&(task_queue->tasks[task_queue->priomax])) ) {
+   while( (0 != (task_queue->priomax)) &&
+          list_is_empty(&(task_queue->tasks[task_queue->priomax]))) {
      --(task_queue->priomax);
    }
 }
 
 /**
  *  Function unlink the task from task_queue
- *  This is desierd function which should be called when we need to switch to explicitly pointed task from wait_queues
+ *  This is desierd function which should be called when we need to switch to
+ *  explicitly pointed task from task_queues
  */
 void OS_HOT os_task_unlink(os_task_t* restrict task)
 {
@@ -200,8 +212,9 @@ void OS_HOT os_task_unlink(os_task_t* restrict task)
 }
 
 /**
- *  Function dequeues the most urgent task from the wait_queue
- *  This is desierd function which should be called when we need to switch to other but most urgent task
+ *  Function dequeues the most urgent task from the task_queue.  This is desierd
+ *  function which should be called when we need to peek (switch to) most
+ *  prioritized task
  */
 os_task_t* OS_HOT os_task_dequeue(os_taskqueue_t* restrict task_queue)
 {
@@ -215,18 +228,25 @@ os_task_t* OS_HOT os_task_dequeue(os_taskqueue_t* restrict task_queue)
    return task;
 }
 
-os_task_t* OS_HOT os_task_dequeue_prio(os_taskqueue_t* restrict task_queue, uint_fast8_t prio)
+/**
+ *  Similar to os_task_dequeue() but  dequeue only if there is a task with prio
+ *  equal or greater than the prio param
+ */
+os_task_t* OS_HOT os_task_dequeue_prio(
+   os_taskqueue_t* restrict task_queue,
+   uint_fast8_t prio)
 {
-   if( task_queue->priomax >= prio ) { /* dequeue only if there si a task with prio equal or greater than the prio param */
+   if( task_queue->priomax >= prio ) {
       return os_task_dequeue(task_queue);
    }
    return NULL;
 }
 
 /**
- *  Functionreturns the pointer to most urgent task on the wait_queue
- *  This function does not modify the wait_queue, it just returns the reference
- *  Use this function olny when you are intrested about some property of most prioritized task on the queue
+ *  Function returns the pointer to most urgent task on the task_queue
+ *  This function does not modify the task_queue, it just returns the reference
+ *  Use this function only when you are intrested about some property of most
+ *  prioritized task on the queue but you dont whant to dqueue this task
  */
 os_task_t* OS_HOT os_task_peekqueue(os_taskqueue_t* restrict task_queue)
 {
@@ -283,24 +303,37 @@ void os_task_exit(int retv)
    os_task_t *task;
    arch_criticalstate_t cristate;
 
-   /* we remove current task from system and going for endless sleep */
-   arch_critical_enter(cristate); /* we need to block the preemption, we never leave this state in this task, when we switch to other task interrupts will be enabled again */
-   task_current->ret_value = retv;
-   task_current->state = OS_DESTROYED;
+   /* we remove current task from system and going for endless sleep. We need
+    * to block the preemption, we never leave this state in this task, when we
+    * switch to other task interrupts will be enabled again */
+   arch_critical_enter(cristate);
 
-   /* if some task is waiting fr this tas we signalize the join)sem, on which some thread may wait in os_task_join */
+   task_current->ret_value = retv; /* store the return value of task for future join */
+   task_current->state = TASKSTATE_DESTROYED;
+
+   /* if some task is waiting for this task, we signalize the join semaphore on
+    * which some other thread is waiting in os_task_join */
    if( NULL != task_current->join_sem ) {
-      os_scheduler_lock(); /* since after join this signalized thread may remove the current task stack and task struct, we cannot switch to it inside os_sem_up (we must lock the scheduler) (keep in mind that locking the scheduler is different thing than critical section) */
+      /* since after join, master thread will probably remove the current task
+       * stack and task struct, we cannot switch to it while we call os_sem_up.
+       * We simply avoiding this by locking the scheduler. (keep in mind that
+       * critical section is different think, here we lock additionaly
+       * scheduler) */
+      os_scheduler_lock();
       os_sem_up(task_current->join_sem);
-      os_scheduler_unlock(); /* we need to allo the task switch durring the following arch_context_switch */
+      os_scheduler_unlock(); /* reenable task switch by scheduler */
    }
 
-   /* next we pop any ready task - at least there will be a idle task so we will never get the NULL there
-       and we switch to that task, this will drop the reference to last task_curent and eficiently remove the task from the system queues */
-   task = os_task_dequeue(&ready_queue); /* chose any ready task to whoh we can switch */
+   /* next we pop any ready task - at least idle task is in READY state so we
+    * will never get the NULL there. Next switch to that task. Since we not
+    * saving current_task anywhere it will disapear from scheduling loop */
+   task = os_task_dequeue(&ready_queue);
    arch_context_switch(task);
 
-   OS_ASSERT(0); /* we should never reach this point, becouse we droped the task */
+
+  /* we should never reach this point, there is no chance that scheduler picked
+   * up this code again since we dropped the task */
+  OS_ASSERT(0);
 }
 
 /* --- private functions --- */
@@ -328,6 +361,7 @@ static void os_task_init(
    task->prio_current = prio;
    task->state = TASKSTATE_READY;
    task->block_type = OS_TASKBLOCK_INVALID;
+   task->wait_queue = NULL;
    list_init(&(task->mtx_list));
 }
 

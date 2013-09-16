@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is a part of RadOs project
  * Copyright (c) 2013, Radoslaw Biernaki <radoslaw.biernacki@gmail.com>
  * All rights reserved.
@@ -153,7 +153,14 @@ static inline void os_scheduler_unlock(void) {
 static inline void os_task_makeready(os_task_t *task)
 {
    task->state = TASKSTATE_READY; /* set the task state */
-   os_task_enqueue(&ready_queue, task); /* add task to ready queue */
+   if(NULL != task->wait_queue) {
+       /* in case task has assosiated wait_queue, add task to task_queue of
+        * wait_queue */
+      os_task_enqueue(task->wait_queue, task);
+   } else {
+      /* otherwise put it into ready_queue */
+      os_task_enqueue(&ready_queue, task);
+   }
 }
 
 static inline void os_task_makewait(

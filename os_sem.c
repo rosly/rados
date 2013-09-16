@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is a part of RadOs project
  * Copyright (c) 2013, Radoslaw Biernaki <radoslaw.biernacki@gmail.com>
  * All rights reserved.
@@ -37,23 +37,26 @@ static void os_sem_timerclbck(void* param);
 void os_sem_create(os_sem_t* sem, os_atomic_t init_value)
 {
    memset(sem, 0, sizeof(os_sem_t));
-   os_taskqueue_init(&(sem->wait_queue));
+   os_taskqueue_init(&(sem->task_queue));
    sem->value = init_value;
 }
 
-/* calling this function for semaphores which are also used in ISR is hghly forbiden
-   since it will crash your kernel (ISR will access to data which is destroyed) */
 void os_sem_destroy(os_sem_t* sem)
 {
    arch_criticalstate_t cristate;
    os_task_t *task;
 
    arch_critical_enter(cristate);
-   while( NULL != (task = os_task_dequeue(&(sem->wait_queue))) ) {
+
+   /* wake up all task which waits on sem->task_queue */
+   while( NULL != (task = os_task_dequeue(&(sem->task_queue))) ) {
       task->block_code = OS_DESTROYED;
-      os_task_makeready(task); /* wake up all task which waits on sem->wait_queue */
+      os_task_makeready(task);
    }
-   memset(sem, 0, sizeof(os_sem_t)); /* finaly we destroy all semaphore data, this should arrise problems if this semaphore was used also in interupts */
+   /* finaly we destroy all semaphore data, this should arrise problems if this
+    * semaphore was used also in interupts (feel warned) */
+   memset(sem, 0, sizeof(os_sem_t));
+
    arch_critical_exit(cristate);
 }
 
@@ -65,10 +68,11 @@ os_retcode_t OS_WARN_UNUSEDRET os_sem_down(os_sem_t* sem, uint_fast16_t timeout_
    arch_criticalstate_t cristate;
 
    OS_ASSERT(0 == isr_nesting); /* this function may be called only form user code */
-   OS_ASSERT(task_current->prio_current > 0); /* idle task cannot cal blocking functions (will crash OS) */
+   OS_ASSERT(task_current->prio_current > 0); /* idle task cannot call blocking
+                                                 functions (will crash OS) */
 
    /* we need to disable the interrupts since semaphores may be signalized from ISR
-       once we check the semahore value we need to add the task to the wait queue in atomic maner
+       once we check the semahore value we need to add the task to the task queue in atomic maner
        also we use the timers here, we need to prevent the race conditions which may arrise
        if we will not protect from timer callbacks */
    arch_critical_enter(cristate);
@@ -92,18 +96,25 @@ os_retcode_t OS_WARN_UNUSEDRET os_sem_down(os_sem_t* sem, uint_fast16_t timeout_
          task_current->timer = &timer;
       }
 
-      os_task_makewait(&(sem->wait_queue), OS_TASKBLOCK_SEM);
+      os_task_makewait(&(sem->task_queue), OS_TASKBLOCK_SEM, TASKSTATE_WAIT);
 
-      task = os_task_dequeue(&ready_queue); /* chose any ready task to whoh we can switch */
-      arch_context_switch(task); /* here we switch to any READY task (possibly enable the interrupts after context switch) */
-      /* the task state is set to RUNING internaly before return from arch_context_switch, also iterrupts are again disabled here (even it they was enabled for execution of previous task) */
+      /* chose some task with READY state to which we can switch */
+      task = os_task_dequeue(&ready_queue);
+      arch_context_switch(task);
+      /* here we switch to any READY task, we will return from
+       * arch_context_switch call at some next schedule().  After return task
+       * state is set to RUNING (before return from arch_context_switch), also
+       * iterrupts are again disabled here (even it they where enabled for
+       * execution of previous task) */
 
       if( NULL != task_current->timer ) {
+         /* seems that timer didn't exipre up to now, we need to clean it */
          task_current->timer = NULL;
-         os_timer_destroy(&timer); /* this will remove timer if it does not expire up to now (internaly this function checks the required condition) */
+         os_timer_destroy(&timer);
       }
 
-      ret = task_current->block_code; /* the block_code was set in os_sem_destroy, timer callback or in os_sem_up */
+      /* the block_code was set in os_sem_destroy, timer callback or in os_sem_up */
+      ret = task_current->block_code;
 
    }while(0);
    arch_critical_exit(cristate);
@@ -111,7 +122,8 @@ os_retcode_t OS_WARN_UNUSEDRET os_sem_down(os_sem_t* sem, uint_fast16_t timeout_
    return ret;
 }
 
-   /* this function can be called from ISR (one of the basic functionality of semaphores) */
+/* this function can be called from ISR (one of the basic functionality of
+ * semaphores) */
 void os_sem_up(os_sem_t* sem)
 {
    arch_criticalstate_t cristate;
@@ -120,23 +132,33 @@ void os_sem_up(os_sem_t* sem)
    OS_ASSERT(sem->value < SIG_ATOMIC_MAX); /* check the semaphore value limit */
 
    arch_critical_enter(cristate);
-   task = os_task_dequeue(&(sem->wait_queue));
+   task = os_task_dequeue(&(sem->task_queue));
    if( NULL == task )
    {
-      ++(sem->value); /* there was no task which waits on sem, in this case increment the sem value */
+      /* there was no task which waits on sem, in this case increment the sem
+       * value */
+      ++(sem->value);
    }
    else
    {
-      if( task->timer ) /* check if task waits for semaphore with timeout */
+      /* check if task waits for wait_queue with timeout */
+      if( task->timer )
       {
-         /* we need to destroy the timer here, because otherwise we will be wournable for race conditions from timer callbacks (curently callback are blocked becose of critical section, but we will posibly jump out of it while we will switch the tasks durring os_shedule) */
+         /* we need to destroy the timer here, because otherwise we will be
+          * vulnerable for race conditions from timer callbacks (in here
+          * callback are blocked because of critical section, but we will
+          * posibly jump out of it while we will switch the tasks durring
+          * os_shedule) */
          os_timer_destroy(task->timer);
-         task->timer = NULL; /* protect from double timer destroy in os_sem_down (that code will be executed when task will be scheduled again) */
+         task->timer = NULL;
       }
 
       task->block_code = OS_OK; /* set the block code to NORMAL WAKEUP */
       os_task_makeready(task);
-      os_schedule(1); /* switch to more prioritized READY task, if there is such (1 param in os_schedule means switch to other READY task which has greater priority) */
+      /* switch to more prioritized READY task, if there is such (1 param in
+       * os_schedule means switch to other READY task which has greater
+       * priority) */
+      os_schedule(1);
    }
    arch_critical_exit(cristate);
 }
@@ -147,12 +169,14 @@ static void os_sem_timerclbck(void* param)
 {
    os_task_t *task = (os_task_t*)param;
 
-   os_task_unlink(task); /* unlink the task from semaphore wait queue */
-
+   /* timer was assigned only to one task, by timer param */
+   os_task_unlink(task);
    task->block_code = OS_TIMEOUT;
    os_task_makeready(task);
-   /* we do not call the os_sched here, because this will be done at the os_tick() (which calls the os_timer_tick which call this function) */
-
-   /* timer is not auto reload so we dont have to wory about it here (it will not call this function again, also we can safely call os_timer_destroy in any time for timer assosiated with this task) */
+   /* we do not call the os_sched here, because this will be done at the
+    * os_tick() (which calls the os_timer_tick which call this function) */
+   /* timer is not auto reload so we dont have to wory about it here (it will
+    * not call this function again, also we can safely call os_timer_destroy in
+    * any time for timer assosiated with this task) */
 }
 

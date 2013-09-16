@@ -117,7 +117,7 @@ int test1_task_proc2(void* OS_UNUSED(param))
  */
 int task_main_proc(void* OS_UNUSED(param))
 {
-   /* regresion test - two tasks hanged on semaphore, higher prioritized with timeout, onc timeout expire signalize the semaphore to wake up the low prioritized, in case of bug low priority task will be not woken up becouse issing priomax update in wait_queue */
+   /* regresion test - two tasks hanged on semaphore, higher prioritized with timeout, onc timeout expire signalize the semaphore to wake up the low prioritized, in case of bug low priority task will be not woken up becouse issing priomax update in task_queue */
    os_sem_create(&(worker_tasks[0].sem), 0);
    os_task_create(
       &(worker_tasks[0].task), 1,

@@ -29,55 +29,27 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/**
- * /file Test os OS port (step 1)
- * /ingroup tests
- *
- * Test if task_proc is called and if it can block on semaphore, test if idle procedure will be called (because of task block)
- * Test in following services are implemented corecly:
- * - task (stack and context) initalization is pefromed corectly
- * - arch_context_switch implemented corectly (at least called 2 times init_idle->task1->idle)
- * /{
- */
+#ifndef __OS_WAITQUEUE_
+#define __OS_WAITQUEUE_
 
-#include <os.h>
-#include <os_test.h>
+typedef struct {
+   /* task_queue for threads which are blocked or prepared to block on this wait
+    * queue. This is typical task queue (no magic) it means that tasks in that
+    * queue are in typical TASKSTATE_WAIT. For explanation how task_current is
+    * placed in this task_queue instead of ready queue, read note around
+    * task->wait_queue */
+   os_taskqueue_t task_queue;
 
-static os_task_t task1;
-static long int task1_stack[OS_STACK_MINSIZE];
-static os_sem_t sem1;
-static int task1_run = 0;
+} os_waitqueue_t;
 
-void idle(void)
-{
-   test_result(task1_run ? 0 : -1);
-}
+void os_waitqueue_create(os_waitqueue_t *queue);
+/** \NOTE calling this function for semaphores which are also used in ISR is
+ *        highly forbiden since it will crash your kernel (ISR will access to
+ *        data which will be destroyed) */
+void os_waitqueue_destroy(os_waitqueue_t *queue);
+void os_waitqueue_prepare(os_waitqueue_t *queue);
+os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_sleep(os_waitqueue_t *queue);
+void os_waitqueue_wakeup(os_waitqueue_t *queue, uint8_fast_t nbr);
 
-int task1_proc(void* OS_UNUSED(param))
-{
-   int ret;
-
-   task1_run = 1;
-
-   ret = os_sem_down(&sem1, OS_SEMTIMEOUT_INFINITE);
-   test_debug("fail: od_sem_down returned with code %d", ret);
-   test_result(-1);
-
-   return 0;
-}
-
-void init(void)
-{
-   os_sem_create(&sem1, 0);
-   os_task_create(&task1, 1, task1_stack, sizeof(task1_stack), task1_proc, NULL);
-}
-
-int main(void)
-{
-   test_setupmain("Test1");
-   os_start(init, idle);
-   return 0;
-}
-
-/** /} */
+#endif
 

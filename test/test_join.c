@@ -107,7 +107,6 @@ int task_proc_join(void* OS_UNUSED( param))
    ret = os_task_join(&task_worker2);
    test_assert(200 == ret);
 
-   test_debug("Test join: passed");
    test_result(0);
    return 0;
 }
@@ -133,6 +132,7 @@ void init(void)
 
 int main(void)
 {
+   test_setupmain("Test_Join");
    os_start(init, idle);
    return 0;
 }

@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is a part of RadOs project
  * Copyright (c) 2013, Radoslaw Biernaki <radoslaw.biernacki@gmail.com>
  * All rights reserved.
@@ -37,13 +37,14 @@ typedef enum {
    TASKSTATE_READY,
    TASKSTATE_WAIT,
    TASKSTATE_DESTROYED,
-   TASKSTATE_INVALID, /* will be set after join to prevent from double join */
+   TASKSTATE_INVALID /* used after join() to prevent from double join */
 } os_taskstate_t;
 
 typedef enum {
    OS_TASKBLOCK_INVALID = 0,
    OS_TASKBLOCK_SEM,
-   OS_TASKBLOCK_MTX
+   OS_TASKBLOCK_MTX,
+   OS_TASKBLOCK_WAITQUEUE
 } os_taskblock_t;
 
 typedef enum {
@@ -51,30 +52,30 @@ typedef enum {
    OS_WOULDBLOCK,
    OS_TIMEOUT,
    OS_DESTROYED,
-
    OS_INVALID
 } os_retcode_t;
 
-struct os_sem_tag; /* forward declaration */
 struct os_taskqueue_tag; /* forward declaration */
+struct os_sem_tag; /* forward declaration */
+struct os_waitqueue_t /* forward declaration */
 
 typedef struct {
   /** need to be the first field, because then it is easier to save the context,
    * for more info about the context store see arch_context_t */
-  arch_context_t ctx; 
+  arch_context_t ctx;
 
   /** list link, allows to place the task on various lists */
-  list_t list; 
+  list_t list;
 
   /** the base priority, constant for all task life cycle, decided to
    * use fast8 type since we ned at least uint8 while we dont whant to have some
    * additional penelty because of alligment issues, form other side it is nt
    * realy connection to fast operations on priorities */
-  uint_fast8_t prio_base; 
+  uint_fast8_t prio_base;
 
   /** current priority of the task, it may be boosted or lowered, for instace by
    * priority inversion code */
-  uint_fast8_t prio_current; 
+  uint_fast8_t prio_current;
 
   /** state of task */
   os_taskstate_t state;
@@ -86,27 +87,37 @@ typedef struct {
     /** taskqueue to which the task belongs, this pointer is required if durring
      * task enqueue/dequeue we have to modify the taskqueue object (this is the
      * case for current taskqueue algorithm) */
-    struct os_taskqueue_tag *task_queue; 
+    struct os_taskqueue_tag *task_queue;
 
     /** pointer to object which blocks the task *, valid only when task state ==
      * TASKSTATE_WAIT */
-    //void *block_obj; 
+    //void *block_obj;
 
-    /** defines on which object the task is blocked, valid only when 
+    /** defines on which object the task is blocked, valid only when
      * task state == TASKSTATE_WAIT */
-    os_taskblock_t block_type; 
+    os_taskblock_t block_type;
 
-    /** assosiated pointer while waiting with timeout guard
-     * valid only if task state = TASKSTATE_WAIT */
+    /** assosiated pointer while waiting with timeout guard valid only if task
+     * state = TASKSTATE_WAIT */
     os_timer_t *timer;
-  }; 
+
+   /* This is pointer to wait_queue if task is assosiated with it
+    * (os_waitqueue_prepare()
+    * In case of preemption, scheduler instead of puting such task into
+    * ready_queue, it will put it into task_queue of assosiated wait_queue. It
+    * means that such tasks eaither are in TASKSTATE_ACTIVE while running and
+    * checking the condition assosiated with wait_queue, or are in
+    * TASKSTATE_WAIT and are placed in task_queue of proper wait_queue. The
+    * assosiated code is inside os_task_makeready() */
+    struct os_wait_queue_tag* wait_queue;
+  };
 
   /** list of owned mutexes, this list is requred to calculate new prio_current
    * durring mutex unlock (while we drop priority), extensive explanation in
    * os_mtx_unlock, keep in mind that this list has nothing in common with block
    * state of the task, this list may be either empty of ocupied both during
    * state READY and WAIT, it just means that task locked some mutexes */
-  list_t mtx_list; 
+  list_t mtx_list;
 
   /** pointer to semaphore provided by task whih would like to be suspended
    * until this task will finish, solving the os_task_join by using pointer to
@@ -116,7 +127,7 @@ typedef struct {
    * sack of task which will wait on this task finalization (we dont vaste
    * memory for keepin semaphore structure here since it is needed only during
    * finalization) */
-  struct os_sem_tag *join_sem; 
+  struct os_sem_tag *join_sem;
 
   union {
     /** value which can be returned by task before it will be destroyed */
@@ -124,7 +135,7 @@ typedef struct {
 
     /** return code returned from blocking function, used to comunicate betwen
      * owner and thread that wake it up */
-    os_retcode_t block_code; 
+    os_retcode_t block_code;
   };
 
 #ifdef OS_CONFIG_CHECKSTACK
@@ -138,7 +149,7 @@ typedef struct os_taskqueue_tag {
    * those list task with the same prrity are placed, note for priority
    * bootsing: in case of prioinversion we assign the prio_curr to level of the
    * blocked task (not + 1), so we never exceed the OS_CONFIG_PRIOCNT limit */
-  list_t tasks[OS_CONFIG_PRIOCNT]; 
+  list_t tasks[OS_CONFIG_PRIOCNT];
 
   /** priority of most important task in the waitqueue, using of this should
    * increase throughput since we dont have to search the most important queue
@@ -146,7 +157,7 @@ typedef struct os_taskqueue_tag {
    * while we dont whant to have some additional penelty because of alligment
    * issues, form other side it is nt realy connection to fast operations on
    * priorities */
-  uint_fast8_t priomax; 
+  uint_fast8_t priomax;
 } os_taskqueue_t;
 
 typedef void (*os_initproc_t)(void);

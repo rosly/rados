@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is a part of RadOs project
  * Copyright (c) 2013, Radoslaw Biernaki <radoslaw.biernacki@gmail.com>
  * All rights reserved.
@@ -36,11 +36,18 @@
 #define OS_SEMTIMEOUT_TRY 0
 
 typedef struct os_sem_tag {
-   os_taskqueue_t wait_queue; /* Queue of threads suspended on this semaphore */
-   os_atomic_t value; /* Semaphore value (initialiy it was uint_fast8_t but os_atomic_t is the only sfe type here, becouse semaphores can be incremented from ISR) */
+   /* Queue of threads suspended on this semaphore */
+   os_taskqueue_t task_queue;
+
+   /* Semaphore value (initialiy it was uint_fast8_t but os_atomic_t is the only
+    * sfe type here, becouse semaphores can be incremented from ISR) */
+   os_atomic_t value;
 } os_sem_t;
 
 void os_sem_create(os_sem_t* sem, os_atomic_t init_cnt);
+/** \NOTE calling this function for semaphores which are also used in ISR is
+ *        highly forbiden since it will crash your kernel (ISR will access to
+ *        data which will be destroyed) */
 void os_sem_destroy(os_sem_t* sem);
 os_retcode_t OS_WARN_UNUSEDRET os_sem_down(os_sem_t* sem, uint_fast16_t timeout_ticks);
 void os_sem_up(os_sem_t* sem);

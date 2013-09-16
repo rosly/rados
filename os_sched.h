@@ -57,7 +57,7 @@ typedef enum {
 
 struct os_taskqueue_tag; /* forward declaration */
 struct os_sem_tag; /* forward declaration */
-struct os_waitqueue_t /* forward declaration */
+struct os_waitqueue_tag; /* forward declaration */
 
 typedef struct {
   /** need to be the first field, because then it is easier to save the context,
@@ -109,7 +109,7 @@ typedef struct {
     * checking the condition assosiated with wait_queue, or are in
     * TASKSTATE_WAIT and are placed in task_queue of proper wait_queue. The
     * assosiated code is inside os_task_makeready() */
-    struct os_wait_queue_tag* wait_queue;
+    struct os_waitqueue_tag *wait_queue;
   };
 
   /** list of owned mutexes, this list is requred to calculate new prio_current

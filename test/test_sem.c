@@ -39,14 +39,20 @@
 #include <os.h>
 #include <os_test.h>
 
-#define TEST_TASKS ((size_t)10)
+#define min(_x, _y) ({ \
+   typeof(_x) _min1 = (_x); \
+   typeof(_y) _min2 = (_y); \
+   (void) (&_min1 == &_min2); \
+   _min1 < _min2 ? _min1 : _min2; })
+
+#define TEST_TASKS ((unsigned)10)
 #define TEST_CYCLES ((os_atomic_t)1000)
 
 typedef struct {
    os_task_t task;
    os_sem_t sem;
    long int task1_stack[OS_STACK_MINSIZE];
-   size_t idx;
+   unsigned idx;
    bool result;
 } task_data_t;
 
@@ -59,7 +65,6 @@ void idle(void)
    /* nothing to do */
 }
 
-#if 0
 /**
  * test procedure for os_sem_down with timeout
  */
@@ -81,7 +86,6 @@ int task_proc(void* param)
 
    return 0;
 }
-#endif
 
 /**
  * test procedure for test1 task1
@@ -112,12 +116,42 @@ int test1_task_proc2(void* OS_UNUSED(param))
    return 0;
 }
 
-/**
- * The main task for tests manage
- */
-int task_main_proc(void* OS_UNUSED(param))
+int testcase_1(void)
 {
-   /* regresion test - two tasks hanged on semaphore, higher prioritized with timeout, onc timeout expire signalize the semaphore to wake up the low prioritized, in case of bug low priority task will be not woken up becouse issing priomax update in task_queue */
+   int ret;
+   unsigned i;
+
+   /* clear out memory */
+   memset(worker_tasks, 0, sizeof(worker_tasks));
+
+   /* create tasks */
+   for(i = 0; i < TEST_TASKS; i++) {
+      worker_tasks[i].idx = i + 1;
+      os_sem_create(&(worker_tasks[i].sem), 0);
+      os_task_create(
+         &(worker_tasks[i].task), min(i + 1, OS_CONFIG_PRIOCNT - 1),
+         worker_tasks[i].task1_stack, sizeof(worker_tasks[i].task1_stack),
+         task_proc, &(worker_tasks[i]));
+   }
+
+   /* join tasks and collect the results */
+   ret = 0;
+   for(i = 0; i < TEST_TASKS; i++) {
+      ret = os_task_join(&(worker_tasks[i].task));
+      test_assert(0 == ret);
+      ret = worker_tasks[i].result ? 0 : 1;
+      test_assert(0 == ret);
+   }
+
+   return ret;
+}
+
+int testcase_regresion(void)
+{
+   /* regresion test - two tasks hanged on semaphore, higher prioritized with
+    * timeout, once timeout expire signalize the semaphore to wake up the low
+    * prioritized, in case of bug low priority task will be not woken up becouse
+    * issing priomax update in task_queue */
    os_sem_create(&(worker_tasks[0].sem), 0);
    os_task_create(
       &(worker_tasks[0].task), 1,
@@ -131,18 +165,33 @@ int task_main_proc(void* OS_UNUSED(param))
    os_task_join(&(worker_tasks[0].task));
    os_task_join(&(worker_tasks[1].task));
 
-#if 0
-   for(i = 0; i < TEST_TASKS; i++) {
-      worker_tasks[i].idx = i + 1;
-      os_sem_create(&(worker_tasks[i].sem), 0);
-      os_task_create(
-         &(worker_tasks[i].task), os_min(i + 1, OS_CONFIG_PRIOMAX - 1),
-         worker_tasks[i].task1_stack, sizeof(worker_tasks[i].task1_stack),
-         task_proc, &(worker_tasks[i]));
-   }
-#endif
+   return 0;
+}
 
-   test_result(0);
+/**
+ * The main task for tests manage
+ */
+int task_main_proc(void* OS_UNUSED(param))
+{
+   int ret;
+
+   do
+   {
+      ret = testcase_1();
+      if(ret) {
+         test_debug("Testcase 1 failure");
+         break;
+      }
+
+      ret = testcase_regresion();
+      if(ret) {
+         test_debug("Testcase regresion failure");
+         break;
+      }
+
+   } while(0);
+
+   test_result(ret);
    return 0;
 }
 

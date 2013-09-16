@@ -39,6 +39,7 @@
 #include "os_sched.h"
 #include "os_sem.h"
 #include "os_mtx.h"
+#include "os_waitqueue.h"
 
 extern os_task_t *task_current; /* need to be visiable for user because of arch_contextstore_i macros */
 extern volatile os_atomic_t isr_nesting; /* need to be visiable for user because of arch_contextstore_i macros */

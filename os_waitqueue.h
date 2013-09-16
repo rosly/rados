@@ -32,7 +32,7 @@
 #ifndef __OS_WAITQUEUE_
 #define __OS_WAITQUEUE_
 
-typedef struct {
+typedef struct os_waitqueue_tag {
    /* task_queue for threads which are blocked or prepared to block on this wait
     * queue. This is typical task queue (no magic) it means that tasks in that
     * queue are in typical TASKSTATE_WAIT. For explanation how task_current is
@@ -42,14 +42,14 @@ typedef struct {
 
 } os_waitqueue_t;
 
-void os_waitqueue_create(os_waitqueue_t *queue);
+void os_waitqueue_create(os_waitqueue_t* queue);
 /** \NOTE calling this function for semaphores which are also used in ISR is
  *        highly forbiden since it will crash your kernel (ISR will access to
  *        data which will be destroyed) */
-void os_waitqueue_destroy(os_waitqueue_t *queue);
-void os_waitqueue_prepare(os_waitqueue_t *queue);
-os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_sleep(os_waitqueue_t *queue);
-void os_waitqueue_wakeup(os_waitqueue_t *queue, uint8_fast_t nbr);
+void os_waitqueue_destroy(os_waitqueue_t* queue);
+void os_waitqueue_prepare(os_waitqueue_t* queue, uint_fast16_t timeout_ticks);
+os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(void);
+void os_waitqueue_wakeup(os_waitqueue_t *queue, uint_fast8_t nbr);
 
 #endif
 

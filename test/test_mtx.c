@@ -45,7 +45,7 @@
    const typeof( ((_type *)0)->_member ) *_mptr = (_ptr); \
    (_type *)( (char *)_mptr - offsetof(_type,_member) );})
 
-#define TEST_LOOPS ((size_t)1000)
+#define TEST_LOOPS ((unsigned)1000)
 
 static os_task_t task_worker[4];
 static long int task_stack[4][OS_STACK_MINSIZE];
@@ -68,7 +68,7 @@ void idle(void)
 int test_scen1_worker(void* param)
 {
    int ret;
-   size_t i;
+   unsigned i;
    long task_idx = (long)param;
 
    for(i = 0; i < TEST_LOOPS; i++) {
@@ -283,7 +283,7 @@ int test_scen3_workerD(void* OS_UNUSED(param))
  */
 int test_coordinator(void* OS_UNUSED(param))
 {
-   size_t i;
+   unsigned i;
 
 /* scenario 1 */
    os_mtx_create(&test_mtx[0]);
@@ -295,7 +295,7 @@ int test_coordinator(void* OS_UNUSED(param))
       os_task_create(
          &task_worker[i], 1,
          task_stack[i], sizeof(task_stack[i]),
-         test_scen1_worker, (void*)i);
+         test_scen1_worker, (void*)(long)i);
    }
    /* we allow for worker schduling on first os_task_join call */
    for(i = 0; i < 4; i++)
@@ -314,7 +314,7 @@ int test_coordinator(void* OS_UNUSED(param))
       os_task_create(
          &task_worker[i], 3 - i,
          task_stack[i], sizeof(task_stack[i]),
-         scen2_worker_proc[i], (void*)i);
+         scen2_worker_proc[i], (void*)(long)i);
    }
    /* we allow for worker schduling on first os_task_join call */
    for(i = 0; i < 3; i++)
@@ -335,7 +335,7 @@ int test_coordinator(void* OS_UNUSED(param))
       os_task_create(
          &task_worker[i], (0 == i) ? 2 : 1,
          task_stack[i], sizeof(task_stack[i]),
-         scen3_worker_proc[i], (void*)i);
+         scen3_worker_proc[i], (void*)(long)i);
    }
    /* we allow for worker schduling on first os_task_join call */
    for(i = 0; i < 4; i++)

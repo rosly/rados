@@ -34,7 +34,7 @@
 /* private function forward declarations */
 static void os_waitqueue_timerclbck(void* param);
 
-void os_waitqueue_create(os_waitqueue_t* queue))
+void os_waitqueue_create(os_waitqueue_t* queue)
 {
    memset(queue, 0, sizeof(os_waitqueue_t));
    os_taskqueue_init(&(queue->task_queue));
@@ -62,9 +62,7 @@ void os_waitqueue_destroy(os_waitqueue_t* queue)
 
 void os_waitqueue_prepare(os_waitqueue_t* queue, uint_fast16_t timeout_ticks)
 {
-   os_retcode_t ret;
    os_timer_t timer;
-   os_task_t *task;
    arch_criticalstate_t cristate;
 
    OS_ASSERT(0 == isr_nesting); /* this function may be called only form user code */
@@ -100,8 +98,6 @@ void os_waitqueue_prepare(os_waitqueue_t* queue, uint_fast16_t timeout_ticks)
 
    }while(0);
    arch_critical_exit(cristate);
-
-   return ret;
 }
 
 os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(void)
@@ -157,7 +153,7 @@ os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(void)
 }
 
 /* this function can be called from ISR (one of the basic functionality of wait_queue) */
-void os_waitqueue_wakeup(os_waitqueue_t *queue, uint8_fast_t nbr);
+void os_waitqueue_wakeup(os_waitqueue_t *queue, uint_fast8_t nbr)
 {
    arch_criticalstate_t cristate;
    os_task_t *task;
@@ -216,6 +212,7 @@ void os_waitqueue_wakeup(os_waitqueue_t *queue, uint8_fast_t nbr);
              * priority) */
             os_schedule(1);
          }
+      }
    }
    arch_critical_exit(cristate);
 }

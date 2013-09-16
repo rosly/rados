@@ -33,7 +33,9 @@
  * /file Test os OS port (step 1)
  * /ingroup tests
  *
- * Test if task_proc is called and if it can block on semaphore, test if idle procedure will be called (because of task block)
+ * This is first basic test to check the port.
+ * Test if task_proc is called and if it can block on semaphore, test if idle
+ * procedure will be called (because of task block)
  * Test in following services are implemented corecly:
  * - task (stack and context) initalization is pefromed corectly
  * - arch_context_switch implemented corectly (at least called 2 times init_idle->task1->idle)
@@ -46,18 +48,18 @@
 static os_task_t task1;
 static long int task1_stack[OS_STACK_MINSIZE];
 static os_sem_t sem1;
-static int task1_run = 0;
+static int task1_started = 0;
 
 void idle(void)
 {
-   test_result(task1_run ? 0 : -1);
+   test_result(task1_started ? 0 : -1);
 }
 
 int task1_proc(void* OS_UNUSED(param))
 {
    int ret;
 
-   task1_run = 1;
+   task1_started = 1;
 
    ret = os_sem_down(&sem1, OS_SEMTIMEOUT_INFINITE);
    test_debug("fail: od_sem_down returned with code %d", ret);

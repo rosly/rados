@@ -33,9 +33,18 @@
  * /file Test os OS port (step 3)
  * /ingroup tests
  *
- * Two task with endles loop, add timer ISR and call os_tick inside, task should switch during timer ISR
- * Test in following services are implemented corecly:
+ * This is third of basic test to check the port.
+ * Test checks it preemption is working by starting two CPU intensive tasks
+ * which don't call any of OS functions.  In backgroung tick procedure should
+ * kick the preemption and switch betwen tasks. If test_setuptick() is
+ * implemented corectly to call os_tick(), tasks should  be forced to give up
+ * the CPU to the other task. When both task will finish, idle task should be
+ * scheduled() and check the results.
+ *
+ * Test in following services are
+ * implemented corecly:
  * - test is arch_context_switch fully working (from preemptive point of view) (will be called at each os_tick)
+ * - preemption and test_setupmain()
  * /{
  */
 
@@ -61,7 +70,7 @@ void idle(void)
 
 int task_proc(void* param)
 {
-   size_t idx = (size_t)param;
+   unsigned idx = (unsigned)(long)param;
 
    while((counter[idx]) < TEST_CYCLES) {
       (counter[idx])++;

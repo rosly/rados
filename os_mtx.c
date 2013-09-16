@@ -149,9 +149,7 @@ os_retcode_t OS_WARN_UNUSEDRET os_mtx_lock(os_mtx_t* mtx)
          }
       }
 
-      os_task_makewait(&(mtx->task_queue), OS_TASKBLOCK_MTX, TASKSTATE_WAIT);
-
-
+      os_task_makewait(&(mtx->task_queue), OS_TASKBLOCK_MTX);
 
       /* chose some task with READY state to which we can switch */
       task = os_task_dequeue(&ready_queue);

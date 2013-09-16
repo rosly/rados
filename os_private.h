@@ -155,8 +155,8 @@ static inline void os_task_makeready(os_task_t *task)
    task->state = TASKSTATE_READY; /* set the task state */
    if(NULL != task->wait_queue) {
        /* in case task has assosiated wait_queue, add task to task_queue of
-        * wait_queue */
-      os_task_enqueue(task->wait_queue, task);
+        * wait_queue assigned to this task */
+      os_task_enqueue(&(task->wait_queue->task_queue), task);
    } else {
       /* otherwise put it into ready_queue */
       os_task_enqueue(&ready_queue, task);

@@ -43,6 +43,7 @@ SOURCES = \
 	os_sched.c \
 	os_sem.c \
 	os_mtx.c \
+	os_waitqueue.c \
 	os_timer.c \
 	$(ARCHSOURCES)
 

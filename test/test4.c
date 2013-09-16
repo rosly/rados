@@ -33,11 +33,12 @@
  * /file Test os OS port (step 4)
  * /ingroup tests
  *
- * Two tasks and two semaphores, tasks should block on sem, the semaphores
- * should be signalized by timer ISR, by driving the timer freq all tree types
- * of switching may be tested, intresting case is when timer is generated eah
- * CPU cycle (can be used to test the critical sections)
-
+ * This is forth of basic test to check the port.
+ * Two tasks and two semaphores. Both tasks will block on semaphores. The
+ * semaphores should be signalized by timer ISR, by driving the timer freq all
+ * tree types of switching may be tested, intresting case is when timer is
+ * generated eah CPU cycle (can be used to test the critical sections)
+ *
  * Test if following services are implemented corecly:
  * - test is arch_context_switch fully working (from preemptive point of view)
  * (will be called at each os_tick)

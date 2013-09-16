@@ -260,7 +260,7 @@ os_task_t* OS_HOT os_task_peekqueue(os_taskqueue_t* restrict task_queue)
 
 void os_taskqueue_init(os_taskqueue_t *task_queue)
 {
-   size_t i;
+   unsigned i;
 
    for(i = 0; i < os_element_cnt(task_queue->tasks); i++) {
       list_init(&(task_queue->tasks[i]));

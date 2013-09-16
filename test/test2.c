@@ -33,12 +33,15 @@
  * /file Test os OS port (step 2)
  * /ingroup tests
  *
- * Create two tasks and two semaphores and test if task can be switched betwen each other while blocking on sem and signalizing the oposite, this will test if context swithichg is working in other scenarios.
- * Also test some minor features like task param, task return value, and task finalization.
- * Test in following services are implemented corecly:
+ * This is second of basic test to check the port.
+ * This test verify arch_context_switch() implementation and checks if task can
+ * be switched betwen two task while blocking on sem and signalizing the
+ * oposite, Also test some minor features like task param, task return value,
+ * and task finalization.
+ * Test if following services are implemented corecly:
  * - arch_context_switch implemented corectly (will be called at each task blocking call)
- * - arch_task_init implemented correcly(at least param passing and calling os_task_test_result at the end of task lifetime)
- * /{
+ * - arch_task_init implemented correcly(at least param passing and calling
+ *   os_task_test_result at the end of task lifetime) /{
  */
 
 #include "os.h"

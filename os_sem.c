@@ -96,7 +96,7 @@ os_retcode_t OS_WARN_UNUSEDRET os_sem_down(os_sem_t* sem, uint_fast16_t timeout_
          task_current->timer = &timer;
       }
 
-      os_task_makewait(&(sem->task_queue), OS_TASKBLOCK_SEM, TASKSTATE_WAIT);
+      os_task_makewait(&(sem->task_queue), OS_TASKBLOCK_SEM);
 
       /* chose some task with READY state to which we can switch */
       task = os_task_dequeue(&ready_queue);

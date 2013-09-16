@@ -46,19 +46,22 @@
    _min1 < _min2 ? _min1 : _min2; })
 
 #define TEST_TASKS ((unsigned)10)
-#define TEST_CYCLES ((os_atomic_t)1000)
 
 typedef struct {
    os_task_t task;
-   os_sem_t sem;
    long int task1_stack[OS_STACK_MINSIZE];
    unsigned idx;
-   bool result;
+   os_waitqueue_t wait_queue;
+   volatile int a;
+   volatile int b;
+   volatile int c;
+   volatile int d;
 } task_data_t;
 
 static os_task_t task_main;
 static long int task_main_stack[OS_STACK_MINSIZE];
 static task_data_t worker_tasks[TEST_TASKS];
+static os_waitqueue_t global_wait_queue;
 
 void idle(void)
 {
@@ -66,56 +69,40 @@ void idle(void)
 }
 
 /**
- * test procedure for os_sem_down with timeout
+ * Simple test procedure for typicall waitloop usage.
  */
-int task_proc(void* param)
+int test1_task_proc(void* param)
 {
    int ret;
    task_data_t *data = (task_data_t*)param;
 
-   data->result = false; /* reseting the test result */
+  /* we have two loops
+   * internal one simulates waiting for external event and on that loop we focus
+   * external one is used only for making multiple test until we decide that
+   * thread should be joined, therefore os_waitqueue_prepare() is inside the
+   * outern loop */
 
-   /* checking if sem have 0 */
-   ret = os_sem_down(&(data->sem), OS_TIMEOUT_TRY);
-   test_assert(OS_WOULDBLOCK == ret);
-   /* sleeping for task assigned time */
-   ret = os_sem_down(&(data->sem), data->idx);
-   test_assert(OS_TIMEOUT == ret);
-
-   data->result = true;
-
-   return 0;
-}
-
-/**
- * test procedure for test1 task1
- */
-int test1_task_proc1(void* OS_UNUSED(param))
-{
-   int ret;
-
-   ret = os_sem_down(&(worker_tasks[0].sem), OS_TIMEOUT_INFINITE);
-   test_assert(0 == ret);
+   while(0 == data->a) {
+      data->b = 0;
+      os_waitqueue_prepare(&(data->wait_queue), OS_TIMEOUT_INFINITE);
+      while(0 == data->b) {
+         /* signalize that we performed condition test */
+         (data->c)++;
+         /* go to sleep */
+         ret = os_waitqueue_wait();
+         test_assert(0 == ret);
+      }
+      (data->d)++;
+   }
 
    return 0;
 }
 
 /**
- * test procedure for test1 task2
+ * Simple test case, when multiple tasks is waiting for the same waitqueue but
+ * they have different success conditions. Simulation fo rthe same success
+ * condition may be done by setting success for more thatn one task
  */
-int test1_task_proc2(void* OS_UNUSED(param))
-{
-   int ret;
-
-   /* wait until timeout - (if still exist the bug will not update the priomax while wakup by timeout) */
-   ret = os_sem_down(&(worker_tasks[0].sem), 10);
-   test_assert(OS_TIMEOUT == ret);
-   /* signalize the same sem to wake up the task1 */
-   os_sem_up(&(worker_tasks[0].sem));
-
-   return 0;
-}
-
 int testcase_1(void)
 {
    int ret;
@@ -124,14 +111,32 @@ int testcase_1(void)
    /* clear out memory */
    memset(worker_tasks, 0, sizeof(worker_tasks));
 
-   /* create tasks */
+   /* initialize variables */
+   os_waitqueue_create(&global_wait_queue);
    for(i = 0; i < TEST_TASKS; i++) {
       worker_tasks[i].idx = i + 1;
-      os_sem_create(&(worker_tasks[i].sem), 0);
+   }
+
+   /* create tasks and perform tests */
+   for(i = 0; i < TEST_TASKS; i++) {
+      worker_tasks[i].idx = i + 1;
       os_task_create(
          &(worker_tasks[i].task), min(i + 1, OS_CONFIG_PRIOCNT - 1),
          worker_tasks[i].task1_stack, sizeof(worker_tasks[i].task1_stack),
-         task_proc, &(worker_tasks[i]));
+         test1_task_proc, &(worker_tasks[i]));
+   }
+
+   /* we thread this (main) thread as IRQ and HW
+    * so we will perform all actions here in busy loop to simulate the
+    * uncontroled enviroment. Since this thread has highest priority only
+    * preemption is able to force this task to sleep */
+   /* wait until all threads will be prepared for sleep */
+   for(i = 0; i < TEST_TASKS; i++) {
+      if(0 == worker_tasks[i].c) {
+         i = -1; /* start check loop from begining */
+      } else {
+         test_debug("Thread %u marked", i);
+      }
    }
 
    /* join tasks and collect the results */
@@ -139,31 +144,10 @@ int testcase_1(void)
    for(i = 0; i < TEST_TASKS; i++) {
       ret = os_task_join(&(worker_tasks[i].task));
       test_assert(0 == ret);
-      ret = worker_tasks[i].result ? 0 : 1;
-      test_assert(0 == ret);
    }
-
-   return ret;
-}
-
-int testcase_regresion(void)
-{
-   /* regresion test - two tasks hanged on semaphore, higher prioritized with
-    * timeout, once timeout expire signalize the semaphore to wake up the low
-    * prioritized, in case of bug low priority task will be not woken up becouse
-    * issing priomax update in task_queue */
-   os_sem_create(&(worker_tasks[0].sem), 0);
-   os_task_create(
-      &(worker_tasks[0].task), 1,
-      worker_tasks[0].task1_stack, sizeof(worker_tasks[0].task1_stack),
-      test1_task_proc1, NULL);
-   os_task_create(
-      &(worker_tasks[1].task), 2,
-      worker_tasks[1].task1_stack, sizeof(worker_tasks[1].task1_stack),
-      test1_task_proc2, NULL);
-   /* finish the test */
-   os_task_join(&(worker_tasks[0].task));
-   os_task_join(&(worker_tasks[1].task));
+   
+   /* destroy the waitqueue */
+   os_waitqueue_destroy(&global_wait_queue);
 
    return 0;
 }
@@ -182,13 +166,6 @@ int task_main_proc(void* OS_UNUSED(param))
          test_debug("Testcase 1 failure");
          break;
       }
-
-      ret = testcase_regresion();
-      if(ret) {
-         test_debug("Testcase regresion failure");
-         break;
-      }
-
    } while(0);
 
    test_result(ret);
@@ -207,7 +184,7 @@ void init(void)
 
 int main(void)
 {
-   test_setupmain("Test_Sem");
+   test_setupmain("Test_Waitqueue");
    os_start(init, idle);
    return 0;
 }

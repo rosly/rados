@@ -32,8 +32,8 @@
 #ifndef __OS_SEM_
 #define __OS_SEM_
 
-#define OS_SEMTIMEOUT_INFINITE UINT_MAX
-#define OS_SEMTIMEOUT_TRY 0
+#define OS_TIMEOUT_INFINITE (UINT16_MAX)
+#define OS_TIMEOUT_TRY ((uint_fast16_t)0)
 
 typedef struct os_sem_tag {
    /* Queue of threads suspended on this semaphore */

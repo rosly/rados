@@ -149,7 +149,7 @@ int os_task_join(os_task_t *task)
        * we will wait for it by blocking on semaphore */
       os_sem_create(&join_sem, 0);
       task->join_sem = &join_sem;
-      ret = os_sem_down(&join_sem, OS_SEMTIMEOUT_INFINITE);
+      ret = os_sem_down(&join_sem, OS_TIMEOUT_INFINITE);
       OS_ASSERT(OS_OK == ret);
       os_sem_destroy(&join_sem);
    }

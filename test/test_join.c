@@ -80,7 +80,7 @@ int task_proc_worker2(void* OS_UNUSED( param))
 {
    int ret;
 
-   ret = os_sem_down(&sem, OS_SEMTIMEOUT_INFINITE);
+   ret = os_sem_down(&sem, OS_TIMEOUT_INFINITE);
    test_assert(0 == ret);
    return 200;
 }

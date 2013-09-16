@@ -50,6 +50,7 @@ TESTSOURCE += \
 	test_join.c \
 	test_sem.c \
 	test_mtx.c \
+	test_waitqueue.c \
 	test_timer.c
 endif
 

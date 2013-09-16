@@ -87,7 +87,7 @@ int task_proc(void* param)
    while(data->idx < TEST_CYCLES)
    {
       (data->idx)++;
-      ret = os_sem_down(&(data->sem), OS_SEMTIMEOUT_INFINITE);
+      ret = os_sem_down(&(data->sem), OS_TIMEOUT_INFINITE);
       test_assert(0 == ret);
    }
 

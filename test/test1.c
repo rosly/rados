@@ -61,7 +61,7 @@ int task1_proc(void* OS_UNUSED(param))
 
    task1_started = 1;
 
-   ret = os_sem_down(&sem1, OS_SEMTIMEOUT_INFINITE);
+   ret = os_sem_down(&sem1, OS_TIMEOUT_INFINITE);
    test_debug("fail: od_sem_down returned with code %d", ret);
    test_result(-1);
 

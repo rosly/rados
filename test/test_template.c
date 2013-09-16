@@ -78,7 +78,7 @@ int task1_proc(void* param)
    {
       task1_i++;
       //os_sem_up(&sem2);
-      ret = os_sem_down(&sem1, OS_SEMTIMEOUT_INFINITE);
+      ret = os_sem_down(&sem1, OS_TIMEOUT_INFINITE);
       test_assert(OS_OK == ret);
    }
 }
@@ -92,7 +92,7 @@ int task2_proc(void* param)
    {
       task2_i++;
       //os_sem_up(&sem1);
-      ret = os_sem_down(&sem2, OS_SEMTIMEOUT_INFINITE);
+      ret = os_sem_down(&sem2, OS_TIMEOUT_INFINITE);
       test_assert(OS_OK == ret);
 
       if( 0 == (task2_i % 100) )

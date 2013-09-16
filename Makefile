@@ -50,7 +50,7 @@ SOURCES = \
 INCLUDES = . $(ARCH)
 BUILDDIR = build/$(ARCH)
 
-#in target.mk for each source the optima optimization level (CFLAGS = -Ox) is defined
+#in target.mk for each source the optimal optimization level (CFLAGS = -Ox) is defined
 #but here we add CFLAGS += -g if debug build
 ifeq ($(DEBUG),)
 CFLAGS += -g

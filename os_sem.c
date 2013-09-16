@@ -86,12 +86,12 @@ os_retcode_t OS_WARN_UNUSEDRET os_sem_down(os_sem_t* sem, uint_fast16_t timeout_
          break;
       }
 
-      if( OS_SEMTIMEOUT_TRY == timeout_ticks ) {
+      if( OS_TIMEOUT_TRY == timeout_ticks ) {
          ret = OS_WOULDBLOCK;
          break;
       }
 
-       if( OS_SEMTIMEOUT_INFINITE != timeout_ticks ) {
+       if( OS_TIMEOUT_INFINITE != timeout_ticks ) {
          os_timer_create(&timer, os_sem_timerclbck, task_current, timeout_ticks, 0);
          task_current->timer = &timer;
       }

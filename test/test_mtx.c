@@ -119,7 +119,7 @@ int test_scen2_workerA(void* OS_UNUSED(param))
    int ret;
 
    /* we need to hold on the A, to allow the C to lock the mutex */
-   ret = os_sem_down(&test_sem[0], OS_SEMTIMEOUT_INFINITE);
+   ret = os_sem_down(&test_sem[0], OS_TIMEOUT_INFINITE);
    test_assert(0 == ret);
 
    /* try to lock the mtx, this should boost the prio of C */
@@ -138,7 +138,7 @@ int test_scen2_workerB(void* OS_UNUSED(param))
    int ret;
 
    /* B also has to allow C to lock the mutex, while then after it will be unblocked together with A it should not shedule until A will unlock the mtx */
-   ret = os_sem_down(&test_sem[1], OS_SEMTIMEOUT_INFINITE);
+   ret = os_sem_down(&test_sem[1], OS_TIMEOUT_INFINITE);
    test_assert(0 == ret);
 
    /* B should not be scheduled untill test procedure will end, so check the condition it this is the right time */
@@ -200,7 +200,7 @@ int test_scen3_workerA(void* OS_UNUSED(param))
    int ret;
 
    /* block on sem, allow B, C and D to progress */
-   ret = os_sem_down(&test_sem[0], OS_SEMTIMEOUT_INFINITE);
+   ret = os_sem_down(&test_sem[0], OS_TIMEOUT_INFINITE);
    test_assert(0 == ret);
 
    /* mtx[1] is allready locked by B and C, so if A will try to lock it both B and C should get boosted prio, while A will lock on following operation */
@@ -224,7 +224,7 @@ int test_scen3_workerB(void* OS_UNUSED(param))
    test_assert(0 == ret);
 
    /* wait on sem2, context will be scheduled to C */
-   ret = os_sem_down(&test_sem[1], OS_SEMTIMEOUT_INFINITE);
+   ret = os_sem_down(&test_sem[1], OS_TIMEOUT_INFINITE);
    test_assert(0 == ret);
 
    /* if we get here it means that D signalized sem[1]

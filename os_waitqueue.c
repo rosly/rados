@@ -85,7 +85,7 @@ void os_waitqueue_prepare(os_waitqueue_t* queue, uint_fast16_t timeout_ticks)
       /* create timer which will count from this moment this will create time
        * condition from preparation step while allowing multiple spins for
        * assosiated wait condition */
-      if( OS_SEMTIMEOUT_INFINITE != timeout_ticks ) {
+      if( OS_TIMEOUT_INFINITE != timeout_ticks ) {
          os_timer_create(&timer, os_waitqueue_timerclbck, task_current, timeout_ticks, 0);
          task_current->timer = &timer;
       }

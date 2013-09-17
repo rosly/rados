@@ -1,6 +1,6 @@
 /*
  * This file is a part of RadOs project
- * Copyright (c) 2013, Radoslaw Biernaki <radoslaw.biernacki@gmail.com>
+ * Copyright (c) 2013, Radoslaw Biernaki <radoslaw.spin_intcondiernacki@gmail.spin_spincntom>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -47,18 +47,19 @@
 
 #define TEST_TASKS ((unsigned)10)
 
-//#define test_verbose_debug test_debug
-#define test_verbose_debug(format, ...)
+#define test_verbose_debug test_debug
+//#define test_verbose_debug(format, ...)
 
 typedef struct {
    os_task_t task;
    long int task1_stack[OS_STACK_MINSIZE];
    unsigned idx;
    os_waitqueue_t wait_queue;
-   volatile int a;
-   volatile int b;
-   volatile int c;
-   volatile int d;
+   volatile unsigned spin_intcond;
+   volatile unsigned spin_extcond;
+   volatile unsigned spin_spincnt;
+   volatile unsigned spin_condmeetcnt;
+   volatile unsigned spin_intcond_reload;
    uint_fast16_t timeout;
    os_retcode_t retcode;
 } task_data_t;
@@ -92,16 +93,22 @@ int slavetask_proc(void* param)
 
    test_verbose_debug("Task %u started", data->idx);
 
-   while(0 == data->a) {
-      data->b = 0;
+   while(0 == data->spin_extcond) {
+      if(data->spin_intcond_reload > 0) {
+         --(data->spin_intcond_reload);
+         data->spin_intcond = 1;
+      } else {
+         data->spin_intcond = 0;
+      }
       while(1)
       {
          os_waitqueue_prepare(
            &global_wait_queue,
            (0 == data->timeout) ? OS_TIMEOUT_INFINITE : data->timeout);
          test_verbose_debug("Task %u spins ...", data->idx);
-         ++(data->c); /* signalize that we performed condition test */
-         if(0 != data->b) {
+         ++(data->spin_spincnt); /* signalize that we performed condition test */
+         if(0 != data->spin_intcond) {
+            os_waitqueue_finish();
             break;
          }
          data->retcode = os_waitqueue_wait(); /* condition not meet, go to sleep */
@@ -113,7 +120,7 @@ int slavetask_proc(void* param)
          }
       }
       test_verbose_debug("Task %u found condition meet", data->idx);
-      (data->d)++;
+      (data->spin_condmeetcnt)++;
    }
    test_verbose_debug("Task %u exiting", data->idx);
 
@@ -130,8 +137,8 @@ int testcase_1(void)
 
    /* wait until all tasks will be prepared for sleep */
    for(i = 0; i < TEST_TASKS; i++) {
-      test_verbose_debug("Spin count for task %u is %u", i, worker_tasks[i].c);
-      if(0 == worker_tasks[i].c) {
+      test_verbose_debug("Spin count for task %u is %u", i, worker_tasks[i].spin_spincnt);
+      if(0 == worker_tasks[i].spin_spincnt) {
          i = -1; /* start check loop from begining */
          /* give time for test tasks to run, we use this sem only for timeout,
           * nobody will rise this sem */
@@ -150,8 +157,8 @@ int testcase_1(void)
    test_assert(OS_TIMEOUT == retcode);
    /* verify that all tasks have spinned */
    for(i = 0; i < TEST_TASKS; i++) {
-      test_verbose_debug("Spin count for task %u is %u", i, worker_tasks[i].c);
-      test_assert(2 == worker_tasks[i].c);
+      test_verbose_debug("Spin count for task %u is %u", i, worker_tasks[i].spin_spincnt);
+      test_assert(2 == worker_tasks[i].spin_spincnt);
    }
 
    /* last time we woken up all task with OS_WAITQUEUE_ALL
@@ -163,8 +170,8 @@ int testcase_1(void)
    test_assert(OS_TIMEOUT == retcode);
    /* verify that all tasks have spinned */
    for(i = 0; i < TEST_TASKS; i++) {
-      test_verbose_debug("Spin count for task %u is %u", i, worker_tasks[i].c);
-      test_assert(3 == worker_tasks[i].c);
+      test_verbose_debug("Spin count for task %u is %u", i, worker_tasks[i].spin_spincnt);
+      test_assert(3 == worker_tasks[i].spin_spincnt);
    }
 
    return 0;
@@ -187,8 +194,8 @@ int testcase_2(void)
    test_assert(OS_TIMEOUT == retcode);
    /* verify that only task 10 spinned */
    for(i = 0; i < TEST_TASKS; i++) {
-      test_verbose_debug("Spin count for task %u is %u", i, worker_tasks[i].c);
-      test_assert((9 == i ? 4 : 3) == worker_tasks[i].c);
+      test_verbose_debug("Spin count for task %u is %u", i, worker_tasks[i].spin_spincnt);
+      test_assert((9 == i ? 4 : 3) == worker_tasks[i].spin_spincnt);
    }
 
    return 0;
@@ -217,7 +224,7 @@ int testcase_3(void)
 
    /* prepare sampling data for test */
    for(i = 0; i < TEST_TASKS; i++) {
-      worker_tasks[i].c = 0;
+      worker_tasks[i].spin_spincnt = 0;
    }
    /* now slave tasks waits on timeout condition, we dont whant that in next
     * loop after signalization they also use timeout, so we clear up the tiemout
@@ -233,16 +240,63 @@ int testcase_3(void)
       test_assert(OS_OK == retcode);
       test_verbose_debug("Main woken up global_tick_cnt = %u", global_tick_cnt);
       for(i = 0; i < TEST_TASKS; i++) {
-        test_verbose_debug("Spin count for task %u is %u", i, worker_tasks[i].c);
+        test_verbose_debug("Spin count for task %u is %u", i, worker_tasks[i].spin_spincnt);
         if(i < global_tick_cnt / 2) {
            /* this task should already timeout and spin the loop */
-           test_assert(1 == worker_tasks[i].c);
+           test_assert(1 == worker_tasks[i].spin_spincnt);
            test_assert(OS_TIMEOUT == worker_tasks[i].retcode);
         } else {
           /* this task should not timeout */
-          test_assert(0 == worker_tasks[i].c);
+          test_assert(0 == worker_tasks[i].spin_spincnt);
         }
       }
+   }
+
+
+   /* disable special threatment for this test inside tick calback */
+   test3_active = 0;
+
+   return 0;
+}
+
+/**
+ * Regresion test case
+ * I forgot to add os_waitqueue_clean API call
+ * This test is about to show that without this call we dont remove task from
+ * wait_queu in case when condition will not allow to call os_waitqueue_wait
+ */
+int testcase_4regresion(void)
+{
+   os_retcode_t retcode;
+   unsigned i;
+
+   /* WARNING task 10 is excluded from this test since it has bigger priority than other tasks
+      if it will run, it will not allow other tasks to schedule */
+
+   /* prepare data for test */
+   for(i = 0; i < TEST_TASKS - 1; i++) {
+      worker_tasks[i].spin_intcond = 1; /* all task should found condition meet without calling os_waitqueue_wait */
+      worker_tasks[i].spin_spincnt = 0;
+      worker_tasks[i].spin_intcond_reload = 10; /* reload set to 10 will cause 10 spins with cond meet in row */
+   }
+
+   /* wake up all tasks and sleep 1 tick
+    * this will cause multiple spins of external loop sine worker_tasks[i].spin_extcond is
+    * still 0 while worker_tasks[i].spin_intcond is 1 */
+   test_verbose_debug("Main allowing slaves to spin multiple times on external loop");
+   os_waitqueue_wakeup(&global_wait_queue, OS_WAITQUEUE_ALL);
+   /* give time for test tasks to run (main is most prioritized, eat all CPU */
+   retcode = os_sem_down(&global_sem, 10);
+   test_assert(OS_TIMEOUT == retcode);
+
+   /* check that all task have spinned multiple times */
+   for(i = 0; i < TEST_TASKS - 1; i++) {
+      test_assert(worker_tasks[i].spin_spincnt > 1);
+   }
+
+   /* clean up after test, stop the spinning of threads */
+   for(i = 0; i < TEST_TASKS - 1; i++) {
+      worker_tasks[i].spin_intcond_reload = 0;
    }
 
    return 0;
@@ -289,13 +343,15 @@ int mastertask_proc(void* OS_UNUSED(param))
       if(ret) break;
       ret = testcase_3();
       if(ret) break;
+      ret = testcase_4regresion();
+      if(ret) break;
    } while(0);
 
    /* join tasks and collect the results release the tasks from loop */
    test_verbose_debug("Main task joining slaves");
    for(i = 0; i < TEST_TASKS; i++) {
-      worker_tasks[i].a = 1;
-      worker_tasks[i].b = 1;
+      worker_tasks[i].spin_extcond = 1;
+      worker_tasks[i].spin_intcond = 1;
    }
    /* signalize all tasks */
    os_waitqueue_wakeup(&global_wait_queue, OS_WAITQUEUE_ALL);

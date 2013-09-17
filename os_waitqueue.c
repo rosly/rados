@@ -98,6 +98,22 @@ void os_waitqueue_prepare(os_waitqueue_t* queue, uint_fast16_t timeout_ticks)
    arch_critical_exit(cristate);
 }
 
+void os_waitqueue_finish(void)
+{
+   arch_criticalstate_t cristate;
+   
+   OS_ASSERT(0 == isr_nesting); /* this function may be called only form user code */
+
+   arch_critical_enter(cristate);
+   /* we check that task_current was assigned to some queue
+    * this helps to force user to write cleaner code since calling
+    * os_waitqueue_finish() after os_waitqueue_wait() is a waste of CPU cycles
+    * */
+   OS_ASSERT(NULL != task_current->wait_queue);
+   task_current->wait_queue = NULL;
+   arch_critical_exit(cristate);
+}
+
 os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(void)
 {
    os_retcode_t ret;

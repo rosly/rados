@@ -98,7 +98,7 @@ $(BUILDDIR)/%.d: %.c
 	@$(ECHO) "[DEP]\t$<"
 	@$(CC) -M ${CFLAGS} $(addprefix -I, $(INCLUDES)) $< >$@
 
-.PHONY: clean test testrun lst size
+.PHONY: clean test testrun testloop lst size
 
 clean:
 	@$(RM) $(BUILDTARGET); $(ECHO) "[RM]\t$(BUILDTARGETS)"
@@ -112,4 +112,7 @@ test: $(BUILDTARGET)
 
 testrun: test
 	@$(MAKE) --no-print-directory -C test testrun
+
+testloop: test
+	@$(MAKE) --no-print-directory -C test testloop
 

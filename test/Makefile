@@ -106,6 +106,9 @@ $(BUILDDIR)/%.d: %.c
 testrun: all
 	@$(addsuffix ;, $(TARGETS))
 
+testloop:
+	@while { for test in $(TARGETS); do if $$test; then true; else break 2; fi; done; }; do echo "All tests OK"; done;
+
 clean:
 	@$(RM) $(TARGETS); $(ECHO) "[RM]\t$(TARGETS)"
 	@$(RM) $(OBJECTS); $(ECHO) "[RM]\t$(OBJECTS)"

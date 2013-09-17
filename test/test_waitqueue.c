@@ -62,6 +62,7 @@ static os_task_t task_main;
 static long int task_main_stack[OS_STACK_MINSIZE];
 static task_data_t worker_tasks[TEST_TASKS];
 static os_waitqueue_t global_wait_queue;
+static os_sem_t global_sem;
 
 void idle(void)
 {
@@ -82,18 +83,25 @@ int test1_task_proc(void* param)
    * thread should be joined, therefore os_waitqueue_prepare() is inside the
    * outern loop */
 
+   test_debug("Task %u started", data->idx);
+
    while(0 == data->a) {
       data->b = 0;
-      os_waitqueue_prepare(&(data->wait_queue), OS_TIMEOUT_INFINITE);
-      while(0 == data->b) {
-         /* signalize that we performed condition test */
-         (data->c)++;
-         /* go to sleep */
-         ret = os_waitqueue_wait();
-         test_assert(0 == ret);
+      while(1)
+      {
+         os_waitqueue_prepare(&global_wait_queue, OS_TIMEOUT_INFINITE);
+         test_debug("Task %u spins ...", data->idx);
+         ++(data->c); /* signalize that we performed condition test */
+         if(0 != data->b) {
+            break;
+         }
+         ret = os_waitqueue_wait(); /* condition not meet, go to sleep */
+         test_assert(OS_OK == ret);
       }
+      test_debug("Task %u found condition meet", data->idx);
       (data->d)++;
    }
+   test_debug("Task %u exiting", data->idx);
 
    return 0;
 }
@@ -106,6 +114,7 @@ int test1_task_proc(void* param)
 int testcase_1(void)
 {
    int ret;
+   os_retcode_t retcode;
    unsigned i;
 
    /* clear out memory */
@@ -113,6 +122,7 @@ int testcase_1(void)
 
    /* initialize variables */
    os_waitqueue_create(&global_wait_queue);
+   os_sem_create(&global_sem, 0);
    for(i = 0; i < TEST_TASKS; i++) {
       worker_tasks[i].idx = i + 1;
    }
@@ -121,31 +131,72 @@ int testcase_1(void)
    for(i = 0; i < TEST_TASKS; i++) {
       worker_tasks[i].idx = i + 1;
       os_task_create(
-         &(worker_tasks[i].task), min(i + 1, OS_CONFIG_PRIOCNT - 1),
+         &(worker_tasks[i].task), 9 == i ? 2 : 1, /* task 10 will have priority 2
+                                                     all other will have priority 1 */
          worker_tasks[i].task1_stack, sizeof(worker_tasks[i].task1_stack),
          test1_task_proc, &(worker_tasks[i]));
    }
 
    /* we thread this (main) thread as IRQ and HW
     * so we will perform all actions here in busy loop to simulate the
-    * uncontroled enviroment. Since this thread has highest priority only
-    * preemption is able to force this task to sleep */
+    * uncontroled enviroment. Since this thread has highest priority even
+    * preemption is not able to force this task to sleep */
+
    /* wait until all threads will be prepared for sleep */
    for(i = 0; i < TEST_TASKS; i++) {
+      test_debug("Spin count for task %u is %u", i, worker_tasks[i].c);
       if(0 == worker_tasks[i].c) {
          i = -1; /* start check loop from begining */
-      } else {
-         test_debug("Thread %u marked", i);
+         /* give time for test threads to run, we use this sem only for timeout,
+          * nobody will rise this sem */
+         retcode = os_sem_down(&global_sem, 10); /* 10 ticks of sleep */
+         test_assert(OS_TIMEOUT == retcode);
       }
    }
 
-   /* join tasks and collect the results */
+   /* all threads had been started, they should now sleep on waitqueue and wait
+    * for signal, after signal they will spin and check the condition
+    * wake up all tasks and check if they had spinned around condition check */
+   test_debug("Main task signalizes all slaves");
+   os_waitqueue_wakeup(&global_wait_queue, TEST_TASKS);
+   /* give time for test threads to run (main is most prioritized, eat all CPU */
+   retcode = os_sem_down(&global_sem, 10); /* 10 ticks of sleep */
+   test_assert(OS_TIMEOUT == retcode);
+   /* verify that all threads have spinned */
+   for(i = 0; i < TEST_TASKS; i++) {
+      test_debug("Spin count for task %u is %u", i, worker_tasks[i].c);
+      test_assert(2 == worker_tasks[i].c);
+   }
+
+   /* task 0 has highest ptiority from slaves, it we notify only once this
+    * should be the task which will woke up */
+   test_debug("Main task signalizes single slave");
+   os_waitqueue_wakeup(&global_wait_queue, 1);
+   /* give time for test threads to run (main is most prioritized, eat all CPU */
+   retcode = os_sem_down(&global_sem, 10); /* 10 ticks of sleep */
+   test_assert(OS_TIMEOUT == retcode);
+   /* verify that only thread 10 spinned */
+   for(i = 0; i < TEST_TASKS; i++) {
+      test_debug("Spin count for task %u is %u", i, worker_tasks[i].c);
+      test_assert((9 == i ? 3 : 2) == worker_tasks[i].c);
+   }
+
+   /* \TODO check the timeout feature */
+
+   /* join tasks and collect the results release the tasks from loop */
+   test_debug("Main task joining slaves");
+   for(i = 0; i < TEST_TASKS; i++) {
+      worker_tasks[i].a = 1;
+      worker_tasks[i].b = 1;
+   }
+   /* signalize all tasks */
+   os_waitqueue_wakeup(&global_wait_queue, OS_WAITQUEUE_ALL);
    ret = 0;
    for(i = 0; i < TEST_TASKS; i++) {
       ret = os_task_join(&(worker_tasks[i].task));
       test_assert(0 == ret);
    }
-   
+
    /* destroy the waitqueue */
    os_waitqueue_destroy(&global_wait_queue);
 
@@ -172,9 +223,14 @@ int task_main_proc(void* OS_UNUSED(param))
    return 0;
 }
 
+void test_tickprint(void)
+{
+  test_debug("Tick");
+}
+
 void init(void)
 {
-   test_setuptick(NULL, 300000000);
+   test_setuptick(test_tickprint, 50000000);
 
    os_task_create(
       &task_main, OS_CONFIG_PRIOCNT - 1,

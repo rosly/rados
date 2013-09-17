@@ -64,7 +64,6 @@ os_retcode_t OS_WARN_UNUSEDRET os_sem_down(os_sem_t* sem, uint_fast16_t timeout_
 {
    os_retcode_t ret;
    os_timer_t timer;
-   os_task_t *task;
    arch_criticalstate_t cristate;
 
    OS_ASSERT(0 == isr_nesting); /* this function may be called only form user code */
@@ -80,8 +79,12 @@ os_retcode_t OS_WARN_UNUSEDRET os_sem_down(os_sem_t* sem, uint_fast16_t timeout_
    {
       if( sem->value > 0 )
       {
-         /* in case sem->value is not zero, we do not have to block, just to consume one coin from sem */
-         --(sem->value); /* /todo in future try to implement the condition and decrement as a cas operation, this will significantly increase throughput */
+         /* in case sem->value is not zero, we do not have to block, just to
+          * consume one coin from sem */
+         /* /TODO in future try to implement the "condition and decrement" as a
+          * CAS operation and move it before critical section, this will
+          * increase performance (something like os_atomic_cas() */
+         --(sem->value);
          ret = OS_OK;
          break;
       }
@@ -96,16 +99,8 @@ os_retcode_t OS_WARN_UNUSEDRET os_sem_down(os_sem_t* sem, uint_fast16_t timeout_
          task_current->timer = &timer;
       }
 
-      os_task_makewait(&(sem->task_queue), OS_TASKBLOCK_SEM);
-
-      /* chose some task with READY state to which we can switch */
-      task = os_task_dequeue(&ready_queue);
-      arch_context_switch(task);
-      /* here we switch to any READY task, we will return from
-       * arch_context_switch call at some next schedule().  After return task
-       * state is set to RUNING (before return from arch_context_switch), also
-       * iterrupts are again disabled here (even it they where enabled for
-       * execution of previous task) */
+      /* now block and change switch the context */
+      os_block_andswitch(&(sem->task_queue), OS_TASKBLOCK_SEM);
 
       if( NULL != task_current->timer ) {
          /* seems that timer didn't exipre up to now, we need to clean it */

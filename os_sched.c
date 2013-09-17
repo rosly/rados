@@ -220,7 +220,7 @@ os_task_t* OS_HOT os_task_dequeue(os_taskqueue_t* restrict task_queue)
 {
    list_t *list = list_detachfirst(&(task_queue->tasks[task_queue->priomax]));
    if( NULL == list ) {
-      return NULL; /* this may happend on mutex, semaphore wait list, but not for ready_queue */
+      return NULL;
    }
    os_task_t *task = os_container_of(list, os_task_t, list);
    os_task_queue_reprio(task_queue);
@@ -229,8 +229,8 @@ os_task_t* OS_HOT os_task_dequeue(os_taskqueue_t* restrict task_queue)
 }
 
 /**
- *  Similar to os_task_dequeue() but  dequeue only if there is a task with prio
- *  equal or greater than the prio param
+ *  Similar to os_task_dequeue() but taks is dequeued only if its prio is higher
+ *  than prio passed by param
  */
 os_task_t* OS_HOT os_task_dequeue_prio(
    os_taskqueue_t* restrict task_queue,
@@ -268,39 +268,98 @@ void os_taskqueue_init(os_taskqueue_t *task_queue)
    task_queue->priomax = 0;
 }
 
-/* This function chose the new task which will be run. THe task is chosen based on task_current priority and higher_prio param.
-   higher_prio param is added to task_current priority, and if top prioritied READY task has priority greater or equal to this value it is chosen as a new task_current.
-    - in case of user code it will switch the context to new task
-    - in case of interrupt (nesting level == 1) it will not swich the context but only change the task_current pointer (so context switch can be done at the end of ISR)
-    - in case of interrupt (nesting level > 1) do nothing at all (not even saerch for READY task), this is because only most bottom ISR at the nesting scenario can switch the tasks (otherwise we will get into trouble)
-
-    This function can not perform the task switching at all, if all of the READY tasks will be less prioritized then the task_current.
-    So if you want to unconditionally switch the task (for instance because task cannot progress any futrher (a kind of lock etc)) use the arch_context_switch instead.
-
-    /note this function can be called only from critical section */
+/**
+ * This function switches the current task to one of task from ready queue.
+ * Typicaly the most prioritized task from ready queue is chosen, but it has to
+ * have prio higher than task_current. Additionaly we can force to chose only
+ * task with higher priority than task_curent by usin of \param higher_prio
+ * param.
+ *
+ *  Function works in following schema
+ *   - chose task from ready_queue, pick only task with priority equal to
+ *     task_current or higher (depending on higher_prio param)
+ *   - in case of user code it will switch the context to new task
+ *   - in case of interrupt (nesting level == 1) it will not swich the context
+ *     but only change the task_current pointer (so context switch can be done at
+ *     the end of ISR)
+ *   - in case of interrupt (nesting level > 1) do nothing at all (not even
+ *     saerch for READY task), this is because only most bottom ISR at the nesting
+ *     scenario can switch the tasks (otherwise we will get into trouble)
+ *
+ *  This function can not perform the task switching at all, if all of the READY
+ *  tasks will be less prioritized then the task_current.  So if you want to
+ *  unconditionally switch the task use the os_switch() instead. This can be
+ *  required if you cannot continiue with execution of current task, for
+ *  instance after kind of block (look at os_sem.c code)
+ *
+ *  /note this function can be called only from critical section
+ */
 void OS_HOT os_schedule(uint_fast8_t higher_prio)
 {
    os_task_t *new_task;
 
-   /* check the nesting level or if scheduler is locked */
-   if( OS_LIKELY((isr_nesting <= 1) && (0 == sched_lock)) ) /* either in case of os_tick and user called os function we expect that the thread will be switched, (verify this assumtion by getting the profile) */
+   /* Check the nesting level or if scheduler is locked.
+    * We dont whant to switch the task if we are in nested ISR and in case we
+    * explicitly locked the scheduler from some reason  */
+   if( OS_LIKELY((isr_nesting <= 1) && (0 == sched_lock)) )
    {
-      new_task = os_task_dequeue_prio(&ready_queue, task_current->prio_current + higher_prio); /* if higher_prio > 0 we will get only task with higher priority than task_current, (see condition inside os_task_dequeue_prio) */
-      if( NULL != new_task ) { /* in case all READY tasks have lower priority, we will get NULL and no task switch will be done */
-         os_task_makeready(task_current); /* push task_current to ready_queue */
+      /* pick some READY task for ready_queue which has priority equal or
+       * greater than task_current (see condition inside os_task_dequue_prio) */
+      new_task = os_task_dequeue_prio(
+                   &ready_queue, task_current->prio_current + higher_prio);
+
+      /* in case all READY tasks have lower priority, we will get NULL and no
+       * task switch will be done */
+      if( NULL != new_task ) {
+         /* since we have new task, task_current need to be pushed to
+          * ready-queue */
+         os_task_makeready(task_current);
+         /* check if we are in ISR */
          if( 0 == isr_nesting ) {
-            arch_context_switch(new_task); /* switch to new task if not in interrupt */
+            /* switch the context only if not in ISR */
+            arch_context_switch(new_task);
          } else {
-            task_current = new_task; /* in case of interrupt only change the task_current pointer,  so the context switching will be properly perfomed by arch_contextrestore_i at the end of ISR */
-            task_current->state = TASKSTATE_RUNNING; /* dont forget about changig the task state */
+            /* in case of ISR, only switch the task_current pointer, context
+             * switching itself must be perfomed at the end of ISR (see
+             * arch_contextrestore_i) */
+            task_current = new_task;
+            task_current->state = TASKSTATE_RUNNING;
          }
       }
    }
 }
 
+/**
+ * Function is simmilar to os_schedule in scope that it switches the context,
+ * but it does it always (os_schedule() may not change the task if there is no
+ * READY task with higher prio).
+ * This function is intended to call while task_current cannot progress any
+ * further and must be blocked.
+ *
+ * \param task_queue task_queue on wich task_current will be blocked
+ * \param block_type a couse of block
+ *
+ * \warning This function cannot be called from ISR!!
+ */
+void OS_HOT os_block_andswitch(
+   os_taskqueue_t* restrict task_queue,
+   os_taskblock_t block_type)
+{
+  /* block current task on pointed queue */
+  os_task_makewait(task_queue, block_type);
+
+  /* Chose any READY task and switch to it - at least idle task is in READY
+   * state (ready_queue) so we will never get the NULL there */
+  arch_context_switch(os_task_dequeue(&ready_queue));
+
+  /* return from arch_context_switch call will be in some of next os_schedule()
+   * call. After return task state is again set to TASKSTATE_RUNING, also
+   * iterrupts are again disabled here (even it they where enabled for execution
+   * of previous task) */
+}
+
 void os_task_exit(int retv)
 {
-   os_task_t *task;
    arch_criticalstate_t cristate;
 
    /* we remove current task from system and going for endless sleep. We need
@@ -324,12 +383,11 @@ void os_task_exit(int retv)
       os_scheduler_unlock(); /* reenable task switch by scheduler */
    }
 
-   /* next we pop any ready task - at least idle task is in READY state so we
-    * will never get the NULL there. Next switch to that task. Since we not
-    * saving current_task anywhere it will disapear from scheduling loop */
-   task = os_task_dequeue(&ready_queue);
-   arch_context_switch(task);
-
+  /* Chose any READY task and switch to it - at least idle task is in READY
+   * state (ready_queue) so we will never get the NULL there
+   * Since we not saving current_task anywhere it will disapear from scheduling
+   * loop */
+   arch_context_switch(os_task_dequeue(&ready_queue));
 
   /* we should never reach this point, there is no chance that scheduler picked
    * up this code again since we dropped the task */

@@ -32,8 +32,10 @@
 #ifndef __OS_TEST_
 #define __OS_TEST_
 
+#define test_debug(format, ...) test_debug_printf(format, ##__VA_ARGS__)
+
 typedef void (*test_tick_clbck_t)(void);
-void test_debug(const char* format, ...);
+void test_debug_printf(const char* format, ...);
 void test_result(int result);
 void test_setupmain(const char* test_name);
 void test_setuptick(test_tick_clbck_t clbck, unsigned long nsec);

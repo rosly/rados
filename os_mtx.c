@@ -149,19 +149,12 @@ os_retcode_t OS_WARN_UNUSEDRET os_mtx_lock(os_mtx_t* mtx)
          }
       }
 
-      os_task_makewait(&(mtx->task_queue), OS_TASKBLOCK_MTX);
-
-      /* chose some task with READY state to which we can switch */
-      task = os_task_dequeue(&ready_queue);
-      arch_context_switch(task);
-      /* here we switch to any READY task, we will return from
-       * arch_context_switch call at some next schedule().  After return task
-       * state is set to RUNING (before return from arch_context_switch), also
-       * iterrupts are again disabled here (even it they where enabled for
-       * execution of previous task). The return is trigered by os_mtx_unlock
-       * performed by other task in tos_mtx_unlock the os_mtx_setowner is
-       * called, so here we are new owner of the mutex please read also comment2
-       * below in this file */
+      /* now block and change switch the context */
+      os_block_andswitch(&(mtx->task_queue), OS_TASKBLOCK_MTX);
+      /* The return from previus call is trigered by os_mtx_unlock performed by
+       * other task in tos_mtx_unlock the os_mtx_setowner is called, so here we
+       * are new owner of the mutex please read also comment2 below in this file
+       * */
 
       /* the block_code was set in os_mtx_destroy or in os_mtx_unlock */
       ret = task_current->block_code;

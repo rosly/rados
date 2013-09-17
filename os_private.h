@@ -129,6 +129,9 @@ os_task_t* OS_HOT os_task_dequeue_prio(os_taskqueue_t* task_queue, uint_fast8_t 
 os_task_t* OS_HOT os_task_peekqueue(os_taskqueue_t* restrict task_queue);
 void os_taskqueue_init(os_taskqueue_t *task_queue);
 void OS_HOT os_schedule(uint_fast8_t higher_prio);
+void OS_HOT os_block_andswitch(
+   os_taskqueue_t* restrict task_queue,
+   os_taskblock_t block_type);
 void os_task_exit(int retv);
 
 /* functions provided by arch port */

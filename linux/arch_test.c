@@ -52,7 +52,7 @@ static void OS_ISR sig_alrm(int OS_UNUSED(signum), siginfo_t * OS_UNUSED(siginfo
    arch_contextrestore_i(sig_alrm);
 }
 
-void test_debug(const char* format, ...)
+void test_debug_printf(const char* format, ...)
 {
    va_list ap;
 

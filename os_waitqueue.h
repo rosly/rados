@@ -32,6 +32,8 @@
 #ifndef __OS_WAITQUEUE_
 #define __OS_WAITQUEUE_
 
+#define OS_WAITQUEUE_ALL ((uint_fast8_t)UINT8_MAX)
+
 typedef struct os_waitqueue_tag {
    /* task_queue for threads which are blocked or prepared to block on this wait
     * queue. This is typical task queue (no magic) it means that tasks in that

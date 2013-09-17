@@ -119,7 +119,7 @@ os_retcode_t OS_WARN_UNUSEDRET os_sem_down(os_sem_t* sem, uint_fast16_t timeout_
 
 /* this function can be called from ISR (one of the basic functionality of
  * semaphores) */
-void os_sem_up(os_sem_t* sem)
+void os_sem_up_sync(os_sem_t* sem, bool sync)
 {
    arch_criticalstate_t cristate;
    os_task_t *task;
@@ -156,10 +156,15 @@ void os_sem_up(os_sem_t* sem)
 
       task->block_code = OS_OK; /* set the block code to NORMAL WAKEUP */
       os_task_makeready(task);
-      /* switch to more prioritized READY task, if there is such (1 param in
-       * os_schedule means switch to other READY task which has greater
-       * priority) */
-      os_schedule(1);
+
+      /* do not call schedule() if we will do it in some other os function
+       * call. This is marked by sync parameter flag */
+      if(!sync) {
+         /* switch to more prioritized READY task, if there is such (1 param in
+          * os_schedule means switch to other READY task which has greater
+          * priority) */
+         os_schedule(1);
+      }
    }
    arch_critical_exit(cristate);
 }

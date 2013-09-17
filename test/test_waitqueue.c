@@ -47,8 +47,8 @@
 
 #define TEST_TASKS ((unsigned)10)
 
-#define test_verbose_debug test_debug
-//#define test_verbose_debug(format, ...)
+//#define test_verbose_debug test_debug
+#define test_verbose_debug(format, ...)
 
 typedef struct {
    os_task_t task;

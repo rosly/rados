@@ -52,7 +52,14 @@ void os_waitqueue_destroy(os_waitqueue_t* queue);
 void os_waitqueue_prepare(os_waitqueue_t* queue, uint_fast16_t timeout_ticks);
 void os_waitqueue_finish(void);
 os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(void);
-void os_waitqueue_wakeup(os_waitqueue_t *queue, uint_fast8_t nbr);
+void os_waitqueue_wakeup_sync(
+   os_waitqueue_t *queue,
+   uint_fast8_t nbr,
+   bool sync);
+static inline void os_waitqueue_wakeup(os_waitqueue_t *queue, uint_fast8_t nbr)
+{
+  os_waitqueue_wakeup_sync(queue, nbr, false);
+}
 
 #endif
 

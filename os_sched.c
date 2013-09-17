@@ -373,13 +373,18 @@ void os_task_exit(int retv)
    /* if some task is waiting for this task, we signalize the join semaphore on
     * which some other thread is waiting in os_task_join */
    if( NULL != task_current->join_sem ) {
+
+      /* \TODO after adding os_sem_up_sync() blocking of scheduler seems to be
+       * unnecessary, we will not call schedule() anyway .. rething it again and
+       * if really unnecessary remove sheduler locking from below */
+
       /* since after join, master thread will probably remove the current task
        * stack and task struct, we cannot switch to it while we call os_sem_up.
        * We simply avoiding this by locking the scheduler. (keep in mind that
        * critical section is different think, here we lock additionaly
        * scheduler) */
       os_scheduler_lock();
-      os_sem_up(task_current->join_sem);
+      os_sem_up_sync(task_current->join_sem, true);
       os_scheduler_unlock(); /* reenable task switch by scheduler */
    }
 

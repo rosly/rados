@@ -41,7 +41,7 @@
 #include <string.h> /* for memcpy */
 
 /* missing stdbool.h for this platform */
-typedef uint8_t bool;
+typedef uint8_fast_t bool;
 #define false ((uint8_t)0)
 #define true  ((uint8_t)1) /* considered also !false but finaly decided to be more strict */
 

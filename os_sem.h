@@ -50,7 +50,11 @@ void os_sem_create(os_sem_t* sem, os_atomic_t init_cnt);
  *        data which will be destroyed) */
 void os_sem_destroy(os_sem_t* sem);
 os_retcode_t OS_WARN_UNUSEDRET os_sem_down(os_sem_t* sem, uint_fast16_t timeout_ticks);
-void os_sem_up(os_sem_t* sem);
+void os_sem_up_sync(os_sem_t* sem, bool sync);
+static inline void os_sem_up(os_sem_t* sem)
+{
+   os_sem_up_sync(sem, false);
+}
 
 #endif
 

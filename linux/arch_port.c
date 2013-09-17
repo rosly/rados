@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is a part of RadOs project
  * Copyright (c) 2013, Radoslaw Biernaki <radoslaw.biernacki@gmail.com>
  * All rights reserved.
@@ -118,6 +118,7 @@ void OS_NORETURN OS_COLD arch_halt(void)
 {
    while(1) {
       raise(SIGABRT);
+      exit(0);
    }
 }
 

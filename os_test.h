@@ -32,7 +32,10 @@
 #ifndef __OS_TEST_
 #define __OS_TEST_
 
-#define test_debug(format, ...) test_debug_printf(format, ##__VA_ARGS__)
+#define test_xstr(s) test_str(s)
+#define test_str(s) #s
+#define test_debug(format, ...) \
+  test_debug_printf(__FILE__ ":" test_xstr(__LINE__) " " format, ##__VA_ARGS__)
 
 typedef void (*test_tick_clbck_t)(void);
 void test_debug_printf(const char* format, ...);

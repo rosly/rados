@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is a part of RadOs project
  * Copyright (c) 2013, Radoslaw Biernaki <radoslaw.biernacki@gmail.com>
  * All rights reserved.
@@ -34,6 +34,7 @@
 
 #define _GNU_SOURCE
 
+#include <stdlib.h> /* for exit */
 #include <stdint.h> /* for patform specific types definitions like uint16_t */
 #include <stdbool.h>
 #include <limits.h> /* for UINT_MAX etc */

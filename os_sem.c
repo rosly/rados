@@ -126,6 +126,12 @@ void os_sem_up(os_sem_t* sem)
 
    OS_ASSERT(sem->value < SIG_ATOMIC_MAX); /* check the semaphore value limit */
 
+   /* \TODO implement nbr in function param so we can increase the semaphore
+    * number more than once. To make it work in this way we have also to wake
+    * multiple tasks. Best will be to craete loop around existing code and wake
+    * up task untill cnt in this loop > 0, Example how to do it is in
+    * waitqueue_wakeup */
+
    arch_critical_enter(cristate);
    task = os_task_dequeue(&(sem->task_queue));
    if( NULL == task )

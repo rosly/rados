@@ -57,7 +57,7 @@ void test_debug_printf(const char* format, ...)
    va_list ap;
 
    va_start(ap, format);
-   printf("%s: ", test_name);
+   //printf("%s: ", test_name);
    vprintf(format, ap);
    printf("\n");
    va_end(ap);

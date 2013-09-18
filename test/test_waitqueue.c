@@ -47,8 +47,8 @@
 
 #define TEST_TASKS ((unsigned)10)
 
-//#define test_verbose_debug test_debug
-#define test_verbose_debug(format, ...)
+#define test_verbose_debug test_debug
+//#define test_verbose_debug(format, ...)
 
 typedef struct {
    os_task_t task;
@@ -70,8 +70,8 @@ static task_data_t worker_tasks[TEST_TASKS];
 static os_waitqueue_t global_wait_queue;
 static os_sem_t global_sem;
 static unsigned test3_active = 0;
+static unsigned test5_active = 0;
 static unsigned global_tick_cnt = 0;
-
 
 void idle(void)
 {
@@ -302,6 +302,42 @@ int testcase_4regresion(void)
    return 0;
 }
 
+/**
+ * Regresion test case
+ * os_waitqueue_finalize() had a bug. It dont take into account timeouts.
+ */
+int testcase_5regresion(void)
+{
+   unsigned local_tick_cnt;
+
+   /* enable spectial threatment */
+   local_tick_cnt = global_tick_cnt = 0;
+   test5_active = 1;
+
+   /* use waitqueue with timeout (2 ticks) and finish it right away (simulate
+    * early condition meet) */
+   test_debug("Main sleeping on waitqueue with timeout, then finish right away");
+   os_waitqueue_prepare(&global_wait_queue, 2);
+   os_waitqueue_finish();
+   /* spin and wait for timeout */
+   while(1) {
+      if(global_tick_cnt > 5) {
+         /* break after 5 ticks */
+         break;
+      }
+      if(local_tick_cnt != global_tick_cnt) {
+         test_debug("Main detected tick increase");
+      }
+      local_tick_cnt = global_tick_cnt;
+   }
+   test_debug("Main finishing test5");
+
+   /* disable spectial threatment */
+   test5_active = 0;
+
+   return 0;
+}
+
 /* \TODO write bit banging on two threads and waitqueue as test5
  * this will be the stress proff of concept */
 
@@ -348,6 +384,8 @@ int mastertask_proc(void* OS_UNUSED(param))
       if(ret) break;
       ret = testcase_4regresion();
       if(ret) break;
+      ret = testcase_5regresion();
+      if(ret) break;
    } while(0);
 
    /* join tasks and collect the results release the tasks from loop */
@@ -379,6 +417,8 @@ void test_tickprint(void)
      /* at each tick wake up the main task to allow it to check the test results
       * */
      os_sem_up(&global_sem);
+  } else if(test5_active) {
+     global_tick_cnt++;
   }
 }
 

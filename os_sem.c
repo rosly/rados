@@ -50,6 +50,9 @@ void os_sem_destroy(os_sem_t* sem)
 
    /* wake up all task which waits on sem->task_queue */
    while( NULL != (task = os_task_dequeue(&(sem->task_queue))) ) {
+
+      /* \TODO FIXME missing timer destroy code ?!? */
+
       task->block_code = OS_DESTROYED;
       os_task_makeready(task);
    }

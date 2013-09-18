@@ -39,7 +39,7 @@
  * asynchronius event may hit, and receiver code will not have oportunity to be
  * notified about it. The result will be missup of this event, since we will
  * need just another one to wake up the task from sleep call.
- * 
+ *
  * In wait queue following sniplet of code can be used on receiver side:
  * 0: os_atomic_t conditional_test;
  *
@@ -78,7 +78,7 @@
  * set, it does not push the task_current into ready_queue (where it will wait
  * for futire schedule()) but instead, it put it into wait_queue->task_queue (a
  * task queue asosiated with wait_queue).
- * 
+ *
  * The proff of concept is following. We must to consider 3 places where
  * preemption may kick-in and ISR or some other task may issue lines 10 and 11
  * on notifier side.
@@ -122,7 +122,7 @@
  *    into wait_queue->task_list before line 10 and 11 in notifier and this will
  *    mean that it is almost the same as in 1). The only difference is that after
  *    receiver is woken up, it will return to line 8 instead of 3, so we must to
- *    make a loop and check condition again. 
+ *    make a loop and check condition again.
  */
 
 #include "os_private.h"
@@ -145,6 +145,9 @@ void os_waitqueue_destroy(os_waitqueue_t* queue)
 
    /* wake up all task which waits on sem->task_queue */
    while( NULL != (task = os_task_dequeue(&(queue->task_queue))) ) {
+
+      /* \TODO FIXME missing timer destroy code ?!? */
+
       task->block_code = OS_DESTROYED;
       os_task_makeready(task);
    }
@@ -206,8 +209,10 @@ void os_waitqueue_finish(void)
     * os_waitqueue_finish() after os_waitqueue_wait() is a waste of CPU cycles
     * */
    OS_ASSERT(NULL != task_current->wait_queue);
-
+   /* remove wait_queue assosiation from task */
    os_atomicptr_write(task_current->wait_queue, NULL);
+
+   /* \TODO FIXME missing timer destroy code ?!? */
 }
 
 os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(void)

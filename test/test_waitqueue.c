@@ -302,6 +302,9 @@ int testcase_4regresion(void)
    return 0;
 }
 
+/* \TODO write bit banging on two threads and waitqueue as test5
+ * this will be the stress proff of concept */
+
 /**
  * The main task for tests manage
  */

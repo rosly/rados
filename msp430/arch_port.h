@@ -91,6 +91,10 @@ typedef uint16_t arch_criticalstate_t;
         "dec %[atomic]\n\t" \
             ::  [atomic] "m" (_atomic))
 
+#define os_atomicptr_read(_ptr) (*(_ptr))
+#define os_atomicptr_write(_ptr, _val) ((_ptr) = (_val))
+#define os_atomicptr_xchnge(_ptr, _val) (OS_ASSERT(!"not implemented"))
+
 #define arch_critical_enter(_critical_state) \
    do { \
       (_critical_state) = __read_status_register(); \

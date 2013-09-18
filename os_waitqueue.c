@@ -29,6 +29,102 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/**
+ * Implementation of waitqueue, simmilar to Linux kernel concept
+ *
+ * The idea behind waitqueue is to allow programer to synchronize os task, with
+ * asynchronius events while avoiding pooling. In this case we usualy need to
+ * chek kind of condition and if it is not meet we need to sleep the task. The
+ * problem is that betwen condition check and some sort of sleep call, the
+ * asynchronius event may hit, and receiver code will not have oportunity to be
+ * notified about it. The result will be missup of this event, since we will
+ * need just another one to wake up the task from sleep call.
+ * 
+ * In wait queue following sniplet of code can be used on receiver side:
+ * 0: os_atomic_t conditional_test;
+ *
+ * 1: while(1) {
+ * 2:   os_waitqueue_prepare(&waitqueue, timeout);
+ * 3:   if(conditional_test) {
+ * 4:      os_waitqueue_finish();
+ * 5:      break;
+ * 6:   }
+ * 7:   ret = os_waitqueue_wait();
+ * 8: }
+ *
+ * On notifier side following sniplet can be used:
+ * 10: conditional_test = true;
+ * 11: os_waitqueue_wakeup(&waitqueue);
+ *
+ * The main goal is to wake the receiver while avoiding the race ondition betwen
+ * conditional_test and os_waitqueue_wait() call. Such problem also can be
+ * solved by semaphore and not using the condition test at all, but waitqueues
+ * has several advantages.
+ * - os_waitqueue_prepare is very fast while whole construction is focused on
+ *   conditional_test == true case. If this is true then waitqueue is much
+ *   faster then semaphore since we dont need to disable interrupts for
+ *   os_waitqueue_prepare (if we dont create timeout for that call).
+ * - if we use single notifier and multiple receivers, we dont have to know the
+ *   number of the receivers to wake all of them (for that OS_WAITQUEUE_ALL can
+ *   be used as nbr parameter of os_waitqueue_wakeup())
+ * - if multiple events will came before receiver task will ask for them,
+ *   semaphore value will be bringd-up multiple times. If event is type of "all
+ *   or nothing", this semaphore will cause receiver to spin several times in
+ *   bussy loop until it finaly seetle for sleep. The reason for that is
+ *   receiver need to consume all signalization of semaphore.
+ *
+ * This primitive works by utilizing the fact that task durring task switch,
+ * scheduler schecks the task_current->wait_queue pointer. If that pointer is
+ * set, it does not push the task_current into ready_queue (where it will wait
+ * for futire schedule()) but instead, it put it into wait_queue->task_queue (a
+ * task queue asosiated with wait_queue).
+ * 
+ * The proff of concept is following. We must to consider 3 places where
+ * preemption may kick-in and ISR or some other task may issue lines 10 and 11
+ * on notifier side.
+ * 1) betwen line 2 and 3
+ * 2) betwen line 6 and 7
+ *
+ * One additional spot is betwen lines 3 and 4 but there task already knows that
+ * it was signalized (because condition was meet) and it just need to clean-up
+ * with os_waitqueue_finish() call
+ *
+ * If receiver is cooperating with ISR, both lines 10 and 11 are issued
+ * simoutaniusly form user task perspective.i Additionaly keep in mind that
+ * durring ISR which preempt mentioned 3 points, task_current is set to task
+ * which we consider as wounerable. If we look at os_waitqueue_wakeup() we will
+ * see that there is a special case for this.
+ * 1) task_current->wait_queue is atomicaly set before ISR, so in ISR line 10
+ *    and 11 are done atomicaly to user code. If we look at
+ *    os_waitqueue_wakeup_sync it will show that there is special case that
+ *    detects that we are in ISR and we preempted the task which waits on the
+ *    same condition which we try to signalize. In this case we only set
+ *    task_current->wait_queue = NULL
+ * 2) if we look at os_waitqueue_wait() we will see that it veiry if
+ *    task_current->wait_queue is still set, if not it exits righ away. It will be
+ *    NULL since we set it to NULL in line 11 of ISR (inside os_waitqueue_wakeup())
+ *
+ * If receiver is cooperating with some other task, then in
+ * os_waitqueue_wakeup() the task_current is set to different value then task
+ * which wait for condition. In other words now it is different story comparing
+ * to ISR. What is more important, line 10 and 11 may not be issued atomicaly.
+ * 1) if we will have task preemption at this point it is enough that notifier
+ *    execute line 10, since receiver will detect that in line 3 (and will skipp
+ *    the sleep). If notifier will execute also line 11 it will see the
+ *    receiver task in wait_queue->task_queue since scheduler puts it there while
+ *    preempting (look at os_task_makeready() and NULL != task->wait_queue
+ *    condition in that function). This means that receiver task will be woken
+ *    up by os_waitqueue_wakeup() and it will continue in line 3, while
+ *    condition is already set.
+ * 2) receiver already passes the condition, so executing line 10 in notifier
+ *    will not have any effect. But here also we need to pass scheduler in case of
+ *    preemption. It means that os_task_makeready() will again put the receiver
+ *    into wait_queue->task_list before line 10 and 11 in notifier and this will
+ *    mean that it is almost the same as in 1). The only difference is that after
+ *    receiver is woken up, it will return to line 8 instead of 3, so we must to
+ *    make a loop and check condition again. 
+ */
+
 #include "os_private.h"
 
 /* private function forward declarations */
@@ -72,46 +168,46 @@ void os_waitqueue_prepare(os_waitqueue_t* queue, uint_fast16_t timeout_ticks)
       currently we do not support waiting on multiple wait queues */
    OS_ASSERT(NULL == task_current->wait_queue);
 
-   /* we need to disable the interrupts since wait_queue may be signalized from
-    * ISR (we need to add task to wait_queue->task_queue in atomic maner) */
-   arch_critical_enter(cristate);
+   /* we dont need to disable the interrupts if arch supports os_atomicptr_write */
 
    /* assosiate task with wait_queue, this will change the bechaviour inside
     * os_task_makeready() and instead of ready_queue taks will be added to
     * task_queue of assosiated wait_queue */
-   task_current->wait_queue = queue;
+   os_atomicptr_write(task_current->wait_queue, queue);
 
    /* create timer which will count from this moment this will create time
     * condition from preparation step while allowing multiple spins for
     * assosiated wait condition */
    if( OS_TIMEOUT_INFINITE != timeout_ticks ) {
+
+      arch_critical_enter(cristate);
+
+      /* in contrast to semaphores, wait_queues can timeout while task is
+       * running (and checking the condition assosiated with wait_queue).
+       * Therefore we must to set the return code before-hand to handle timeout
+       * case properly */
+      task_current->block_code = OS_OK;
+
       os_timer_create(&timer, os_waitqueue_timerclbck, task_current, timeout_ticks, 0);
       task_current->timer = &timer;
+      arch_critical_exit(cristate);
    }
-
-   /* in contrast to semaphores, wait_queues can timeout while task is
-    * running (and checking the condition assosiated with wait_queue).
-    * Therefore we must to set the return code before-hand to handle timeout
-    * case properly */
-   task_current->block_code = OS_OK;
-
-   arch_critical_exit(cristate);
 }
 
 void os_waitqueue_finish(void)
 {
-   arch_criticalstate_t cristate;
-   
    OS_ASSERT(0 == isr_nesting); /* this function may be called only form user code */
 
-   arch_critical_enter(cristate);
-   /* we check that task_current was assigned to some queue
+   /* we dont need to disable the interrupts if arch supports os_atomicptr_write */
+
+   /* Just for BUG hunting in user code, this is not a functional line
+    * we check that task_current was assigned to some queue
     * this helps to force user to write cleaner code since calling
     * os_waitqueue_finish() after os_waitqueue_wait() is a waste of CPU cycles
     * */
    OS_ASSERT(NULL != task_current->wait_queue);
-   task_current->wait_queue = NULL;
-   arch_critical_exit(cristate);
+
+   os_atomicptr_write(task_current->wait_queue, NULL);
 }
 
 os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(void)

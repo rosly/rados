@@ -70,7 +70,6 @@ static task_data_t worker_tasks[TEST_TASKS];
 static os_waitqueue_t global_wait_queue;
 static os_sem_t global_sem;
 static unsigned test3_active = 0;
-static unsigned test5_active = 0;
 static unsigned global_tick_cnt = 0;
 
 void idle(void)
@@ -117,14 +116,19 @@ int slavetask_proc(void* param)
          /* only timeout and success is allowed as return code */
          if(OS_TIMEOUT == data->retcode) {
             test_verbose_debug("Task %u timeouted on wait_queue", data->idx);
-         } else {
-            test_assert(OS_OK == data->retcode);
+         } else if(OS_DESTROYED == data->retcode) {
+            test_verbose_debug("Task %u exiting by OS_DESTROYED", data->idx);
+            /* lest be layzy in that so we can check if timeout is properly
+             * torn down */
+            unsigned local_tick_cnt = global_tick_cnt;
+            while(global_tick_cnt < local_tick_cnt + 10); /* spin for 10 ticks */
+            return 0;
          }
       }
       test_verbose_debug("Task %u found condition meet", data->idx);
       (data->spin_condmeetcnt)++;
    }
-   test_verbose_debug("Task %u exiting", data->idx);
+   test_verbose_debug("Task %u exiting by condition meet", data->idx);
 
    return 0;
 }
@@ -235,6 +239,7 @@ int testcase_3(void)
       worker_tasks[i].timeout = 0;
    }
 
+   global_tick_cnt = 1;
    test_verbose_debug("Main wait until slaves will timeout");
    /* verify that only desired task will timeout at each tick count */
    while(global_tick_cnt < (TEST_TASKS * 2) + 1) {
@@ -298,6 +303,7 @@ int testcase_4regresion(void)
 
    /* clean up after test, stop the spinning of threads */
    for(i = 0; i < TEST_TASKS - 1; i++) {
+      worker_tasks[i].spin_intcond = 1;
       worker_tasks[i].spin_intcond_reload = 0;
    }
 
@@ -313,9 +319,8 @@ int testcase_5regresion(void)
    unsigned local_tick_cnt;
    os_waitobj_t waitobj;
 
-   /* enable spectial threatment */
+   /* reset tickcnt's */
    local_tick_cnt = global_tick_cnt = 0;
-   test5_active = 1;
 
    /* use waitqueue with timeout (2 ticks) and finish it right away (simulate
     * early condition meet) */
@@ -335,9 +340,6 @@ int testcase_5regresion(void)
    }
    test_debug("Main finishing test5");
 
-   /* disable spectial threatment */
-   test5_active = 0;
-
    return 0;
 }
 
@@ -351,6 +353,7 @@ int mastertask_proc(void* OS_UNUSED(param))
 {
    int ret;
    unsigned i;
+   os_retcode_t retcode;
 
    /* clear out memory */
    memset(worker_tasks, 0, sizeof(worker_tasks));
@@ -391,22 +394,45 @@ int mastertask_proc(void* OS_UNUSED(param))
       if(ret) break;
    } while(0);
 
-   /* join tasks and collect the results release the tasks from loop */
-   test_verbose_debug("Main task joining slaves");
+   /* by destroing the waitqueue we also signalize tasks
+    * return code should be then OS_DESTROYED. We chek that.
+    * But before that, we force threads to spin one more and sleep with timeout.
+    * This will aditionaly test is we properly remove timer in
+    * os_waitqueue_destroy() */
+
+   /* modify the timeout of each task and */
    for(i = 0; i < TEST_TASKS; i++) {
-      worker_tasks[i].spin_extcond = 1;
-      worker_tasks[i].spin_intcond = 1;
+      worker_tasks[i].timeout = 5; /* some close future */
    }
-   /* signalize all tasks */
+   /* wake up tasks to allow them to use timeout in next prepare call */
+   test_verbose_debug("Main signalizing slaves for timeout reload");
    os_waitqueue_wakeup(&global_wait_queue, OS_WAITQUEUE_ALL);
+   /* give time for test tasks to run (main is most prioritized, eat all CPU */
+   retcode = os_sem_down(&global_sem, 1);
+   test_assert(OS_TIMEOUT == retcode);
+
+   /* prepare sampling data for test */
+   for(i = 0; i < TEST_TASKS; i++) {
+      worker_tasks[i].spin_spincnt = 0;
+   }
+
+   /* destroy the wait queue */
+   test_verbose_debug("Main destroing the wait queue");
+   os_waitqueue_destroy(&global_wait_queue);
+
+   /* join the slave tasks */
+   test_verbose_debug("Main task joining slaves");
    ret = 0;
    for(i = 0; i < TEST_TASKS; i++) {
       ret = os_task_join(&(worker_tasks[i].task));
       test_assert(0 == ret);
    }
 
-   /* destroy the waitqueue */
-   os_waitqueue_destroy(&global_wait_queue);
+   /* verify that slave task did not take next spin after waitqueue was
+    * destroyed */
+   for(i = 0; i < TEST_TASKS; i++) {
+      test_assert(0 == worker_tasks[i].spin_spincnt);
+   }
 
    test_result(ret);
    return 0;
@@ -415,13 +441,13 @@ int mastertask_proc(void* OS_UNUSED(param))
 void test_tickprint(void)
 {
   test_verbose_debug("Tick");
+
+  global_tick_cnt++;
+
   if(test3_active) {
-     global_tick_cnt++;
      /* at each tick wake up the main task to allow it to check the test results
       * */
      os_sem_up(&global_sem);
-  } else if(test5_active) {
-     global_tick_cnt++;
   }
 }
 

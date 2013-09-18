@@ -127,9 +127,6 @@
 
 #include "os_private.h"
 
-/* TODO FIXME move all OS_ASSERT under the critical section, this not hurts and
- * we are doing this already in sem.c */
-
 /* private function forward declarations */
 static void os_waitqueue_timerclbck(void* param);
 
@@ -151,6 +148,7 @@ void os_waitqueue_destroy(os_waitqueue_t* queue)
 
       /* \TODO FIXME missing timer destroy code ?!? */
 
+      task->wait_queue = NULL;
       task->block_code = OS_DESTROYED;
       os_task_makeready(task);
    }
@@ -309,6 +307,8 @@ void os_waitqueue_wakeup_sync(
          os_timeout_destroy(task); 
 
          task->wait_queue = NULL; /* disassociate task from wait_queue */
+         /* task->block_code is set to OS_OK in os_waitqueue_prepare */
+         task->block_code = OS_OK; /* \TODO FIXME there is some issue with that, it is visiable in test, check if test is broken or the code sequence which sert the block_code is somehow broken */
          os_task_makeready(task);
 
          /* do not call schedule() if we will do it in some other os function

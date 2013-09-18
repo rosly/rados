@@ -145,17 +145,10 @@ void os_sem_up_sync(os_sem_t* sem, bool sync)
    }
    else
    {
-      /* check if task waits for wait_queue with timeout */
-      if( task->timer )
-      {
-         /* we need to destroy the timer here, because otherwise we will be
-          * vulnerable for race conditions from timer callbacks (in here
-          * callback are blocked because of critical section, but we will
-          * posibly jump out of it while we will switch the tasks durring
-          * os_shedule) */
-         os_timer_destroy(task->timer);
-         task->timer = NULL;
-      }
+      
+      /* we need to destroy the timer here, because otherwise we will be
+       * vulnerable for race conditions from timer callbacks (ISR) */
+      os_timeout_destroy(task); 
 
       task->block_code = OS_OK; /* set the block code to NORMAL WAKEUP */
       os_task_makeready(task);
@@ -185,7 +178,8 @@ static void os_sem_timerclbck(void* param)
    /* we do not call the os_sched here, because this will be done at the
     * os_tick() (which calls the os_timer_tick which call this function) */
    /* timer is not auto reload so we dont have to wory about it here (it will
-    * not call this function again, also we can safely call os_timer_destroy in
-    * any time for timer assosiated with this task) */
+    * not call this function again, also we can safely call os_timer_destroy
+    * multiple times for such destroyed timer unles memory for timer structure
+    * will not be invalidated*/
 }
 

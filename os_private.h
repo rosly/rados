@@ -176,6 +176,25 @@ static inline void os_task_makewait(
    os_task_enqueue(task_queue, task_current);
 }
 
+static inline void os_timeout_create(
+   os_timer_t *timer,
+   timer_proc_t clbck,
+   uint_fast16_t timeout_ticks)
+{
+   task_current->block_code = OS_OK;
+   os_timer_create(timer, clbck, task_current, timeout_ticks, 0);
+   task_current->timer = timer;
+}
+
+static inline void os_timeout_destroy(os_task_t *task)
+{
+   /* check if there is a timeout assosiated with task */
+   if( NULL != task->timer ) {
+     os_timer_destroy(task->timer);
+     task->timer = NULL;
+   }
+}
+
 /* --- Timers protected types --- */
 
 /* protected function from timer module */

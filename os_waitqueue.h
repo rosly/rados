@@ -44,12 +44,19 @@ typedef struct os_waitqueue_tag {
 
 } os_waitqueue_t;
 
+typedef struct {
+   os_timer_t timer;
+}os_waitobj_t;
+
 void os_waitqueue_create(os_waitqueue_t* queue);
 /** \NOTE calling this function for semaphores which are also used in ISR is
  *        highly forbiden since it will crash your kernel (ISR will access to
  *        data which will be destroyed) */
 void os_waitqueue_destroy(os_waitqueue_t* queue);
-void os_waitqueue_prepare(os_waitqueue_t* queue, uint_fast16_t timeout_ticks);
+void os_waitqueue_prepare(
+   os_waitqueue_t *queue,
+   os_waitobj_t *waitobj,
+   uint_fast16_t timeout_ticks);
 void os_waitqueue_finish(void);
 os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(void);
 void os_waitqueue_wakeup_sync(

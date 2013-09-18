@@ -127,6 +127,9 @@
 
 #include "os_private.h"
 
+/* TODO FIXME move all OS_ASSERT under the critical section, this not hurts and
+ * we are doing this already in sem.c */
+
 /* private function forward declarations */
 static void os_waitqueue_timerclbck(void* param);
 
@@ -159,11 +162,11 @@ void os_waitqueue_destroy(os_waitqueue_t* queue)
    arch_critical_exit(cristate);
 }
 
-void os_waitqueue_prepare(os_waitqueue_t* queue, uint_fast16_t timeout_ticks)
+void os_waitqueue_prepare(
+   os_waitqueue_t *queue,
+   os_waitobj_t *waitobj,
+   uint_fast16_t timeout_ticks)
 {
-   os_timer_t timer;
-   arch_criticalstate_t cristate;
-
    OS_ASSERT(0 == isr_nesting); /* this function may be called only form user code */
    OS_ASSERT(task_current->prio_current > 0); /* idle task cannot call blocking
                                                  functions (will crash OS) */
@@ -171,28 +174,19 @@ void os_waitqueue_prepare(os_waitqueue_t* queue, uint_fast16_t timeout_ticks)
       currently we do not support waiting on multiple wait queues */
    OS_ASSERT(NULL == task_current->wait_queue);
 
-   /* we dont need to disable the interrupts if arch supports os_atomicptr_write */
-
    /* assosiate task with wait_queue, this will change the bechaviour inside
     * os_task_makeready() and instead of ready_queue taks will be added to
     * task_queue of assosiated wait_queue */
    os_atomicptr_write(task_current->wait_queue, queue);
 
-   /* create timer which will count from this moment this will create time
-    * condition from preparation step while allowing multiple spins for
-    * assosiated wait condition */
+   /* create timer which will count time starting from this moment. By doing
+    * this time keeping is done for both, the condition checking code and sleep
+    * time inside os_waitqueue_wait() */
    if( OS_TIMEOUT_INFINITE != timeout_ticks ) {
+      arch_criticalstate_t cristate;
 
       arch_critical_enter(cristate);
-
-      /* in contrast to semaphores, wait_queues can timeout while task is
-       * running (and checking the condition assosiated with wait_queue).
-       * Therefore we must to set the return code before-hand to handle timeout
-       * case properly */
-      task_current->block_code = OS_OK;
-
-      os_timer_create(&timer, os_waitqueue_timerclbck, task_current, timeout_ticks, 0);
-      task_current->timer = &timer;
+      os_timeout_create(&(waitobj->timer), os_waitqueue_timerclbck, timeout_ticks);
       arch_critical_exit(cristate);
    }
 }
@@ -200,19 +194,33 @@ void os_waitqueue_prepare(os_waitqueue_t* queue, uint_fast16_t timeout_ticks)
 void os_waitqueue_finish(void)
 {
    OS_ASSERT(0 == isr_nesting); /* this function may be called only form user code */
-
-   /* we dont need to disable the interrupts if arch supports os_atomicptr_write */
-
-   /* Just for BUG hunting in user code, this is not a functional line
-    * we check that task_current was assigned to some queue
-    * this helps to force user to write cleaner code since calling
+   /* we check that task_current was assigned to some queue this helps to force
+    * user to write corect and efficient code since calling
     * os_waitqueue_finish() after os_waitqueue_wait() is a waste of CPU cycles
-    * */
+    */
    OS_ASSERT(NULL != task_current->wait_queue);
-   /* remove wait_queue assosiation from task */
-   os_atomicptr_write(task_current->wait_queue, NULL);
 
-   /* \TODO FIXME missing timer destroy code ?!? */
+   /* just peek if we have timer for timeout assigned */
+   if(NULL != os_atomicptr_read(task_current->timer)) {
+      arch_criticalstate_t cristate;
+
+      arch_critical_enter(cristate);
+
+      /* remove wait_queue assosiation from task */
+      task_current->wait_queue = NULL;
+
+      /* destroy timeout assosiated with task good to note is that we check
+       * task_curent->timer second time inside os_timeout_destroy() since
+       * previus checking was done outside critical section (things may change
+       * from that moment) */
+      os_timeout_destroy(task_current); 
+
+      arch_critical_exit(cristate);
+
+   } else {
+      /* remove wait_queue assosiation from task */
+      os_atomicptr_write(task_current->wait_queue, NULL);
+   }
 }
 
 os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(void)
@@ -238,18 +246,14 @@ os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(void)
       /* now block and change switch the context */
       os_block_andswitch(&(task_current->wait_queue->task_queue), OS_TASKBLOCK_WAITQUEUE);
 
-      if( NULL != task_current->timer ) {
-         /* seems that timer didn't exipre up to now, we need to clean it */
-         os_timer_destroy(task_current->timer);
-         task_current->timer = NULL;
-      }
+      /* destroy timeout assosiated with task if it was created */
+      os_timeout_destroy(task_current); 
 
    }while(0);
 
-   /* the block_code was set in os_waitqueue_destroy, timer callback or in
-    * os_waitqueue_wakeup, in contrast to semaphores it may be even set while
-    * task is in RUNNING state and it is checking the condition assosiated with
-    * wait_queue */
+   /* the block code is either OS_OK (set in os_timeout_create()) or OS_TIMEOUT
+    * (set in os_waitqueue_timerclbck()) or OS_DESTROYED (set in
+    * os_waitqueue_destroy()) */
    ret = task_current->block_code;
 
    arch_critical_exit(cristate);
@@ -300,19 +304,11 @@ void os_waitqueue_wakeup_sync(
             break; /* there will be no more task to wake, stop spinning */
          }
 
-         /* check if task waits for wait_queue with timeout */
-         if( NULL != task->timer ) {
-            /* we need to destroy the timer here, because otherwise we will
-             * be vulnerable for race conditions from timer callbacks (in
-             * here callback are blocked because of critical section, but we
-             * will possibly jump out of it while we will switch the tasks
-             * during os_shedule) */
-            os_timer_destroy(task->timer);
-            task->timer = NULL;
-         }
+         /* we need to destroy the timer here, because otherwise we will be
+          * vulnerable for race conditions from timer callbacks (ISR) */
+         os_timeout_destroy(task); 
 
          task->wait_queue = NULL; /* disassociate task from wait_queue */
-         task->block_code = OS_OK; /* set the block code to NORMAL WAKEUP */
          os_task_makeready(task);
 
          /* do not call schedule() if we will do it in some other os function
@@ -334,10 +330,11 @@ static void os_waitqueue_timerclbck(void* param)
 {
    os_task_t *task = (os_task_t*)param;
 
-   /* we know the task since timer was assigned only to one task, by timer
-    * param. But we need to make sure that this task is not running right now,
-    * because it will mean that it is not in ready_queue, but instead it is in
-    * TASKSTATE_RUNNING */
+   /* unlike to semaphores, timeout for waitqueues are created when task is
+    * still running in os_waitqueue_prepare. It may happened that this timer
+    * will burn off while task is still runinng and not yet reached
+    * os_waitqueue_wait() function.  It will mean that is will be not linked at
+    * any task_list so we should not try to unlik it. */
    if(TASKSTATE_RUNNING != task->state) {
      os_task_unlink(task);
    }
@@ -348,7 +345,8 @@ static void os_waitqueue_timerclbck(void* param)
    /* we do not call the os_sched here, because this will be done at the
     * os_tick() (which calls the os_timer_tick which call this function) */
    /* timer is not auto reload so we dont have to wory about it here (it will
-    * not call this function again, also we can safely call os_timer_destroy in
-    * any time for timer assosiated with this task) */
+    * not call this function again, also we can safely call os_timer_destroy
+    * multiple times for such destroyed timer unles memory for timer structure
+    * will not be invalidated*/
 }
 

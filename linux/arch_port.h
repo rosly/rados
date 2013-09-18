@@ -88,7 +88,7 @@ extern sigset_t arch_crit_signals;
         "decq %[atomic]\n\t" \
             ::  [atomic] "m" (_atomic))
 
-#define os_atomicptr_read(_ptr) (*(_ptr))
+#define os_atomicptr_read(_ptr) (_ptr)
 #define os_atomicptr_write(_ptr, _val) ((_ptr) = (_val))
 #define os_atomicptr_xchnge(_ptr, _val) (OS_ASSERT(!"not implemented"))
 

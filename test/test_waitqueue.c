@@ -102,8 +102,10 @@ int slavetask_proc(void* param)
       }
       while(1)
       {
+         os_waitobj_t waitobj;
+
          os_waitqueue_prepare(
-           &global_wait_queue,
+           &global_wait_queue, &waitobj,
            (0 == data->timeout) ? OS_TIMEOUT_INFINITE : data->timeout);
          test_verbose_debug("Task %u spins ...", data->idx);
          ++(data->spin_spincnt); /* signalize that we performed condition test */
@@ -309,6 +311,7 @@ int testcase_4regresion(void)
 int testcase_5regresion(void)
 {
    unsigned local_tick_cnt;
+   os_waitobj_t waitobj;
 
    /* enable spectial threatment */
    local_tick_cnt = global_tick_cnt = 0;
@@ -317,7 +320,7 @@ int testcase_5regresion(void)
    /* use waitqueue with timeout (2 ticks) and finish it right away (simulate
     * early condition meet) */
    test_debug("Main sleeping on waitqueue with timeout, then finish right away");
-   os_waitqueue_prepare(&global_wait_queue, 2);
+   os_waitqueue_prepare(&global_wait_queue, &waitobj, 2);
    os_waitqueue_finish();
    /* spin and wait for timeout */
    while(1) {

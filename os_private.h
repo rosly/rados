@@ -181,7 +181,6 @@ static inline void os_timeout_create(
    timer_proc_t clbck,
    uint_fast16_t timeout_ticks)
 {
-   task_current->block_code = OS_OK;
    os_timer_create(timer, clbck, task_current, timeout_ticks, 0);
    task_current->timer = timer;
 }

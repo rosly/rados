@@ -158,7 +158,7 @@ int testcase_1(void)
     * wake up all tasks and check if they had spinned around condition check */
    test_verbose_debug("Main task all slaves slaves");
    os_waitqueue_wakeup(&global_wait_queue, OS_WAITQUEUE_ALL);
-   /* give time for test tasks to run (main is most prioritized, eat all CPU */
+   /* give time for test tasks to run (main is most prioritized, eats all CPU */
    retcode = os_sem_down(&global_sem, 10); /* 10 ticks of sleep */
    test_assert(OS_TIMEOUT == retcode);
    /* verify that all tasks have spinned */
@@ -171,7 +171,7 @@ int testcase_1(void)
       lest try to woke up all tasks by specifing the exact amount */
    test_verbose_debug("Main task all slaves slaves");
    os_waitqueue_wakeup(&global_wait_queue, TEST_TASKS);
-   /* give time for test tasks to run (main is most prioritized, eat all CPU */
+   /* give time for test tasks to run (main is most prioritized, eats all CPU */
    retcode = os_sem_down(&global_sem, 10); /* 10 ticks of sleep */
    test_assert(OS_TIMEOUT == retcode);
    /* verify that all tasks have spinned */
@@ -195,7 +195,7 @@ int testcase_2(void)
     * should be the task which will woke up */
    test_verbose_debug("Main task signalizes single slave");
    os_waitqueue_wakeup(&global_wait_queue, 1);
-   /* give time for test tasks to run (main is most prioritized, eat all CPU */
+   /* give time for test tasks to run (main is most prioritized, eats all CPU */
    retcode = os_sem_down(&global_sem, 10); /* 10 ticks of sleep */
    test_assert(OS_TIMEOUT == retcode);
    /* verify that only task 10 spinned */
@@ -224,7 +224,7 @@ int testcase_3(void)
    /* wake up tasks to allow them to use timeout in next prepare call */
    test_verbose_debug("Main signalizing slaves for timeout reload");
    os_waitqueue_wakeup(&global_wait_queue, OS_WAITQUEUE_ALL);
-   /* give time for test tasks to run (main is most prioritized, eat all CPU */
+   /* give time for test tasks to run (main is most prioritized, eats all CPU */
    retcode = os_sem_down(&global_sem, 1);
    test_assert(OS_OK == retcode);
 
@@ -292,7 +292,7 @@ int testcase_4regresion(void)
     * still 0 while worker_tasks[i].spin_intcond is 1 */
    test_verbose_debug("Main allowing slaves to spin multiple times on external loop");
    os_waitqueue_wakeup(&global_wait_queue, OS_WAITQUEUE_ALL);
-   /* give time for test tasks to run (main is most prioritized, eat all CPU */
+   /* give time for test tasks to run (main is most prioritized, eats all CPU */
    retcode = os_sem_down(&global_sem, 10);
    test_assert(OS_TIMEOUT == retcode);
 
@@ -394,27 +394,30 @@ int mastertask_proc(void* OS_UNUSED(param))
       if(ret) break;
    } while(0);
 
-   /* by destroing the waitqueue we also signalize tasks
-    * return code should be then OS_DESTROYED. We chek that.
-    * But before that, we force threads to spin one more and sleep with timeout.
-    * This will aditionaly test is we properly remove timer in
-    * os_waitqueue_destroy() */
+   /* by destroing the waitqueue we also signalize tasks return code should be
+    * then OS_DESTROYED. But before we verify that, we force threads to spin
+    * once more and sleep with timeout. This will aditionaly test is we
+    * properly remove timer in os_waitqueue_destroy() */
 
-   /* modify the timeout of each task and */
+   test_verbose_debug("---------------------- Final test ----------------------");
+
+   /* modify the timeout of each task and
+      and prepare sampling data for test */
    for(i = 0; i < TEST_TASKS; i++) {
+      worker_tasks[i].spin_intcond = 0;
+      worker_tasks[i].spin_extcond = 0;
+      worker_tasks[i].spin_spincnt = 0;
+      worker_tasks[i].spin_condmeetcnt = 0;
+      worker_tasks[i].spin_intcond_reload = 0;
       worker_tasks[i].timeout = 5; /* some close future */
    }
-   /* wake up tasks to allow them to use timeout in next prepare call */
+   /* wake up tasks to allow them to use timeout in next waitqueue_prepare() call */
    test_verbose_debug("Main signalizing slaves for timeout reload");
    os_waitqueue_wakeup(&global_wait_queue, OS_WAITQUEUE_ALL);
-   /* give time for test tasks to run (main is most prioritized, eat all CPU */
-   retcode = os_sem_down(&global_sem, 1);
+   /* give time for test tasks to run (main is most prioritized, eats all CPU */
+   retcode = os_sem_down(&global_sem, 2); /* 2 ticks should be enough  to
+                                             synchronize with slaves */
    test_assert(OS_TIMEOUT == retcode);
-
-   /* prepare sampling data for test */
-   for(i = 0; i < TEST_TASKS; i++) {
-      worker_tasks[i].spin_spincnt = 0;
-   }
 
    /* destroy the wait queue */
    test_verbose_debug("Main destroing the wait queue");
@@ -429,9 +432,10 @@ int mastertask_proc(void* OS_UNUSED(param))
    }
 
    /* verify that slave task did not take next spin after waitqueue was
-    * destroyed */
+    * destroyed and that retcode was OS_DEStROYED (not OS_TIMEOUTED) */
    for(i = 0; i < TEST_TASKS; i++) {
-      test_assert(0 == worker_tasks[i].spin_spincnt);
+      test_assert(OS_DESTROYED == worker_tasks[i].retcode);
+      test_assert(1 == worker_tasks[i].spin_spincnt);
    }
 
    test_result(ret);

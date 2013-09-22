@@ -68,6 +68,9 @@ void os_mtx_destroy(os_mtx_t* mtx)
       os_task_makeready(task); /* wake up all task which waits on mtx->task_queue */
    }
    memset(mtx, 0, sizeof(os_mtx_t)); /* finaly we obstruct mtx data */
+   /* schedule to make context switch in case os_mtx_destroy was called by some
+    * low priority task */
+   os_schedule(1);
    arch_critical_exit(cristate);
 }
 

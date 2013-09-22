@@ -146,7 +146,9 @@ void os_waitqueue_destroy(os_waitqueue_t* queue)
    /* wake up all task which waits on sem->task_queue */
    while( NULL != (task = os_task_dequeue(&(queue->task_queue))) ) {
 
-      /* \TODO FIXME missing timer destroy code ?!? */
+      /* we need to destroy the timer here, because otherwise we will be
+       * vulnerable for race conditions from timer callbacks (ISR) */
+      os_timeout_destroy(task); 
 
       task->wait_queue = NULL;
       task->block_code = OS_DESTROYED;
@@ -156,6 +158,10 @@ void os_waitqueue_destroy(os_waitqueue_t* queue)
    /* finaly we destroy all wait queue data, this should arrise problems if this
     * queue was used also in interupts (feel warned) */
    memset(queue, 0, sizeof(os_waitqueue_t));
+
+   /* schedule to make context switch in case os_waitqueue_destroy was called by
+    * some low priority task */
+   os_schedule(1);
 
    arch_critical_exit(cristate);
 }
@@ -176,6 +182,7 @@ void os_waitqueue_prepare(
     * os_task_makeready() and instead of ready_queue taks will be added to
     * task_queue of assosiated wait_queue */
    os_atomicptr_write(task_current->wait_queue, queue);
+   task_current->block_code = OS_OK;
 
    /* create timer which will count time starting from this moment. By doing
     * this time keeping is done for both, the condition checking code and sleep
@@ -249,8 +256,8 @@ os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(void)
 
    }while(0);
 
-   /* the block code is either OS_OK (set in os_timeout_create()) or OS_TIMEOUT
-    * (set in os_waitqueue_timerclbck()) or OS_DESTROYED (set in
+   /* the block code is either OS_OK (set in os_waitqueue_wakeup_sync()) or
+    * OS_TIMEOUT (set in os_waitqueue_timerclbck()) or OS_DESTROYED (set in
     * os_waitqueue_destroy()) */
    ret = task_current->block_code;
 
@@ -307,8 +314,7 @@ void os_waitqueue_wakeup_sync(
          os_timeout_destroy(task); 
 
          task->wait_queue = NULL; /* disassociate task from wait_queue */
-         /* task->block_code is set to OS_OK in os_waitqueue_prepare */
-         task->block_code = OS_OK; /* \TODO FIXME there is some issue with that, it is visiable in test, check if test is broken or the code sequence which sert the block_code is somehow broken */
+         task->block_code = OS_OK; /* set the block code to NORMAL WAKEUP */
          os_task_makeready(task);
 
          /* do not call schedule() if we will do it in some other os function

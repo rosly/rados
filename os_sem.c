@@ -51,7 +51,9 @@ void os_sem_destroy(os_sem_t* sem)
    /* wake up all task which waits on sem->task_queue */
    while( NULL != (task = os_task_dequeue(&(sem->task_queue))) ) {
 
-      /* \TODO FIXME missing timer destroy code ?!? */
+      /* we need to destroy the timer here, because otherwise we will be
+       * vulnerable for race conditions from timer callbacks (ISR) */
+      os_timeout_destroy(task); 
 
       task->block_code = OS_DESTROYED;
       os_task_makeready(task);
@@ -59,6 +61,10 @@ void os_sem_destroy(os_sem_t* sem)
    /* finaly we destroy all semaphore data, this should arrise problems if this
     * semaphore was used also in interupts (feel warned) */
    memset(sem, 0, sizeof(os_sem_t));
+
+   /* schedule to make context switch in case os_sem_destroy was called by
+    * some low priority task */
+   os_schedule(1);
 
    arch_critical_exit(cristate);
 }
@@ -97,7 +103,7 @@ os_retcode_t OS_WARN_UNUSEDRET os_sem_down(os_sem_t* sem, uint_fast16_t timeout_
          break;
       }
 
-       if( OS_TIMEOUT_INFINITE != timeout_ticks ) {
+      if( OS_TIMEOUT_INFINITE != timeout_ticks ) {
          os_timer_create(&timer, os_sem_timerclbck, task_current, timeout_ticks, 0);
          task_current->timer = &timer;
       }

@@ -47,8 +47,19 @@
 
 #define TEST_TASKS ((unsigned)10)
 
-#define test_verbose_debug test_debug
+//#define test_verbose_debug test_debug
 //#define test_verbose_debug(format, ...)
+
+static uint_fast8_t test_debug_idx = 0;
+static const char test_debug_star[] = { '-', '\\', '|', '/' };
+
+#include <stdio.h>
+#define test_verbose_debug(format, ...) \
+{ \
+  test_debug_idx = (test_debug_idx + 1u > sizeof(test_debug_star) ? 0 : test_debug_idx + 1u); \
+  printf("\b%c", test_debug_star[test_debug_idx]); \
+  fflush(stdout); \
+}
 
 typedef struct {
    os_task_t task;
@@ -324,7 +335,7 @@ int testcase_5regresion(void)
 
    /* use waitqueue with timeout (2 ticks) and finish it right away (simulate
     * early condition meet) */
-   test_debug("Main sleeping on waitqueue with timeout, then finish right away");
+   test_verbose_debug("Main sleeping on waitqueue with timeout, then finish right away");
    os_waitqueue_prepare(&global_wait_queue, &waitobj, 2);
    os_waitqueue_finish();
    /* spin and wait for timeout */
@@ -334,11 +345,11 @@ int testcase_5regresion(void)
          break;
       }
       if(local_tick_cnt != global_tick_cnt) {
-         test_debug("Main detected tick increase");
+         test_verbose_debug("Main detected tick increase");
       }
       local_tick_cnt = global_tick_cnt;
    }
-   test_debug("Main finishing test5");
+   test_verbose_debug("Main finishing test5");
 
    return 0;
 }

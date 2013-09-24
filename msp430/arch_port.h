@@ -64,7 +64,7 @@ typedef struct {
     uint16_t sp;
 } arch_context_t;
 
-typedef uint16_t os_atomic_t; /* this should be included by signal.h but on my enviroment signal.h is empty */
+typedef volatile uint16_t os_atomic_t; /* this should be included by signal.h but on my enviroment signal.h is empty */
 typedef uint16_t arch_criticalstate_t;
 
 #define OS_ISR __attribute__((naked)) ISR

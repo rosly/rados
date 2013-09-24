@@ -58,7 +58,7 @@ typedef struct {
     ucontext_t context;
 } arch_context_t;
 
-typedef sig_atomic_t os_atomic_t;
+typedef volatile sig_atomic_t os_atomic_t;
 
 typedef sigset_t arch_criticalstate_t;
 

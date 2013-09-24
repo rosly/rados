@@ -48,7 +48,7 @@
 #include <os.h>
 #include <os_test.h>
 
-#define TEST_CYCLES ((os_atomic_t)1000)
+#define TEST_CYCLES ((os_atomic_t)50)
 
 typedef struct {
    os_sem_t sem;
@@ -70,7 +70,7 @@ void tick_clbck(void)
 
 void idle(void)
 {
-   if((TEST_CYCLES != task1_data.idx) || (TEST_CYCLES != task2_data.idx))
+   if((task1_data.idx < TEST_CYCLES) || (task2_data.idx < TEST_CYCLES))
    {
      return; /* this is not the end, continue */
    }
@@ -88,7 +88,7 @@ int task_proc(void* param)
    {
       (data->idx)++;
       ret = os_sem_down(&(data->sem), OS_TIMEOUT_INFINITE);
-      test_assert(0 == ret);
+      test_assert(OS_OK == ret);
    }
 
    return 0;
@@ -96,13 +96,18 @@ int task_proc(void* param)
 
 void init(void)
 {
-   test_setuptick(tick_clbck, 1);
+   memset(&task1_data, 0, sizeof(task1_data));
+   memset(&task2_data, 0, sizeof(task2_data));
 
    os_sem_create(&(task1_data.sem), 0);
    os_sem_create(&(task2_data.sem), 0);
 
    os_task_create(&task1, 1, task1_stack, sizeof(task1_stack), task_proc, &task1_data);
    os_task_create(&task2, 1, task2_stack, sizeof(task2_stack), task_proc, &task2_data);
+
+  /* frequent ticks help test race conditions.  The best would be to call tick ISR
+   * every instruction */
+   test_setuptick(tick_clbck, 1);
 }
 
 int main(void)

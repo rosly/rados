@@ -136,8 +136,8 @@ int os_task_join(os_task_t *task)
    int ret;
 
    OS_ASSERT(0 == isr_nesting); /* this function may be called only form user code */
-   OS_ASSERT(task_current->prio_current > 0); /* idle task cannot call blocking
-                                                 functions (will crash OS) */
+   /* idle task cannot call blocking functions (will crash OS) */
+   OS_ASSERT(task_current->prio_current > 0); 
 
    arch_critical_enter(cristate);
    OS_ASSERT(NULL == task->join_sem); /* only single task can wait for another task */

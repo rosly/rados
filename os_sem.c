@@ -76,8 +76,8 @@ os_retcode_t OS_WARN_UNUSEDRET os_sem_down(os_sem_t* sem, uint_fast16_t timeout_
    arch_criticalstate_t cristate;
 
    OS_ASSERT(0 == isr_nesting); /* this function may be called only form user code */
-   OS_ASSERT(task_current->prio_current > 0); /* idle task cannot call blocking
-                                                 functions (will crash OS) */
+   /* idle task cannot call blocking functions (will crash OS) */
+   OS_ASSERT(task_current->prio_current > 0); 
 
    /* we need to disable the interrupts since semaphores may be signalized from ISR
        once we check the semahore value we need to add the task to the task queue in atomic maner

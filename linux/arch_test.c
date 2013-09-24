@@ -65,11 +65,15 @@ void test_debug_printf(const char* format, ...)
 
 void test_result(int result)
 {
+   arch_criticalstate_t cristate;
+
    if(0 == result) {
       printf("%s: Test PASSED\n", test_name);
    } else {
       printf("%s: Test FAILURE\n", test_name);
    }
+
+   arch_critical_enter(cristate);
    exit(result);
 }
 

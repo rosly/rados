@@ -102,8 +102,8 @@ void init(void)
 {
    os_sem_create(&sem1, 0);
    os_sem_create(&sem2, 0);
-   os_task_create(&task1, 1, task1_stack, sizeof(task1_stack), task1_proc, &task1_idx);
-   os_task_create(&task2, 1, task2_stack, sizeof(task2_stack), task2_proc, &task2_idx);
+   os_task_create(&task1, 1, task1_stack, sizeof(task1_stack), task1_proc, (void*)&task1_idx);
+   os_task_create(&task2, 1, task2_stack, sizeof(task2_stack), task2_proc, (void*)&task2_idx);
 }
 
 int main(void)

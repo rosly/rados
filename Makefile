@@ -101,7 +101,7 @@ $(BUILDDIR)/%.d: %.c
 .PHONY: clean test testrun testloop lst size
 
 clean:
-	@$(RM) $(BUILDTARGET); $(ECHO) "[RM]\t$(BUILDTARGETS)"
+	@$(RM) $(BUILDTARGET); $(ECHO) "[RM]\t$(BUILDTARGET)"
 	@$(RM) $(OBJECTS); $(ECHO) "[RM]\t$(OBJECTS)"
 	@$(RM) $(DEPEND); $(ECHO) "[RM]\t$(DEPEND)"
 	@$(RM) $(LISTINGS); $(ECHO) "[RM]\t$(LISTINGS)"

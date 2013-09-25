@@ -38,7 +38,8 @@
  * it only may change after os_schedule call, compiler asumes that after
  * function call all data under the pointer may be changed (also ISR will not
  * change it since interrupts are blocked by critical sections) */
-/* intentionaly not volatile */ os_task_t *task_current = NULL;
+/* intentionaly not volatile */
+os_task_t *task_current = NULL;
 os_taskqueue_t ready_queue;
 volatile os_atomic_t isr_nesting = 0;
 volatile os_atomic_t sched_lock = 0;

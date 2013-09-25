@@ -32,11 +32,15 @@
 #include "os_private.h"
 
 /** Maximal number of unsychronized ticks */
-#define OS_TIMER_UNSYNCH_MAX ((uint_fast16_t)1024)
+#define OS_TIMER_UNSYNCH_MAX ((os_ticks_t)1024)
 
 /** Prevent from craeting timer with to big timeout, so even if it will fit into
  *  timeout datatype, it could create problems with high OS_TIMER_UNSYNCH_MAX */
-#define OS_TIMER_TICKSREM_MAX ((uint_fast16_t)(UINT16_MAX - OS_TIMER_UNSYNCH_MAX))
+#define OS_TIMER_TICKSREM_MAX ((os_ticks_t)(UINT16_MAX - OS_TIMER_UNSYNCH_MAX))
+
+/** current ticks counter, increamented each tick ISR call
+ *  used for time keeping */
+os_ticks_t os_ticks_cnt = 0;
 
 /** /TODO In future we need some smarter algorithm than list for active timers,
  * list will not scale good so it will be only efective in case of small amout
@@ -55,7 +59,7 @@
  * while timers should be added to queue (and soting should be done there) by
  * os_timer_add */
 static list_t timers;
-static uint_fast16_t timer_tick_unsynch = 0;
+static os_ticks_t timer_tick_unsynch = 0;
 
 static void OS_HOT os_timer_add(os_timer_t *add_timer);
 static void OS_HOT os_timer_synch(void);
@@ -73,8 +77,8 @@ void os_timer_create(
   os_timer_t* timer,
   timer_proc_t clbck,
   void* param,
-  uint_fast16_t timeout_ticks,
-  uint_fast16_t reload_ticks)
+  os_ticks_t timeout_ticks,
+  os_ticks_t reload_ticks)
 {
    arch_criticalstate_t cristate;
 
@@ -135,6 +139,12 @@ void OS_HOT os_timer_tick(void)
    list_t *head;
    os_timer_t* head_timer;
 
+   /* increment system global ticks count
+    * to be able to use this counter properly, user code must call os_ticks_now
+    * and os_ticks_diff funtions whcih handle the overflow scenario */
+   ++os_ticks_cnt;
+
+   /* handle the timer list */
    head = list_peekfirst(&timers);
    if( NULL == head ) {
       /* if there is no timers in queue we can safely reset unsynch and no timer
@@ -234,5 +244,48 @@ static void OS_HOT os_timer_triger(void)
       itr_timer->ticks_rem = itr_timer->ticks_reload;
       os_timer_add(itr_timer); /* add timer at the proper place */
    }
+}
+
+os_ticks_t os_ticks_diff(os_ticks_t* restrict tick_start)
+{
+  arch_criticalstate_t cristate;
+  os_ticks_t ret;
+
+  arch_critical_enter(cristate);
+  if(*tick_start > os_ticks_cnt)
+    {
+      ret = ARCH_TICKS_MAX - *ticks_start + 1 + os_ticks_cnt;
+    }
+  else
+    {
+      ret = os_ticks_cnt - *ticks_start;
+    }
+  *ticks_start = os_ticks_cnt;
+  arch_critical_exit(cristate);
+
+  return ret;
+}
+
+void os_timeout_start(os_timeout_t* restrict timeout, unsigned timeout_ms)
+{
+  os_ticks_now(i&(timeout->tick_start));
+  timeout->ticks_rem = timeout_ms * OS_TICKS_MS;
+}
+
+int os_timeout_check(os_timeout_t* restrict timeout)
+{
+  os_ticks_t ticks_tmp;
+
+  ticks_tmp = os_ticks_diff(&(timeout->ticks_start));
+  if(ticks_tmp >= timeout->ticks_rem)
+    {
+      timeout->ticks_rem = 0;
+      return 1;
+    }
+  else
+    {
+      timeout->ticks_rem -= ticks_tmp;
+      return 0;
+    }
 }
 

@@ -169,7 +169,7 @@ void os_waitqueue_destroy(os_waitqueue_t* queue)
 void os_waitqueue_prepare(
    os_waitqueue_t *queue,
    os_waitobj_t *waitobj,
-   uint_fast16_t timeout_ticks)
+   os_ticks_t timeout_ticks)
 {
    OS_ASSERT(0 == isr_nesting); /* this function may be called only form user code */
    OS_ASSERT(task_current->prio_current > 0); /* idle task cannot call blocking

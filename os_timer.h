@@ -32,18 +32,47 @@
 #ifndef __OS_TIMER_
 #define __OS_TIMER_
 
+#define OS_TIMEOUT_INFINITE (ARCH_TICKS_MAX)
+#define OS_TIMEOUT_TRY ((os_ticks_t)0)
+
+/** definition of system tick, it is defined by arch but never can be smaller than
+ * uint16_t */
+typedef arch_ticks_t os_ticks_t;
+#if sizeof(os_ticks_t) < sizeof(uint16_t)
+#error os_ticks_t cannot be smaller than uint16_t
+#endif
+
 typedef void (*timer_proc_t)(void* param);
 
 typedef struct {
    list_t list;
-   uint_fast16_t ticks_rem;
-   uint_fast16_t ticks_reload;
+   os_ticks_t ticks_rem;
+   os_ticks_t ticks_reload;
    timer_proc_t clbck;
    void* param;
 } os_timer_t;
 
+typedef struct
+{
+  os_ticks_t ticks_start;
+  os_ticks_t ticks_rem;
+} os_timeout_t;
+
+/** current ticks counter, increamented each tick ISR call
+ *  used for time keeping */
+extern os_ticks_t os_ticks_cnt;
+
 void os_timer_create(os_timer_t* timer, timer_proc_t clbck, void* param, uint_fast16_t timeout_ticks, uint_fast16_t reload_ticks);
 void os_timer_destroy(os_timer_t* timer);
+
+static inline void os_ticks_now(os_ticks_t *ticks_now)
+{
+  arch_ticks_atomiccpy(ticks_now, &os_ticks_cnt);
+}
+
+os_ticks_t os_ticks_diff(os_ticks_t* restrict tick_start);
+void os_timeout_start(os_timeout_t* restrict timeout, unsigned timeout_ms);
+int os_timeout_check(os_timeout_t* restrict timeout);
 
 #endif
 

@@ -34,7 +34,7 @@
 
 test_tick_clbck_t test_tick_clbck = NULL;
 
-void test_debug(const char* OS_UNUSED(format), ...)
+void test_debug_printf(const char* OS_UNUSED(format), ...)
 {
    /* for mp430 we dont support this functionality */
 }
@@ -44,7 +44,7 @@ void test_result(int OS_UNUSED(result))
    arch_halt();
 }
 
-void test_setupmain(void)
+void test_setupmain(const char* OS_UNUSED(test_name))
 {
    test_assert(0); /* missing implementation */
 }

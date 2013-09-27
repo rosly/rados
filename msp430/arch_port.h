@@ -41,7 +41,7 @@
 #include <string.h> /* for memcpy */
 
 /* missing stdbool.h for this platform */
-typedef uint8_fast_t bool;
+typedef uint8_t bool;
 #define false ((uint8_t)0)
 #define true  ((uint8_t)1) /* considered also !false but finaly decided to be more strict */
 
@@ -64,8 +64,10 @@ typedef struct {
     uint16_t sp;
 } arch_context_t;
 
-typedef volatile uint16_t os_atomic_t; /* this should be included by signal.h but on my enviroment signal.h is empty */
-typedef uint16_t arch_criticalstate_t;
+typedef uint16_t arch_atomic_t; /* exactly 16 bits. sig_atomic_t should be available from signal.h but on my enviroment signal.h was empty */
+typedef uint16_t arch_ticks_t; /* exactly 16 bits */
+#define ARCH_TICKS_MAX ((arch_ticks_t)UINT16_MAX)
+typedef uint16_t arch_criticalstate_t; /* size of CPU status register */
 
 #define OS_ISR __attribute__((naked)) ISR
 #define OS_NAKED __attribute__((naked))
@@ -79,7 +81,7 @@ typedef uint16_t arch_criticalstate_t;
 #define OS_UNUSED(_x) unused_ ## _x __attribute__((unused))
 
 #define OS_STACK_DESCENDING
-#define OS_STACK_MINSIZE ((size_t)28 * 4) /* four times the single context dump */
+#define OS_STACK_MINSIZE ((size_t)28 * 4) /* four times of context dump size */
 
 #define os_atomic_inc(_atomic) \
     __asm__ __volatile__ ( \
@@ -91,9 +93,16 @@ typedef uint16_t arch_criticalstate_t;
         "dec %[atomic]\n\t" \
             ::  [atomic] "m" (_atomic))
 
-#define os_atomicptr_read(_ptr) (*(_ptr))
+/* all pointers in MSP430 are size of CPU register, no need to read or write
+ * with any concurent handling */
+#define os_atomicptr_read(_ptr) (_ptr)
 #define os_atomicptr_write(_ptr, _val) ((_ptr) = (_val))
 #define os_atomicptr_xchnge(_ptr, _val) (OS_ASSERT(!"not implemented"))
+
+#define arch_ticks_atomiccpy(_dst, _src) \
+  do { \
+      *(_dst) = *(_src); /* we can copy as rval since MSP430 is 16bit arch and arch_ticks_t is 16bit*/ \
+  }while(0)
 
 #define arch_critical_enter(_critical_state) \
    do { \

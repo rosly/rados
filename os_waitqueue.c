@@ -148,7 +148,7 @@ void os_waitqueue_destroy(os_waitqueue_t* queue)
 
       /* we need to destroy the timer here, because otherwise we will be
        * vulnerable for race conditions from timer callbacks (ISR) */
-      os_timeout_destroy(task); 
+      os_blocktimer_destroy(task); 
 
       task->wait_queue = NULL;
       task->block_code = OS_DESTROYED;
@@ -191,7 +191,7 @@ void os_waitqueue_prepare(
       arch_criticalstate_t cristate;
 
       arch_critical_enter(cristate);
-      os_timeout_create(&(waitobj->timer), os_waitqueue_timerclbck, timeout_ticks);
+      os_blocktimer_create(&(waitobj->timer), os_waitqueue_timerclbck, timeout_ticks);
       arch_critical_exit(cristate);
    }
 }
@@ -215,10 +215,10 @@ void os_waitqueue_finish(void)
       task_current->wait_queue = NULL;
 
       /* destroy timeout assosiated with task good to note is that we check
-       * task_curent->timer second time inside os_timeout_destroy() since
+       * task_curent->timer second time inside os_blocktimer_destroy() since
        * previus checking was done outside critical section (things may change
        * from that moment) */
-      os_timeout_destroy(task_current); 
+      os_blocktimer_destroy(task_current); 
 
       arch_critical_exit(cristate);
 
@@ -252,7 +252,7 @@ os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(void)
       os_block_andswitch(&(task_current->wait_queue->task_queue), OS_TASKBLOCK_WAITQUEUE);
 
       /* destroy timeout assosiated with task if it was created */
-      os_timeout_destroy(task_current); 
+      os_blocktimer_destroy(task_current); 
 
    }while(0);
 
@@ -311,7 +311,7 @@ void os_waitqueue_wakeup_sync(
 
          /* we need to destroy the timer here, because otherwise we will be
           * vulnerable for race conditions from timer callbacks (ISR) */
-         os_timeout_destroy(task); 
+         os_blocktimer_destroy(task); 
 
          task->wait_queue = NULL; /* disassociate task from wait_queue */
          task->block_code = OS_OK; /* set the block code to NORMAL WAKEUP */

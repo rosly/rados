@@ -29,9 +29,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* This file ahs to contain all definitions used by various kernel modules which
-   cannot be exposed for user view. Those definitions can be used only by the
-   internal kernel code (similarity to procected class clausule in C++)*/
+/* This file  contains all definitions used by various kernel modules which
+   cannot be exposed for user view (in other words they are shared betwen kernel
+   modules). Those definitions can be used only by the internal kernel code
+   (similarity to private class clausule in C++)*/
 
 #ifndef __OS_PRIVATE_
 #define __OS_PRIVATE_
@@ -176,7 +177,7 @@ static inline void os_task_makewait(
    os_task_enqueue(task_queue, task_current);
 }
 
-static inline void os_timeout_create(
+static inline void os_blocktimer_create(
    os_timer_t *timer,
    timer_proc_t clbck,
    uint_fast16_t timeout_ticks)
@@ -185,7 +186,7 @@ static inline void os_timeout_create(
    task_current->timer = timer;
 }
 
-static inline void os_timeout_destroy(os_task_t *task)
+static inline void os_blocktimer_destroy(os_task_t *task)
 {
    /* check if there is a timeout assosiated with task */
    if( NULL != task->timer ) {

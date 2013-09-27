@@ -53,7 +53,7 @@ void os_sem_destroy(os_sem_t* sem)
 
       /* we need to destroy the timer here, because otherwise we will be
        * vulnerable for race conditions from timer callbacks (ISR) */
-      os_timeout_destroy(task); 
+      os_blocktimer_destroy(task); 
 
       task->block_code = OS_DESTROYED;
       os_task_makeready(task);
@@ -104,19 +104,13 @@ os_retcode_t OS_WARN_UNUSEDRET os_sem_down(os_sem_t* sem, uint_fast16_t timeout_
       }
 
       if( OS_TIMEOUT_INFINITE != timeout_ticks ) {
-         os_timer_create(&timer, os_sem_timerclbck, task_current, timeout_ticks, 0);
-         task_current->timer = &timer;
+         os_blocktimer_create(&timer, os_sem_timerclbck, timeout_ticks);
       }
 
       /* now block and change switch the context */
       os_block_andswitch(&(sem->task_queue), OS_TASKBLOCK_SEM);
 
-      if( NULL != task_current->timer ) {
-         /* seems that timer didn't exipre up to now, we need to clean it */
-         task_current->timer = NULL;
-         os_timer_destroy(&timer);
-      }
-
+      os_blocktimer_destroy(task_current);
       /* the block_code was set in os_sem_destroy, timer callback or in os_sem_up */
       ret = task_current->block_code;
 
@@ -151,10 +145,9 @@ void os_sem_up_sync(os_sem_t* sem, bool sync)
    }
    else
    {
-      
       /* we need to destroy the timer here, because otherwise we will be
        * vulnerable for race conditions from timer callbacks (ISR) */
-      os_timeout_destroy(task); 
+      os_blocktimer_destroy(task); 
 
       task->block_code = OS_OK; /* set the block code to NORMAL WAKEUP */
       os_task_makeready(task);

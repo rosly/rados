@@ -35,6 +35,7 @@
 #include "arch_port.h"
 #include "list.h"
 #include "os_config.h"
+#include "os_protected.h"
 #include "os_timer.h"
 #include "os_sched.h"
 #include "os_sem.h"
@@ -45,3 +46,4 @@ extern os_task_t *task_current; /* need to be visiable for user because of arch_
 extern volatile os_atomic_t isr_nesting; /* need to be visiable for user because of arch_contextstore_i macros */
 
 #endif
+

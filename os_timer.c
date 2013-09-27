@@ -246,13 +246,14 @@ static void OS_HOT os_timer_triger(void)
    }
 }
 
-os_ticks_t os_ticks_diff(os_ticks_t* restrict tick_start)
+/* \TODO unit test missing */
+os_ticks_t os_ticks_diff(os_ticks_t* restrict ticks_start)
 {
   arch_criticalstate_t cristate;
   os_ticks_t ret;
 
   arch_critical_enter(cristate);
-  if(*tick_start > os_ticks_cnt)
+  if(*ticks_start > os_ticks_cnt)
     {
       ret = ARCH_TICKS_MAX - *ticks_start + 1 + os_ticks_cnt;
     }
@@ -266,12 +267,14 @@ os_ticks_t os_ticks_diff(os_ticks_t* restrict tick_start)
   return ret;
 }
 
-void os_timeout_start(os_timeout_t* restrict timeout, unsigned timeout_ms)
+/* \TODO unit test missing */
+void os_timeout_start(os_timeout_t* restrict timeout, os_ticks_t ticks)
 {
-  os_ticks_now(i&(timeout->tick_start));
-  timeout->ticks_rem = timeout_ms * OS_TICKS_MS;
+  os_ticks_now(&(timeout->ticks_start));
+  timeout->ticks_rem = ticks;
 }
 
+/* \TODO unit test missing */
 int os_timeout_check(os_timeout_t* restrict timeout)
 {
   os_ticks_t ticks_tmp;

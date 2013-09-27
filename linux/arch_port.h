@@ -58,8 +58,9 @@ typedef struct {
     ucontext_t context;
 } arch_context_t;
 
-typedef volatile sig_atomic_t os_atomic_t;
-
+typedef sig_atomic_t arch_atomic_t; /* this is guaranteed to be at least 24 bits wide from POSIX */
+typedef uint_fast16_t arch_ticks_t;
+#define ARCH_TICKS_MAX ((arch_ticks_t)UINT_FAST16_MAX)
 typedef sigset_t arch_criticalstate_t;
 
 extern sigset_t arch_crit_signals;
@@ -88,9 +89,16 @@ extern sigset_t arch_crit_signals;
         "decq %[atomic]\n\t" \
             ::  [atomic] "m" (_atomic))
 
+/* all pointers in any linux are size of CPU register, no need to read or write
+ * with any concurent handling */
 #define os_atomicptr_read(_ptr) (_ptr)
 #define os_atomicptr_write(_ptr, _val) ((_ptr) = (_val))
 #define os_atomicptr_xchnge(_ptr, _val) (OS_ASSERT(!"not implemented"))
+
+#define arch_ticks_atomiccpy(_dst, _src) \
+  do { \
+      *(_dst) = *(_src); /* we can copy as val since linux works on arch > 32bit */ \
+  }while(0)
 
 #define arch_critical_enter(_critical_state) \
    do { \

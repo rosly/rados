@@ -255,6 +255,7 @@ os_ticks_t os_ticks_diff(os_ticks_t* restrict ticks_start)
   arch_critical_enter(cristate);
   if(*ticks_start > os_ticks_cnt)
     {
+      OS_ASSERT(0); /* \TODO \FIXME check this under debugger!!!! */
       ret = ARCH_TICKS_MAX - *ticks_start + 1 + os_ticks_cnt;
     }
   else

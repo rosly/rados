@@ -175,6 +175,7 @@ void os_task_create(
    void* param);
 int os_task_join(os_task_t *task);
 void OS_HOT os_tick(void);
+void OS_COLD os_halt(void);
 
 #endif
 

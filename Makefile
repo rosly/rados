@@ -39,6 +39,9 @@ endif
 #variables are defined
 include $(ARCH)/target.mk
 
+SOURCEDIR = .
+BUILDDIR = build/$(ARCH)
+INCLUDEDIR = . $(ARCH)
 SOURCES = \
 	os_sched.c \
 	os_sem.c \
@@ -46,9 +49,6 @@ SOURCES = \
 	os_waitqueue.c \
 	os_timer.c \
 	$(ARCHSOURCES)
-
-INCLUDES = . $(ARCH)
-BUILDDIR = build/$(ARCH)
 
 #in target.mk for each source the optimal optimization level (CFLAGS = -Ox) is defined
 #but here we add CFLAGS += -g if debug build
@@ -59,7 +59,7 @@ endif
 CFLAGS += -Wall -Wextra -Werror
 LDFLAGS +=
 
-vpath %.c . $(ARCH)
+vpath %.c $(SOURCEDIR) $(ARCH)
 vpath %.o $(BUILDDIR)
 vpath %.elf $(BUILDDIR)
 DEPEND = $(addprefix $(BUILDDIR)/, $(SOURCES:.c=.d))
@@ -77,7 +77,7 @@ $(BUILDTARGET): $(OBJECTS)
 
 $(BUILDDIR)/%.o: %.c
 	@$(ECHO) "[CC]\t$<"
-	@$(CC) -c $(CFLAGS) -o $@ $(addprefix -I, $(INCLUDES)) $<
+	@$(CC) -c $(CFLAGS) -o $@ $(addprefix -I, $(INCLUDEDIR)) $<
 
 $(BUILDDIR)/%.lst: %.o
 	@$(ECHO) "[LST]\t$<"
@@ -96,7 +96,7 @@ endif
 # (otherwise use -MM instead of -M)
 $(BUILDDIR)/%.d: %.c
 	@$(ECHO) "[DEP]\t$<"
-	@$(CC) -M ${CFLAGS} $(addprefix -I, $(INCLUDES)) $< >$@
+	@$(CC) -M ${CFLAGS} $(addprefix -I, $(INCLUDEDIR)) $< >$@
 
 .PHONY: clean test testrun testloop lst size
 

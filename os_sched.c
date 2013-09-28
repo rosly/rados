@@ -174,6 +174,11 @@ void OS_HOT os_tick(void)
    os_schedule(0);
 }
 
+void OS_COLD os_halt(void)
+{
+  arch_halt();
+}
+
 /* --- private functions --- */
 
 void OS_HOT os_task_enqueue(

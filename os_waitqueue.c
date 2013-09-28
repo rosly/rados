@@ -177,6 +177,8 @@ void os_waitqueue_prepare(
    /* check if task is not already subscribed to other wait_queue
       currently we do not support waiting on multiple wait queues */
    OS_ASSERT(NULL == task_current->wait_queue);
+   /* in case of timeout use, we need to have waitobj */
+   OS_ASSERT((OS_TIMEOUT_INFINITE == timeout_ticks) || (NULL != waitobj));
 
    /* assosiate task with wait_queue, this will change the bechaviour inside
     * os_task_makeready() and instead of ready_queue taks will be added to

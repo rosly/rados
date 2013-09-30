@@ -47,9 +47,11 @@
 
 #define TEST_TASKS ((unsigned)10)
 
-//#define test_verbose_debug test_debug
+#if 1
+#define test_verbose_debug test_debug
 //#define test_verbose_debug(format, ...)
 
+#else
 static uint_fast8_t test_debug_idx = 0;
 static const char test_debug_star[] = { '-', '\\', '|', '/' };
 
@@ -60,6 +62,7 @@ static const char test_debug_star[] = { '-', '\\', '|', '/' };
   printf("\b%c", test_debug_star[test_debug_idx]); \
   fflush(stdout); \
 }
+#endif
 
 typedef struct {
    os_task_t task;
@@ -354,9 +357,58 @@ int testcase_5regresion(void)
    return 0;
 }
 
+/**
+ * Regresion test case
+ * os_waitqueue_wait had a bug. If waitqueue was signalized before task reach
+ * waitqueue_wait() and timer was created, then this signalized task will not
+ * clear timeout, since was detecting the signalization in special case and skip the
+ * timer cleanup
+ */
+int testcase_6regresion(void)
+{
+   unsigned local_tick_cnt;
+   os_waitqueue_t waitqueue;
+   os_waitobj_t waitobj;
+   os_retcode_t ret;
+
+   /* reset tickcnt's */
+   local_tick_cnt = global_tick_cnt = 0;
+
+   /* use waitqueue with timeout (2 ticks), after timeout will butrn of try to
+    * use the waitqueue again. If bug is still there OS_SELFCHECK_ASSERT(NULL ==
+    * task_current->timer);will triger inside os_blocktimer_create */
+   test_verbose_debug("Main preparing waitqueue than while it was signalized it trys to wait on it");
+   os_waitqueue_prepare(&waitqueue, &waitobj, 2);
+
+   while(1) {
+      if(global_tick_cnt > 5) {
+         /* break after 5 ticks */
+         break;
+      }
+      if(local_tick_cnt != global_tick_cnt) {
+         test_verbose_debug("Main detected tick increase");
+      }
+      local_tick_cnt = global_tick_cnt;
+   }
+   /* now try to wait on it, in mean time there was timeout so we should hit the
+    * special condition if(NULL == task_current->wait_queue) */
+   ret = os_waitqueue_wait();
+   test_assert(OS_TIMEOUT == ret);
+
+   /* now try to use the wait queue again, if bug is still there this will fail
+    * */
+   os_waitqueue_prepare(&waitqueue, &waitobj, 2);
+
+   /* cleanup and finish test case */
+   os_waitqueue_finish();
+   
+   return 0;
+}
+
 /* \TODO write bit banging on two threads and waitqueue as test5
  * this will be the stress proff of concept */
 
+#if 1
 \TODO \FIXME another bugg!!!! fuck!!!
 if os_waitqueue_wakeup will be called from ISR while task_current is spining on condition (or about to call waitqueue_wait),
    and we make a waitqueue_prepare call with timeout .. then the spetial condition in waitqueue_waueup will just task_current->wait_queue = NULL
@@ -374,6 +426,7 @@ those bugs was probably fixed in some of last commit, but we need to revoke them
 \TODO \FIXME another bug
 waitqueue timer has missing check for os_task_makeready if task state is already RUNNING. From fisr sight this may cause some problems since we touching ready_queue in that case while this is forbiden for such task (it is already scheduled)!!!
 Again, revoke fix and make regresion test for it
+#endif
 
 /**
  * The main task for tests manage
@@ -420,6 +473,8 @@ int mastertask_proc(void* OS_UNUSED(param))
       ret = testcase_4regresion();
       if(ret) break;
       ret = testcase_5regresion();
+      if(ret) break;
+      ret = testcase_6regresion();
       if(ret) break;
    } while(0);
 

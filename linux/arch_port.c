@@ -127,7 +127,7 @@ void OS_NORETURN OS_COLD arch_halt(void)
 {
    while(1) {
       raise(SIGABRT);
-      exit(0);
+      exit(-1); /* signalize error bail out */
    }
 }
 

@@ -195,12 +195,6 @@ static inline void os_blocktimer_create(
    timer_proc_t clbck,
    uint_fast16_t timeout_ticks)
 {
-   /* \TODO FIXME there is probable bug in waitqueue and sem timer calbacks
-    * no one is seting task->timer to NULL there or destroying timer
-    * if this assertion will be broken then my assumptions was correct, it need
-    * to be fixed. I was not sure i(I dont remember) if timer is meant to be
-    * destroyed by cleanup API of sem and waitqueue, so I not decided to fix it
-    * imidiately. Just see if this will happen */
    OS_SELFCHECK_ASSERT(NULL == task_current->timer);
 
    os_timer_create(timer, clbck, task_current, timeout_ticks, 0);

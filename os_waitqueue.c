@@ -242,6 +242,8 @@ os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(void)
       /* check if we really was prepared for waiting on wait_queue
          if not this may mean that we where woken up in mean time */
       if(NULL == task_current->wait_queue) {
+        /* cleanup, destroy timeout assosiated with task if it was created */
+        os_blocktimer_destroy(task_current); 
         break;
       }
 

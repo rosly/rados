@@ -357,6 +357,24 @@ int testcase_5regresion(void)
 /* \TODO write bit banging on two threads and waitqueue as test5
  * this will be the stress proff of concept */
 
+\TODO \FIXME another bugg!!!! fuck!!!
+if os_waitqueue_wakeup will be called from ISR while task_current is spining on condition (or about to call waitqueue_wait),
+   and we make a waitqueue_prepare call with timeout .. then the spetial condition in waitqueue_waueup will just task_current->wait_queue = NULL
+   without even considering timer destroy!!!
+
+\TODO \FIXME second bug!!!
+again calling waitqueue_wakeup when task_current is spinning, so the same special condition will triger
+and totaly piss off nbr parameter, so if we would like to wake up many task from ISR, but in the same  time task_current was about to block on waitqueue_wait
+then we will unblock just this one ano no more of others ... fuck!!!!
+
+KISS keep it simple stupid!!!
+
+those bugs was probably fixed in some of last commit, but we need to revoke them, make the regresion test and then apply fixes again to verify that this work
+
+\TODO \FIXME another bug
+waitqueue timer has missing check for os_task_makeready if task state is already RUNNING. From fisr sight this may cause some problems since we touching ready_queue in that case while this is forbiden for such task (it is already scheduled)!!!
+Again, revoke fix and make regresion test for it
+
 /**
  * The main task for tests manage
  */

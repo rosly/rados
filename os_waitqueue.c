@@ -146,8 +146,8 @@ void os_waitqueue_destroy(os_waitqueue_t* queue)
    /* wake up all task which waits on sem->task_queue */
    while( NULL != (task = os_task_dequeue(&(queue->task_queue))) ) {
 
-      /* we need to destroy the timer here, because otherwise we will be
-       * vulnerable for race conditions from timer callbacks (ISR) */
+      /* destroy the timer if it was assosiated with task which we plan to wake
+       * up */
       os_blocktimer_destroy(task); 
 
       task->wait_queue = NULL;
@@ -201,11 +201,6 @@ void os_waitqueue_prepare(
 void os_waitqueue_finish(void)
 {
    OS_ASSERT(0 == isr_nesting); /* this function may be called only form user code */
-   /* we check that task_current was assigned to some queue this helps to force
-    * user to write corect and efficient code since calling
-    * os_waitqueue_finish() after os_waitqueue_wait() is a waste of CPU cycles
-    */
-   OS_ASSERT(NULL != task_current->wait_queue);
 
    /* just peek if we have timer for timeout assigned */
    if(NULL != os_atomicptr_read(task_current->timer)) {
@@ -253,7 +248,7 @@ os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(void)
       /* now block and change switch the context */
       os_block_andswitch(&(task_current->wait_queue->task_queue), OS_TASKBLOCK_WAITQUEUE);
 
-      /* destroy timeout assosiated with task if it was created */
+      /* cleanup, destroy timeout assosiated with task if it was created */
       os_blocktimer_destroy(task_current); 
 
    }while(0);
@@ -301,33 +296,54 @@ void os_waitqueue_wakeup_sync(
        * switching Since task_current is not in task_queue of wait_queue, all
        * what we need to do is disassociate the task from wait queue */
       task_current->wait_queue = NULL;
-   } else {
-       while((OS_WAITQUEUE_ALL == nbr) || ((nbr--) > 0)) {
-         /* chose most prioritized task from wait_queue->task_queue and for
-          * task with same priority chose in FIFO manner */
-         task = os_task_dequeue(&(queue->task_queue));
-         /* check if there was task which waits on queue */
-         if( NULL == task ) {
-            break; /* there will be no more task to wake, stop spinning */
-         }
 
-         /* we need to destroy the timer here, because otherwise we will be
-          * vulnerable for race conditions from timer callbacks (ISR) */
-         os_blocktimer_destroy(task); 
+      /* we need to destroy the timer here, because otherwise it may fire right
+       * after we leave the critical section */
+      os_blocktimer_destroy(task_current); 
 
-         task->wait_queue = NULL; /* disassociate task from wait_queue */
-         task->block_code = OS_OK; /* set the block code to NORMAL WAKEUP */
-         os_task_makeready(task);
+      /* since we teoreticaly prevented from sleep one task, now we have one
+       * task less to wake up */
+      if(OS_WAITQUEUE_ALL != nbr) {
+        --nbr;
+      }
 
-         /* do not call schedule() if we will do it in some other os function
-          * call. This is marked by sync parameter flag */
-         if(!sync) {
-            /* switch to more prioritized READY task, if there is such (1 param
-             * in os_schedule means switch to other READY task which has greater
-             * priority) */
-            os_schedule(1);
-         }
-       }
+      /* \TODO \FIXME consider that task_current may be less prioritazed than
+       * tasks in wait_queue->task_queue, so preventing it from sleep is not
+       * fait in scope of scheduling. There may be some more prioritized task
+       * which should be woken up first, while this task maybe should go to
+       * sleep for instance in nbr = 1
+       * One additional note: look at os_schedule() at bottom of this function,
+       * this will not help either, because if nbr was 1, then this bottom
+       * section will not even fire
+       * we should put task_current into wait_queue->task_queue and then pick
+       * most prioritized one */
+   }
+
+   while((OS_WAITQUEUE_ALL == nbr) || ((nbr--) > 0)) {
+     /* chose most prioritized task from wait_queue->task_queue and for
+      * task with same priority chose in FIFO manner */
+     task = os_task_dequeue(&(queue->task_queue));
+     /* check if there was task which waits on queue */
+     if( NULL == task ) {
+        break; /* there will be no more task to wake, stop spinning */
+     }
+
+     /* we need to destroy the timer here, because otherwise it may fire right
+      * after we leave the critical section */
+     os_blocktimer_destroy(task); 
+
+     task->wait_queue = NULL; /* disassociate task from wait_queue */
+     task->block_code = OS_OK; /* set the block code to NORMAL WAKEUP */
+     os_task_makeready(task);
+
+     /* do not call schedule() if we will do it in some other os function
+      * call. This is marked by sync parameter flag */
+     if(!sync) {
+        /* switch to more prioritized READY task, if there is such (1 param
+         * in os_schedule means switch to other READY task which has greater
+         * priority) */
+        os_schedule(1);
+     }
    }
    arch_critical_exit(cristate);
 }
@@ -338,20 +354,29 @@ static void os_waitqueue_timerclbck(void* param)
 {
    os_task_t *task = (os_task_t*)param;
 
+   /* remove the wait_queue assosiation since we timeouted
+    * only then we can call os_task_makeready(), check internals */
+   task->wait_queue = NULL;
+   task->block_code = OS_TIMEOUT;
+
    /* unlike to semaphores, timeout for waitqueues are created when task is
     * still running in os_waitqueue_prepare. It may happened that this timer
     * will burn off while task is still runinng and not yet reached
-    * os_waitqueue_wait() function.  It will mean that is will be not linked at
-    * any task_list so we should not try to unlik it. */
-   if(TASKSTATE_RUNNING != task->state) {
+    * os_waitqueue_wait() function. 
+    * It means that task for this timer may be in any state, WAIT, READY or even
+    * RUNNING. Therefore we do not check for
+    * OS_SELFCHECK_ASSERT(TASKSTATE_WAIT == task->state);
+    *
+    * It will also mean that it can be linked at some task_list only if it state
+    * is WAIT */
+   if(TASKSTATE_WAIT == task->state) {
      os_task_unlink(task);
+     os_task_makeready(task);
    }
-   /* remove the wait_queue assosiation since we timeouted */
-   task->wait_queue = NULL;
-   task->block_code = OS_TIMEOUT;
-   os_task_makeready(task);
    /* we do not call the os_sched here, because this will be done at the
     * os_tick() (which calls the os_timer_tick which call this function) */
+   /* we do not need to destroy timer here, since it will be destroyed by
+    * cleanup code inside the woken up task */
    /* timer is not auto reload so we dont have to wory about it here (it will
     * not call this function again, also we can safely call os_timer_destroy
     * multiple times for such destroyed timer unles memory for timer structure

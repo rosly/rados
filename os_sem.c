@@ -51,8 +51,8 @@ void os_sem_destroy(os_sem_t* sem)
    /* wake up all task which waits on sem->task_queue */
    while( NULL != (task = os_task_dequeue(&(sem->task_queue))) ) {
 
-      /* we need to destroy the timer here, because otherwise we will be
-       * vulnerable for race conditions from timer callbacks (ISR) */
+      /* destroy the timer if it was assosiated with task which we plan to wake
+       * up */
       os_blocktimer_destroy(task); 
 
       task->block_code = OS_DESTROYED;
@@ -110,6 +110,7 @@ os_retcode_t OS_WARN_UNUSEDRET os_sem_down(os_sem_t* sem, uint_fast16_t timeout_
       /* now block and change switch the context */
       os_block_andswitch(&(sem->task_queue), OS_TASKBLOCK_SEM);
 
+      /* cleanup, destroy timeout assosiated with task if it was created */
       os_blocktimer_destroy(task_current);
       /* the block_code was set in os_sem_destroy, timer callback or in os_sem_up */
       ret = task_current->block_code;
@@ -145,8 +146,8 @@ void os_sem_up_sync(os_sem_t* sem, bool sync)
    }
    else
    {
-      /* we need to destroy the timer here, because otherwise we will be
-       * vulnerable for race conditions from timer callbacks (ISR) */
+      /* we need to destroy the timer here, because otherwise it may fire right
+       * after we leave the critical section */
       os_blocktimer_destroy(task); 
 
       task->block_code = OS_OK; /* set the block code to NORMAL WAKEUP */
@@ -170,12 +171,16 @@ static void os_sem_timerclbck(void* param)
 {
    os_task_t *task = (os_task_t*)param;
 
+   OS_SELFCHECK_ASSERT(TASKSTATE_WAIT == task->state);
+
    /* timer was assigned only to one task, by timer param */
    os_task_unlink(task);
    task->block_code = OS_TIMEOUT;
    os_task_makeready(task);
    /* we do not call the os_sched here, because this will be done at the
     * os_tick() (which calls the os_timer_tick which call this function) */
+   /* we do not need to destroy timer here, since it will be destroyed by
+    * cleanup code inside the woken up task */
    /* timer is not auto reload so we dont have to wory about it here (it will
     * not call this function again, also we can safely call os_timer_destroy
     * multiple times for such destroyed timer unles memory for timer structure

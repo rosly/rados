@@ -43,6 +43,9 @@ typedef struct {
    os_ticks_t ticks_reload;
    timer_proc_t clbck;
    void* param;
+#ifdef OS_CONFIG_APICHECK
+   uint_fast16_t magic; /* usage checking mark */
+#endif
 } os_timer_t;
 
 typedef struct

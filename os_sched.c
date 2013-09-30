@@ -96,8 +96,10 @@ void os_start(
    /* after all initialization actions, idle task will spin in idle loop */
    while(1)
    {
-     /* user supplied idle function */
+      /* user supplied idle function */
       app_idle();
+      /* if exit then arch defined relax function */
+      arch_idle();
    }
 }
 

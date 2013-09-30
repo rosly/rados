@@ -38,6 +38,9 @@
  *  timeout datatype, it could create problems with high OS_TIMER_UNSYNCH_MAX */
 #define OS_TIMER_TICKSREM_MAX ((os_ticks_t)(UINT16_MAX - OS_TIMER_UNSYNCH_MAX))
 
+#define OS_TIMER_MAGIC1 ((uint_fast16_t)0xAABB)
+#define OS_TIMER_MAGIC2 ((uint_fast16_t)0xCCDD)
+
 /** current ticks counter, increamented each tick ISR call
  *  used for time keeping */
 os_ticks_t os_ticks_cnt = 0;
@@ -86,10 +89,8 @@ void os_timer_create(
    OS_ASSERT(timeout_ticks > 0);
    /* and cannot be to high, or it will create problems with unsynch ticks */
    OS_ASSERT(timeout_ticks < OS_TIMER_TICKSREM_MAX);
-
-   /* \TODO are we able to prevent double usage of initialized timer ? currently
-    * this will probably crash the system. It is better to prevent such mistakes
-    * than fixing bugs */
+   /* prevent double usage of initialized timer */
+   OS_ASSERT(timer->magic != OS_TIMER_MAGIC1);
 
    /* currently I assume that timers may be created from ISR, but I'm not sure
     * for 100% if this will not broke something \TODO check that!*/
@@ -100,6 +101,9 @@ void os_timer_create(
    timer->ticks_reload = reload_ticks;
    timer->clbck = clbck;
    timer->param = param;
+#ifdef OS_CONFIG_APICHECK
+   timer->magic = OS_TIMER_MAGIC1;
+#endif
 
    /* timer list is iterated from ISR, we need to disable the interrupts */
    arch_critical_enter(cristate);
@@ -117,18 +121,32 @@ void os_timer_destroy(os_timer_t* timer)
 {
    arch_criticalstate_t cristate;
 
+   /* prevent double usage of initialized timer */
+   OS_ASSERT((timer->magic == OS_TIMER_MAGIC1) || 
+             (timer->magic == OS_TIMER_MAGIC2));
+
    /* timer list is iterated from ISR, we need to disable the interrupts */
    arch_critical_enter(cristate);
+
+   /* only still active timers need some actions */
    if( timer->ticks_rem > 0 )
    {
-      /* only still active timers need some actions */
-      list_unlink(&(timer->list)); /* detach from active timer list */
-      timer->ticks_rem = 0; /* marking timer as expired, prevents double destroy */
-      timer->ticks_reload = 0; /* clearing the autoreload field, this will allow
-                                  for safe destroy of timers from the
-                                  timer_callback (timer will not be restarted if
-                                  this field is 0) */
+      /* detach from active timer list */
+      list_unlink(&(timer->list));
+      /* marking timer as expired, prevents double destroy */
+      timer->ticks_rem = 0; 
+      /* clearing the autoreload field, this will allow for safe destroy of
+       * timers from the timer_callback (timer will not be restarted if this
+       * field is 0) */
+      timer->ticks_reload = 0; 
    }
+
+#ifdef OS_CONFIG_APICHECK
+   /* obstruct magic, additionaly this value helps to spot that this timer was
+    * sucessfully destroyed */
+   timer->magic = OS_TIMER_MAGIC2; 
+#endif
+
    arch_critical_exit(cristate);
 }
 

@@ -31,6 +31,8 @@
 
 #include "os_private.h"
 
+#include <sched.h> /* sched_yield used only here */
+
 /* signal set masked during critical sections, we use global variable to set/unset the signal mask in fast way */
 sigset_t arch_crit_signals;
 
@@ -47,6 +49,7 @@ void OS_ISR arch_sig_switch(int OS_UNUSED(signum), siginfo_t * OS_UNUSED(siginfo
 void arch_os_start(void)
 {
    int ret;
+   sigset_t sigmask_all;
    struct sigaction switch_sigaction = {
       .sa_sigaction = arch_sig_switch,
       .sa_mask = { { 0 } }, /* additional (beside the current signal) mask (they will be added to the mask instead of set) */
@@ -55,12 +58,18 @@ void arch_os_start(void)
       /* SA_ONSTACK could be sed if we would like to use the signal stack instead of thread stack */
    };
 
-   /* prepare the signal set (global variable) masked during critical sections */
+   /* prepare the global set for signals masked during critical sections
+    * we cannot be interrupted by any signal, beside SIGUSR1 used as a helper
+    * for context switching */
    ret = sigfillset(&arch_crit_signals); /* blocking all signals */
    OS_ASSERT(0 == ret);
    ret = sigdelset(&arch_crit_signals, SIGUSR1); /* beside SIGUSR1 used for context switching */
    OS_ASSERT(0 == ret);
 
+   /* setup the signal disposition for SIGUSR1, to call arch_sig_switch */
+   ret = sigfillset(&sigmask_all); /* we forbid the signal nesting while handling SIGUSR1, we cannot be interupted while handling SIGUSR1 or it will break everything */ 
+   OS_ASSERT(0 == ret);
+   switch_sigaction.sa_mask = sigmask_all;
    ret = sigaction(SIGUSR1, &switch_sigaction, NULL);
    OS_ASSERT(0 == ret);
 }
@@ -120,5 +129,10 @@ void OS_NORETURN OS_COLD arch_halt(void)
       raise(SIGABRT);
       exit(0);
    }
+}
+
+void arch_idle(void)
+{
+  (void)sched_yield();
 }
 

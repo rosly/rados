@@ -53,6 +53,18 @@
 #define OS_ASSERT
 #endif
 
+#ifdef OS_CONFIG_SELFCHECKING
+#define OS_SELFCHECK_ASSERT(_cond) \
+   do \
+   { \
+      if( OS_UNLIKELY(!(_cond)) ) { \
+         arch_halt(); \
+      } \
+   }while(0)
+#else
+#define OS_SELFCHECK_ASSERT
+#endif
+
 /**
 * Common macro that allows to calculate pointer to parent,
 * from pointer to member, name of the member inside parent and parent object type
@@ -140,6 +152,7 @@ void arch_os_start(void);
 void OS_HOT arch_context_switch(os_task_t *new_task);
 void OS_NORETURN OS_COLD arch_halt(void);
 void arch_task_init(os_task_t *tcb, void* stack, size_t stack_size, os_taskproc_t proc, void* param);
+void arch_idle(void);
 
 /* this function blocks the preemptive scheduling
    Take into account that interrupts are still enabled, while only the task switch will not be performed
@@ -182,6 +195,14 @@ static inline void os_blocktimer_create(
    timer_proc_t clbck,
    uint_fast16_t timeout_ticks)
 {
+   /* \TODO FIXME there is probable bug in waitqueue and sem timer calbacks
+    * no one is seting task->timer to NULL there or destroying timer
+    * if this assertion will be broken then my assumptions was correct, it need
+    * to be fixed. I was not sure i(I dont remember) if timer is meant to be
+    * destroyed by cleanup API of sem and waitqueue, so I not decided to fix it
+    * imidiately. Just see if this will happen */
+   OS_SELFCHECK_ASSERT(NULL == task_current->timer);
+
    os_timer_create(timer, clbck, task_current, timeout_ticks, 0);
    task_current->timer = timer;
 }

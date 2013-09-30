@@ -48,11 +48,11 @@
     - store all CPU context sensitive registers in arch_context_t structure (which is placed at the begining of os_task_t)
     - store only SP in arch_context_t structure, while CPU registers on the task stack
     it is up to user (which prepate specific port) to chose the right method.
-    Most simple RTOS use the second method. This is mainly becouse storing registers value on stack
+    Most simple RTOS use the second method. This is mainly because storing registers value on stack
     is the fastest vay to store the registers value. But this solution allows badly writen task code to overwrite
     the context of another task and crash the whole OS (for instance if it will have the pointer to data on other task stack and it will perform buffer overflow)
     Becouse of simmilar sequrity reason in more complicated OS (like Linux) task context is saved on task control structure (aka our arch_context_t),
-    This is mainly becouse user code must not be able to compromise the kernel. In out OS we dont have the memory management code
+    This is mainly because user code must not be able to compromise the kernel. In out OS we dont have the memory management code
     (aka OS data protection) so both solutions are equaly good if we assume that bad code will at any case make disaster in our system :) */
 typedef struct {
     ucontext_t context;
@@ -125,29 +125,45 @@ extern sigset_t arch_crit_signals;
  - store all registers (power control bits does not have to be necessarly stored)
  - increment the isr_nesting
  - if isr_nesting is = 1 then
-    - store the context curr_tcb->ctx (may take benfit from allready stored registers by storing only the stack pointer)
+    - store the context curr_tcb->ctx (may take benfit from allready stored
+      registers by storing only the stack pointer)
  - end
 
  - in some near future down in the ISR enable interrupts to support the nesting interrupts
 
- because ISR was called it means that interrupts was enabled. On some arch like MPS430 they may be automaticly disabled durring the enter to ISR
- On those architectures interrupts may be enabled when ISR will mask pending interrupt.
- In general disabling interrupt is usualy needed because we touch the task_current (usualy need 2 asm instructions) and we cannot be preempted by another interrupt.
- From other hand enabling the interrupts again as soon as possible is needed for realtime constrains.
- If your code does not need to be realtime constrained, it is not needed to enable the interupts in ISR, also the nesting interrupt code can be disabled
+ Because ISR was called it means that interrupts was enabled. On some arch like
+ MPS430 they may be automaticly disabled durring the enter to ISR On those
+ architectures interrupts may be enabled when ISR will mask pending interrupt.
+ In general disabling interrupt is usualy needed because we touch the
+ task_current (usualy need 2 asm instructions) and we cannot be preempted by
+ another interrupt.  From other hand enabling the interrupts again as soon as
+ possible is needed for realtime constrains.  If your code does not need to be
+ realtime constrained, it is not needed to enable the interupts in ISR, also the
+ nesting interrupt code can be disabled
 
- The reason why we skip the stack pointer storage in case of nesing is obvous. In case of nesting we was not in task but in other ISR. So the SP will not be the task SP.
- But we have to store all registers anyway. This is why we store all registers and then optionaly store the SP in context of tcb
+ The reason why we skip the stack pointer storage in case of nesing is obvous.
+ In case of nesting we was not in task but in other ISR. So the SP will not be
+ the task SP.  But we have to store all registers anyway. This is why we store
+ all registers and then optionaly store the SP in context of tcb
 
- For X86 port this macro need to be placed in signal handler function. This function have to be declared as compatible with SA_SIGINFO disposition and it has to have the ucontext parameter
- which will point to stored context. This macoro will use this variable to copy the context (probably temporaly stored on stack) into tack_current->ctx.context. This is required both by OS
- design and becouse this temporary context wil be destroyed once signal handler will return. Linux will use this context to restore the process state. We use this feature to switch betwen tasks.
- Therefore arch_contextrestore_i only copy the newly chosen task into context on stack while Linux kernel do the main job which is restoring the register context. */
+ For X86 port this macro need to be placed in signal handler function. This
+ function have to be declared as compatible with SA_SIGINFO disposition and it
+ has to have the ucontext parameter which will point to stored context. This
+ macoro will use this variable to copy the context (probably temporaly stored on
+ stack) into tack_current->ctx.context. This is required both by OS design and
+ because this temporary context will be destroyed once signal handler will
+ return. Linux will use this context to restore the process state. We use this
+ feature to switch betwen tasks. Therefore arch_contextrestore_i only copy the
+ newly chosen task into context on stack while Linux kernel do the main job
+ which is restoring the register context. */
 #define arch_contextstore_i(_isrName) \
     do { \
-      /* context of the task is allready saved on stack by linux kernel, so we can freely use C here (we wont destroy any regs) */ \
+      /* context of the task is allready saved on stack by linux kernel, so we
+       * can freely use C here (we wont destroy any regs) */ \
       if( 1 >= (++isr_nesting) ) { \
-         task_current->ctx.context = *(ucontext_t*)ucontext; /* here we copy the context prepared by linux kernel on current stack, to preserve it for later task restoration */ \
+         /* here we copy the context prepared by linux kernel on current stack \
+          * to preserve it for later task restoration */  \
+         task_current->ctx.context = *(ucontext_t*)ucontext; \
       } \
     } while(0)
 
@@ -162,10 +178,14 @@ extern sigset_t arch_crit_signals;
  - perform actions that will lead to enable IE after reti
  - return by reti
 
- Please first read the note for arch_context_StoreI. The important point here is why we need to enable the interrupt after reti in both cases (in normal and nested).
- This is because we disabled them for task_current manipulation in first step. But we need to enable them because:
- - in case of not nested they was for sure enabled (need to be enabled because we enter ISR ;) )
- - in case of nested the was also for sure enabled (from the same reason, we enter nested ISR) */
+ Please first read the note for arch_context_StoreI. The important point here is
+ why we need to enable the interrupt after reti in both cases (in normal and
+ nested).  This is because we disabled them for task_current manipulation in
+ first step. But we need to enable them because:
+ - in case of not nested they was for sure enabled (need to be enabled because
+   we enter ISR ;) )
+ - in case of nested the was also for sure enabled (from the same reason, we
+   enter nested ISR) */
 #define arch_contextrestore_i(_isrName) \
     do { \
       arch_dint(); \

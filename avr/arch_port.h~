@@ -17,7 +17,7 @@
  *    may be used to endorse or promote products derived from this software without
  *    specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE RADOS PROJET AND CONTRIBUTORS "AS IS" AND
+ * THIS SOFTWARE IS PROVIDED BY THE RADOS PROJECT AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
  * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
@@ -32,22 +32,11 @@
 #ifndef __OS_PORT_
 #define __OS_PORT_
 
-//#define __CC430F6137__ similar deffine should be automaticly added by compiler when it will read the -mcu=cc430f6137, this define is required for legacymsp430.h
-
-#include <legacymsp430.h>
-#include <stdint.h> /* for patform specific types definitions like uint16_t */
+#include <stdint.h> /* for platform specific types definitions like uint16_t */
 #include <limits.h> /* for UINT_MAX etc */
 #include <stddef.h>
 #include <string.h> /* for memcpy */
-
-/* missing stdbool.h for this platform */
-typedef uint8_t bool;
-#define false ((uint8_t)0)
-#define true  ((uint8_t)1) /* considered also !false but finaly decided to be more strict */
-
-/* Within an interrupt handler, set the given bits in the value of SR
- * that will be popped off the stack on return */
-//void __bis_status_register_on_exit (uint16_t bits);
+#include <stdbool.h>
 
 /* Following structure held CPU registers which need to be preserved between
  * context switches. In general (at any ARCH), there are two possible

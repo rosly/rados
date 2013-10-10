@@ -43,17 +43,18 @@
 #include <signal.h>
 #include <ucontext.h>
 
-/* in this struct you may find CPU registers which need to be preserved from context swich perspective.
-    There are two possible aproatches:
-    - store all CPU context sensitive registers in arch_context_t structure (which is placed at the begining of os_task_t)
-    - store only SP in arch_context_t structure, while CPU registers on the task stack
-    it is up to user (which prepate specific port) to chose the right method.
-    Most simple RTOS use the second method. This is mainly because storing registers value on stack
-    is the fastest vay to store the registers value. But this solution allows badly writen task code to overwrite
-    the context of another task and crash the whole OS (for instance if it will have the pointer to data on other task stack and it will perform buffer overflow)
-    Becouse of simmilar sequrity reason in more complicated OS (like Linux) task context is saved on task control structure (aka our arch_context_t),
-    This is mainly because user code must not be able to compromise the kernel. In out OS we dont have the memory management code
-    (aka OS data protection) so both solutions are equaly good if we assume that bad code will at any case make disaster in our system :) */
+/* Following structure held CPU registers which need to be preserved between
+ * context switches. In general (at any ARCH), there are two possible
+ * approaches:
+ * - store all CPU context sensitive registers in arch_context_t structure
+ *   (which is placed at the beginning of os_task_t)
+ * - store only stack pointer in arch_context_t structure, while storing CPU
+ *  registers on the task stack
+ * It is up to programmer (who prepare specific port) to chose the appropriate
+ * approach (storing registers in arch_context_t uses more static task memory
+ * while storing them on stack requires more stack memory).  Most of others RTOS
+ * use the second method. This is mainly because storing registers stack is the
+ * fastest way (require less CPU cycles). */
 typedef struct {
     ucontext_t context;
 } arch_context_t;

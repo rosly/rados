@@ -52,23 +52,6 @@ hi address
 */
 void OS_NAKED OS_HOT arch_context_switch(os_task_t *new_task)
 {
-   __asm__ __volatile__ (
-      "push r2\n\t"
-      "pushm 12,r15\n\t" /* pushing R4 -R15 */
-      "mov %[ctx], r4\n\t"
-      "mov r1, @r4\n\t"
-         ::  [ctx] "m" (task_current));
-   task_current = new_task;
-   task_current->state = TASKSTATE_RUNNING;
-   __asm__ __volatile__ (
-      "mov %[ctx], r1\n\t"
-      "mov @r1, r1\n\t"
-      "popm 12,r15\n\t" /* poping R4 -R15 */
-      "bic %[powerbits], @r1 \n\t" /* enable full power mode in SR which will be poped */
-      "pop r2\n\t"
-      "ret\n\t"
-         ::  [ctx] "m" (task_current),
-             [powerbits] "i" (SCG1+SCG0+OSCOFF+CPUOFF));
 }
 
 void arch_os_start(void)
@@ -89,34 +72,12 @@ void OS_NAKED arch_task_start(os_taskproc_t proc, void* param)
 */
 void arch_task_init(os_task_t *task, void* stack_param, size_t stack_size, os_taskproc_t proc, void* param)
 {
-   uint16_t *stack = (uint16_t*)(((uint8_t*)stack_param) + stack_size); /* for msp430 we have descending stack */
-   OS_ASSERT(0 == ((uint16_t)stack_param & 1)); /* in MSP430 stack has to be alligned to uint16_t */
-
-   stack--; /* in MSP430 stack works in predectement on push */
-   *(stack--) = (uint16_t)arch_task_start;
-   *(stack--) = GIE; /* enable interrupts after task starts */
-   *(stack--) = (uint16_t)proc; /* R15 */
-   *(stack--) = (uint16_t)param; /* R14 */
-   *(stack--) = 0; /* R13 */
-   *(stack--) = 0; /* R12 */
-   *(stack--) = 0; /* R11 */
-   *(stack--) = 0; /* R10 */
-   *(stack--) = 0; /* R9 */
-   *(stack--) = 0; /* R8 */
-   *(stack--) = 0; /* R7 */
-   *(stack--) = 0; /* R6 */
-   *(stack--) = 0; /* R5 */
-   *(stack--) = 0; /* R4 */
-   stack++; /* in MSP430 stack works in postincrement on pop, in other words sp point to value which will be poped in next op */
-
-   task->ctx.sp = (uint16_t)stack;
 }
 
 void OS_NORETURN OS_COLD arch_halt(void)
 {
    dint();
    while(1) {
-      __bis_status_register(LPM0_bits);
       nop();
    }
 }

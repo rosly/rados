@@ -38,6 +38,9 @@
 #include <string.h> /* for memcpy */
 #include <stdbool.h>
 
+#include <avr/builtins.h> /* for __builtin_avr_sei */
+#include <avr/common.h> /* for SREG */
+
 /* Following structure held CPU registers which need to be preserved between
  * context switches. In general (at any ARCH), there are two possible
  * approaches:
@@ -54,8 +57,12 @@ typedef struct {
     uint16_t sp;
 } arch_context_t;
 
-/** exactly 8 bits, this is most optimal type for AVR which don't require extra
- * handling code to be atomic */
+/* ABR does not support direct memory manipulation sinc it is LOAD-STORE
+ * architecure, therefore even for 8bit incrmnt we need do disable interupts for
+ * atomic operation, because of that there is only 1 additional instruction if
+ * we hwould like to use 16bis for atomi (instead of 8bit which is more natural
+ * for AVR) (in othrer words we need to mask iterrupts anywa so why dont use
+ * wider type) */
 typedef uint8_t arch_atomic_t; 
 /** exactly 16 bits, minimal reasonable type for ticks, requires special
  * handling code */
@@ -77,41 +84,148 @@ typedef uint8_t arch_criticalstate_t; /* size of AVR status register */
 #define OS_STACK_DESCENDING
 #define OS_STACK_MINSIZE ((size_t)28 * 4) /* four times of context dump size */
 
+/* AVR does not support direct memory operations (LOAD-STORE architecture)
+ * we mmust disable interupts to ensure atomicity */
 #define os_atomic_inc(_atomic) \
-    __asm__ __volatile__ ( \
-        "inc %[atomic]\n\t" \
-            ::  [atomic] "m" (_atomic))
+  do { \
+    arch_criticalstate_t cristate; \
+    arch_critical_enter(cristate); \
+    (_atomic)++; \
+    arch_critical_exit(cristate); \
+  }while(1)
 
+#if 0
+  do { \
+    uint8_t _tmp_reg2; \
+    __asm__ __volatile__ ( \
+         "in %0, __SREG__\n\t" \
+         "cli\n\t" \
+         "ld __tmp_reg__, %[atomic]\n\t" \
+         "inc __tmp_reg__\n\t" \
+         "st %[atomic], __tmp_reg__\n\t" \
+         "out __SREG__, %0\n\t" \
+             : "=&r" (_tmp_reg2) \
+             : [atomic] "e" (_atomic) \
+             : "memory" ); \
+  }while(0)
+#endif
+
+/* AVR does not support direct memory operations (LOAD-STORE architecture)
+ * we mmust disable interupts to ensure atomicity */
 #define os_atomic_dec(_atomic) \
+  do { \
+    arch_criticalstate_t cristate; \
+    arch_critical_enter(cristate); \
+    --(_atomic); \
+    arch_critical_exit(cristate); \
+  }while(1)
+
+#if 0
+  do { \
+    uint8_t _tmp_reg2; \
     __asm__ __volatile__ ( \
-        "dec %[atomic]\n\t" \
-            ::  [atomic] "m" (_atomic))
+         "in %0, __SREG__\n\t" \
+         "cli\n\t" \
+         "ld __tmp_reg__, %[atomic]\n\t" \
+         "dec __tmp_reg__\n\t" \
+         "st %[atomic], __tmp_reg__\n\t" \
+         "out __SREG__, %0\n\t" \
+             : "=&r" (_tmp_reg2) \
+             : [atomic] "e" (_atomic) \
+             : "memory" ); \
+  }while(0)
+#endif
 
-/* all pointers in MSP430 are size of CPU register, no need to read or write
- * with any concurent handling */
-#define os_atomicptr_read(_ptr) (_ptr)
-#define os_atomicptr_write(_ptr, _val) ((_ptr) = (_val))
+/* on AVR there is no instruction to load whole X, Y, or whole Z at once, we
+ * need to disable interrupts if we whant to do it atomicaly */
+#define os_atomicptr_read(_ptr) \
+  ({ \
+    typeof(_ptr) _tmp_widereg; \
+    arch_criticalstate_t cristate; \
+    arch_critical_enter(cristate); \
+    _tmp_widereg = (_ptr); \
+    arch_critical_exit(cristate); \
+    _tmp_widereg; /* return loaded value */ \
+  })
+
+#if 0
+  {( \
+    uint16_t _tmp_widereg; \
+    __asm__ __volatile__ ( \
+         "in __tmp_reg__, __SREG__\n\t" \
+         "cli\n\t" \
+         "ld %a0, %[ptr]+\n\t" \
+         "ld %b0, %[ptr]\n\t" \
+         "out __SREG__, __tmp_reg__\n\t" \
+             : "=&r" (_tmp_widereg) \
+             : "[ptr] e" (_ptr) \
+             : ); \
+    _tmp_widereg; /* return loaded value */ \
+  )}
+#endif
+
+/* on AVR there is no instruction to store whole X, Y, or whole Z at once, we
+ * need to disable interrupts if we whant to do it atomicaly */
+#define os_atomicptr_write(_ptr, _val) \
+  do { \
+    arch_criticalstate_t cristate; \
+    arch_critical_enter(cristate); \
+    (_ptr) = (_val); \
+    arch_critical_exit(cristate); \
+ }while(0)
+
+#if 0
+  do { \
+    __asm__ __volatile__ ( \
+         "in __tmp_reg__, __SREG__\n\t" \
+         "cli\n\t" \
+         "st %[ptr]+,%a1n\t" \
+         "ld %[ptr],%b1\n\t" \
+         "out __SREG__, __tmp_reg__\n\t" \
+             : : "[ptr] e" (_ptr), [_val] "e" (_val) \
+             : "0" (_ptr) ); /* clobering ptr */ \
+  }while(0)
+#endif
+
 #define os_atomicptr_xchnge(_ptr, _val) (OS_ASSERT(!"not implemented"))
-
 #define arch_ticks_atomiccpy(_dst, _src) \
   do { \
-      *(_dst) = *(_src); /* we can copy as rval since MSP430 is 16bit arch and arch_ticks_t is 16bit*/ \
+    arch_criticalstate_t cristate; \
+    arch_critical_enter(cristate); \
+    *(_dst) = *(_src); \
+    arch_critical_exit(cristate); \
+ }while(0)
+
+#if 0
+  do { \
+    uint8_t _tmp_reg2; \
+    __asm__ __volatile__ ( \
+         "in __tmp_reg__, __SREG__\n\t" \
+         "cli\n\t" \
+         "ld %[_tmp_reg2], %[_src]+\n\t" \
+         "st %[_dst]+, %[_tmp_reg2]\n\t" \
+         "ld %[_tmp_reg2], %[_src]+\n\t" \
+         "st %[_dst]+, %[_tmp_reg2]\n\t" \
+         "out __SREG__, __tmp_reg__\n\t" \
+             : [_tmp_reg2] "+r" (_tmp_reg2) \
+             : [_src] "e" (_src), [_dst] "e" (_dst) \
+             : "0" (_src), "1" (_dst), "memory" ); \
   }while(0)
+#endif
 
 #define arch_critical_enter(_critical_state) \
    do { \
-      (_critical_state) = __read_status_register(); \
-      dint(); \
+      (_critical_state) = SREG; \
+      arch_dint(); \
    }while(0)
 
 #define arch_critical_exit(_critical_state) \
    do { \
-      /* __bis_status_register(GIE & (_critical_state)); modify only the IE flag, while remain rest untouched */ \
-      __write_status_register(_critical_state); /* overwrite all flags, since previously we run proram then power bits were set (no risk) */ \
+      SREG = (_critical_state); \
    }while(0)
 
-#define arch_dint() dint()
-#define arch_eint() eint()
+#define arch_dint() __builtin_avr_cli()
+#define arch_eint() __builtin_avr_sei()
 
 /* format of the context pushed on stack for MSP430 port
 low adress
@@ -139,18 +253,7 @@ hi address
 
  The reason why we skip the stack pointer storage in case of nesing is obvous. In case of nesting we was not in task but in other ISR. So the SP will not be the task SP.
  But we have to store all registers anyway. This is why we store all registers and then optionaly store the SP in context of tcb */
-#define arch_contextstore_i(_isrName) \
-    __asm__ __volatile__ ( \
-        /* on MSP430 interupts are disabled when entering ISR */ \
-        "inc %[isr_nesting]\n\t" /* increment isr_nesting, here we destroy orginal SR but it already lay on stack*/ \
-        "pushm 12,r15\n\t" /* pushing R4 -R15 */ \
-        "cmp #1, %[isr_nesting]\n\t" /* check isr_nesting */ \
-        "jne "#_isrName "_contextStoreIsr_Nested\n\t" \
-        "mov %[ctx], r15\n\t" \
-        "mov r1, @r15\n\t" \
-#_isrName "_contextStoreIsr_Nested:\n\t" \
-            ::  [ctx] "m" (task_current), \
-                [isr_nesting] "m" (isr_nesting))
+#define arch_contextstore_i(_isrName)
 
 /* This function have to:
  - disable IE (in case we achritecture allows for nesting)
@@ -167,26 +270,7 @@ hi address
  This is because we disabled them for task_current manipulation in first step. But we need to enable them because:
  - in case of not nested they was for sure enabled (need to be enabled because we enter ISR ;) )
  - in case of nested the was also for sure enabled (from the same reason, we enter nested ISR) */
-#define arch_contextrestore_i(_isrName) \
-    __asm__ __volatile__ ( \
-        "dint\n\t" /* disable interrupts in case some ISR will implement nesting interrupt handling */ \
-        "dec %[isr_nesting]\n\t" \
-        "jnz "#_isrName "_contexRestoreIsr_Nested\n\t" \
-        "mov %[ctx], r1\n\t" \
-        "mov @r1, r1\n\t" \
-        "popm 12,r15\n\t" /* poping R4 -R15 */ \
-        "bic %[powerbits], @r1 \n\t" /* enable full power mode in SR that will be poped */ \
-        "jmp "#_isrName "_contexRestoreIsr_Done\n\t" \
-#_isrName "_contexRestoreIsr_Nested:\n\t" \
-        "mov.b   #0x80,  &0x0a20\n\t" \
-        "popm 12,r15\n\t" /* poping R4 -R15 */ \
-#_isrName "_contexRestoreIsr_Done:\n\t" \
-        "bis %[iebits], @r1 \n\t" /* enable interrupts in SR that will be poped */ \
-        "reti\n\t" \
-            ::  [ctx] "m" (task_current), \
-                [isr_nesting] "m" (isr_nesting), \
-                [iebits] "i" (GIE), \
-                [powerbits] "i" (SCG1+SCG0+OSCOFF+CPUOFF))
+#define arch_contextrestore_i(_isrName) 
 
 #endif /* __OS_PORT_ */
 

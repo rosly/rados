@@ -1,25 +1,28 @@
-MCU      = cc430f6137
-
-CC       = msp430-gcc
-LD       = msp430-ld
-AR       = msp430-ar
-AS       = msp430-gcc
-GASP     = msp430-gasp
-NM       = msp430-nm
-OBJCOPY  = msp430-objcopy
-OBJDUMP  = msp430-objdump
-RANLIB   = msp430-ranlib
-STRIP    = msp430-strip
-SIZE     = msp430-size
-READELF  = msp430-readelf
+CC       = avr-gcc
+LD       = avr-ld
+AR       = avr-ar
+AS       = avr-gcc
+GASP     = avr-gasp
+NM       = avr-nm
+OBJCOPY  = avr-objcopy
+OBJDUMP  = avr-objdump
+RANLIB   = avr-ranlib
+STRIP    = avr-strip
+SIZE     = size
+READELF  = avr-readelf
 #MAKETXT  = srec_cat
 CP       = cp -p
 RM       = rm -f
 MV       = mv
 
-#on MSP430 even in DEBUG build -Os is most resonable
-CFLAGS   = -mmcu=$(MCU) -Os -std=gnu99 
-LDFLAGS  = -mmcu=$(MCU) -mdisable-watchdog
+ifeq ($(DEBUG),)
+#for debug buld we use -O0 do not obstruct the generated code
+CFLAGS   = -O0
+else
+CFLAGS   = -O2
+endif
+CFLAGS   += -std=gnu99 
+LDFLAGS  =
 
 ARCHSOURCES = \
 	arch_port.c \

@@ -108,7 +108,7 @@ typedef uint16_t arch_criticalstate_t; /* size of CPU status register */
 #define arch_critical_enter(_critical_state) \
    do { \
       (_critical_state) = __read_status_register(); \
-      dint(); \
+      arch_dint(); \
    }while(0)
 
 #define arch_critical_exit(_critical_state) \

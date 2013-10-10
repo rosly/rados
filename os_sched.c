@@ -405,6 +405,9 @@ void os_task_exit(int retv)
   /* we should never reach this point, there is no chance that scheduler picked
    * up this code again since we dropped the task */
   OS_ASSERT(0);
+  arch_critical_exit(cristate); /* just to prevent warning about unused variable */
+  /* \TODO change arch_critical_enter call in this function into arch_dint() and
+   * check if this will work */
 }
 
 /* --- private functions --- */

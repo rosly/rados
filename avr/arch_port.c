@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is a part of RadOs project
  * Copyright (c) 2013, Radoslaw Biernaki <radoslaw.biernacki@gmail.com>
  * All rights reserved.
@@ -50,7 +50,7 @@ hi address
  - perform actions that will lead to restore after ret the IE flag state saved when task context was dumped (we may swith to peempted task so we ned to enable IE while IE was disabled durring enter of arch_context_switch)
  - return by ret
 */
-void OS_NAKED OS_HOT arch_context_switch(os_task_t *new_task)
+void OS_NAKED OS_HOT arch_context_switch(os_task_t * OS_UNUSED(new_task))
 {
 }
 
@@ -70,15 +70,17 @@ void OS_NAKED arch_task_start(os_taskproc_t proc, void* param)
 - ensure that task will have the interrupts enabled after it enters proc, on some arch this may be also used in arch_task_start
  /param stack pointer to stack end, it will have the same meaning as sp on paticular arch
 */
-void arch_task_init(os_task_t *task, void* stack_param, size_t stack_size, os_taskproc_t proc, void* param)
+void arch_task_init(os_task_t * OS_UNUSED(task), void* OS_UNUSED(stack_param),
+                    size_t OS_UNUSED(stack_size), os_taskproc_t OS_UNUSED(proc),
+                    void* OS_UNUSED(param))
 {
 }
 
 void OS_NORETURN OS_COLD arch_halt(void)
 {
-   dint();
+   arch_dint();
    while(1) {
-      nop();
+      /* \TODO put CPU into relax */
    }
 }
 

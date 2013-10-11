@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is a part of RadOs project
  * Copyright (c) 2013, Radoslaw Biernaki <radoslaw.biernacki@gmail.com>
  * All rights reserved.
@@ -39,7 +39,7 @@
 #include <stdbool.h>
 
 #include <avr/builtins.h> /* for __builtin_avr_sei */
-#include <avr/common.h> /* for SREG */
+#include <avr/io.h> /* for SREG */
 
 /* Following structure held CPU registers which need to be preserved between
  * context switches. In general (at any ARCH), there are two possible
@@ -63,14 +63,21 @@ typedef struct {
  * we hwould like to use 16bis for atomi (instead of 8bit which is more natural
  * for AVR) (in othrer words we need to mask iterrupts anywa so why dont use
  * wider type) */
-typedef uint8_t arch_atomic_t; 
+typedef uint8_t arch_atomic_t;
 /** exactly 16 bits, minimal reasonable type for ticks, requires special
  * handling code */
 typedef uint16_t arch_ticks_t;
 #define ARCH_TICKS_MAX ((arch_ticks_t)UINT16_MAX)
 typedef uint8_t arch_criticalstate_t; /* size of AVR status register */
 
-#define OS_ISR __attribute__((naked))
+/* for ISR we use:
+ * -naked - since we provide own register save-restore macros
+ * -signal - seems to be proper attr for ISR, there is also interrupt but from
+ *  what I see it is used if we whant ISR to handle nesting fast as possible
+ * -used
+ * -externally_visible
+ */
+#define OS_ISR __attribute__((naked, signal, used, externally_visible))
 #define OS_NAKED __attribute__((naked))
 #define OS_NORETURN __attribute__ ((noreturn))
 #define OS_PURE __attribute__ ((pure))
@@ -270,7 +277,7 @@ hi address
  This is because we disabled them for task_current manipulation in first step. But we need to enable them because:
  - in case of not nested they was for sure enabled (need to be enabled because we enter ISR ;) )
  - in case of nested the was also for sure enabled (from the same reason, we enter nested ISR) */
-#define arch_contextrestore_i(_isrName) 
+#define arch_contextrestore_i(_isrName)
 
 #endif /* __OS_PORT_ */
 

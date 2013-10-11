@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is a part of RadOs project
  * Copyright (c) 2013, Radoslaw Biernaki <radoslaw.biernacki@gmail.com>
  * All rights reserved.
@@ -114,7 +114,7 @@ void arch_task_init(os_task_t *task, void* stack_param, size_t stack_size, os_ta
 
 void OS_NORETURN OS_COLD arch_halt(void)
 {
-   dint();
+   arch_dint();
    while(1) {
       __bis_status_register(LPM0_bits);
       nop();

@@ -16,10 +16,10 @@ RM       = rm -f
 MV       = mv
 
 ifeq ($(DEBUG),)
+CFLAGS   = -O2
+else
 #for debug buld we use -O0 do not obstruct the generated code
 CFLAGS   = -O0
-else
-CFLAGS   = -O2
 endif
 CFLAGS   += -std=gnu99 
 LDFLAGS  = -lrt

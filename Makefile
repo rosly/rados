@@ -52,7 +52,7 @@ SOURCES = \
 
 #in target.mk for each source the optimal optimization level (CFLAGS = -Ox) is defined
 #but here we add CFLAGS += -g if debug build
-ifeq ($(DEBUG),)
+ifneq ($(DEBUG),)
 CFLAGS += -g
 endif
 #regardles architecture we use highest warning level
@@ -77,7 +77,7 @@ $(BUILDTARGET): $(OBJECTS)
 
 $(BUILDDIR)/%.o: %.c
 	@$(ECHO) "[CC]\t$<"
-	@$(CC) -c $(CFLAGS) -o $@ $(addprefix -I, $(INCLUDEDIR)) $<
+	@$(CC) -save-temps=obj -c $(CFLAGS) -o $@ $(addprefix -I, $(INCLUDEDIR)) $<
 
 $(BUILDDIR)/%.lst: %.o
 	@$(ECHO) "[LST]\t$<"

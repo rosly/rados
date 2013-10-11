@@ -20,10 +20,10 @@ MV       = mv
 
 CFLAGS   = -mmcu=$(MCU_OPSET) -D__AVR_$(MCU_TYPE)__ -std=gnu99 
 ifeq ($(DEBUG),)
+CFLAGS   += -O2
+else
 #for debug buld we use -O0 do not obstruct the generated code
 CFLAGS   += -O0
-else
-CFLAGS   += -O2
 endif
 LDFLAGS  =
 

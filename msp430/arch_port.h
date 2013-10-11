@@ -164,9 +164,7 @@ hi address
  - decrement the isr_nesting
  - if isr_nesting = 0 then
      - restore context from curr_tcb->ctx
-     - perform actions that will lead to sustain the power enable after ret
- - else
-    - restore all registers
+ - restore all registers
  - perform actions that will lead to enable IE after reti
  - return by reti
 

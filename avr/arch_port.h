@@ -57,12 +57,9 @@ typedef struct {
     uint16_t sp;
 } arch_context_t;
 
-/* ABR does not support direct memory manipulation sinc it is LOAD-STORE
- * architecure, therefore even for 8bit incrmnt we need do disable interupts for
- * atomic operation, because of that there is only 1 additional instruction if
- * we hwould like to use 16bis for atomi (instead of 8bit which is more natural
- * for AVR) (in othrer words we need to mask iterrupts anywa so why dont use
- * wider type) */
+/* AVR does not support direct memory manipulation since AVR is LOAD-STORE
+ * architecure. Therefore even for 8bit increment we need do disable interupts,
+ * to make this operation atomic */
 typedef uint8_t arch_atomic_t;
 /** exactly 16 bits, minimal reasonable type for ticks, requires special
  * handling code */
@@ -78,6 +75,7 @@ typedef uint8_t arch_criticalstate_t; /* size of AVR status register */
  * -externally_visible
  */
 #define OS_ISR __attribute__((naked, signal, used, externally_visible))
+//#define OS_ISR __attribute__((naked, used, externally_visible))
 #define OS_NAKED __attribute__((naked))
 #define OS_NORETURN __attribute__ ((noreturn))
 #define OS_PURE __attribute__ ((pure))
@@ -89,7 +87,7 @@ typedef uint8_t arch_criticalstate_t; /* size of AVR status register */
 #define OS_UNUSED(_x) unused_ ## _x __attribute__((unused))
 
 #define OS_STACK_DESCENDING
-#define OS_STACK_MINSIZE ((size_t)28 * 4) /* four times of context dump size */
+#define OS_STACK_MINSIZE ((size_t)35 * 4) /* four times of context dump size */
 
 /* AVR does not support direct memory operations (LOAD-STORE architecture)
  * we mmust disable interupts to ensure atomicity */
@@ -234,12 +232,13 @@ typedef uint8_t arch_criticalstate_t; /* size of AVR status register */
 #define arch_dint() __builtin_avr_cli()
 #define arch_eint() __builtin_avr_sei()
 
-/* format of the context pushed on stack for MSP430 port
-low adress
+/* format of the context pushed on stack for AVR port
+hi adress
     PC - pushed frst
-    R3(SR) - pushed automaticly on ISR enter (manualy durring schedule form user)
-    R4 - R15 - pusched last
-hi address
+    R0 - stored to gain one free register
+    SREG
+    R1 - R31 - pusched last
+low address
 */
 
 /* This function have to:
@@ -260,16 +259,73 @@ hi address
 
  The reason why we skip the stack pointer storage in case of nesing is obvous. In case of nesting we was not in task but in other ISR. So the SP will not be the task SP.
  But we have to store all registers anyway. This is why we store all registers and then optionaly store the SP in context of tcb */
-#define arch_contextstore_i(_isrName)
+#define arch_contextstore_i(_isrName) \
+    __asm__ __volatile__ ( \
+        /* on AVR interupts are disabled when entering ISR */ \
+        /* store r0 for temporary operations */ \
+        "push    r0"            "\n\t" \
+        /* store SREG */               \
+        "in      r0, __SREG__"  "\n\t" \
+        "push    r0"            "\n\t" \
+        /* store remain registers */    \
+        "push    r1"            "\n\t" \
+        "push    r2"            "\n\t" \
+        "push    r3"            "\n\t" \
+        "push    r4"            "\n\t" \
+        "push    r5"            "\n\t" \
+        "push    r6"            "\n\t" \
+        "push    r7"            "\n\t" \
+        "push    r8"            "\n\t" \
+        "push    r9"            "\n\t" \
+        "push    r10"           "\n\t" \
+        "push    r11"           "\n\t" \
+        "push    r12"           "\n\t" \
+        "push    r13"           "\n\t" \
+        "push    r14"           "\n\t" \
+        "push    r15"           "\n\t" \
+        "push    r16"           "\n\t" \
+        "push    r17"           "\n\t" \
+        "push    r18"           "\n\t" \
+        "push    r19"           "\n\t" \
+        "push    r20"           "\n\t" \
+        "push    r21"           "\n\t" \
+        "push    r22"           "\n\t" \
+        "push    r23"           "\n\t" \
+        "push    r24"           "\n\t" \
+        "push    r25"           "\n\t" \
+        "push    r26"           "\n\t" \
+        "push    r27"           "\n\t" \
+        "push    r28"           "\n\t" \
+        "push    r29"           "\n\t" \
+        "push    r30"           "\n\t" \
+        "push    r31"           "\n\t" \
+        /* incement isr_nesting */ \
+        "lds     r16, %[isr_nesting]" "\n\t" \
+        "inc     r16"            "\n\t" \
+        "sts     %[isr_nesting], r16" "\n\t" \
+        /* prepare frame pointer for future C code (usual ISR prolog skiped \
+         * since OS_ISR was used */ \
+        "in      r28, __SP_L__" "\n\t" /* load SPL into r28 (means Ya) */ \
+        "in      r29, __SP_H__" "\n\t" /* load SPH into r29 (means Yb) */ \
+        "eor     r1, r1"        "\n\t" /* clear r1 */ \
+        /* check isr_nesting and skip SP storing if != 1 */ \
+        "cpi     r16, 1"         "\n\t" \
+        "brne    isr_contextstore_nested_%=\n\t" \
+        /* store SP into task_current->ctx */ \
+        "lds     r30, %[ctx]"   "\n\t"  /* load Z by addr of curent_task */ \
+        "lds     r31, %[ctx]+1" "\n\t"  /* load Z by addr of curent_task */ \
+        "st      Z,   r28"      "\n\t"   /* store SPL into task_curent->ctx */ \
+        "std     Z+1, r29"      "\n\t"   /* store SPH into task_curent->ctx */ \
+     "isr_contextstore_nested_%=:\n\t" \
+            ::  [ctx] "p" (&(task_current)), \
+                [isr_nesting] "p" (&(isr_nesting)))
 
 /* This function have to:
  - disable IE (in case we achritecture allows for nesting)
  - decrement the isr_nesting
  - if isr_nesting = 0 then
      - restore context from curr_tcb->ctx
-     - perform actions that will lead to sustain the power enable after ret
- - else
-    - restore all registers
+ - restore all registers
  - perform actions that will lead to enable IE after reti
  - return by reti
 
@@ -277,7 +333,67 @@ hi address
  This is because we disabled them for task_current manipulation in first step. But we need to enable them because:
  - in case of not nested they was for sure enabled (need to be enabled because we enter ISR ;) )
  - in case of nested the was also for sure enabled (from the same reason, we enter nested ISR) */
-#define arch_contextrestore_i(_isrName)
+#define arch_contextrestore_i(_isrName) \
+    __asm__ __volatile__ ( \
+        /* disable interrupts in case some ISR will implement nesting interrupt * \
+         * handling */ \
+        "cli"                         "\n\t" \
+        /* incement is_nesting */ \
+        "lds     r16, %[isr_nesting]" "\n\t" \
+        "dec     r16"                 "\n\t" \
+        "sts     %[isr_nesting], r16" "\n\t" \
+        /* check isr_nesting and skip restoring iof SP if isr_nesting != 0 */ \
+        "brne    isr_contextrestore_nested_%=\n\t" \
+        /* restore SP from task_current->ctx */ \
+        "lds     r30, %[ctx]"         "\n\t" /* load Z by addr of curent_task */ \
+        "lds     r31, %[ctx]+1"       "\n\t" /* load Z by addr of curent_task */ \
+        "ld      r16, Z"              "\n\t" /* load SPL into task_curent->ctx */ \
+        "ldd     r17, Z+1"            "\n\t" /* load SPH into task_curent->ctx */ \
+        "out     __SP_L__, r16"       "\n\t" /* load SPL from r16 */ \
+        "out     __SP_H__, r17"       "\n\t" /* load SPH from r17 */ \
+     "isr_contextrestore_nested_%=:\n\t" \
+        /* restore all register */ \
+        "pop    r31"                 "\n\t" \
+        "pop    r30"                 "\n\t" \
+        "pop    r29"                 "\n\t" \
+        "pop    r28"                 "\n\t" \
+        "pop    r27"                 "\n\t" \
+        "pop    r26"                 "\n\t" \
+        "pop    r25"                 "\n\t" \
+        "pop    r24"                 "\n\t" \
+        "pop    r23"                 "\n\t" \
+        "pop    r22"                 "\n\t" \
+        "pop    r21"                 "\n\t" \
+        "pop    r20"                 "\n\t" \
+        "pop    r19"                 "\n\t" \
+        "pop    r18"                 "\n\t" \
+        "pop    r17"                 "\n\t" \
+        "pop    r16"                 "\n\t" \
+        "pop    r15"                 "\n\t" \
+        "pop    r14"                 "\n\t" \
+        "pop    r13"                 "\n\t" \
+        "pop    r12"                 "\n\t" \
+        "pop    r11"                 "\n\t" \
+        "pop    r10"                 "\n\t" \
+        "pop    r9"                  "\n\t" \
+        "pop    r8"                  "\n\t" \
+        "pop    r7"                  "\n\t" \
+        "pop    r6"                  "\n\t" \
+        "pop    r5"                  "\n\t" \
+        "pop    r4"                  "\n\t" \
+        "pop    r3"                  "\n\t" \
+        "pop    r2"                  "\n\t" \
+        "pop    r1"                  "\n\t" \
+        /* restore SREG, I bit in popped SEG will not be set since we pushed it * \
+         * at the begining of ISR where interrupst where disabled, so restoring * \
+         * SREG will not enable interrupts until we execute reti */ \
+        "pop    r0"                  "\n\t" \
+        "out    __SREG__, r0"        "\n\t" \
+        /* restore r0 and reti */           \
+        "pop    r0"                  "\n\t" \
+        "reti"                       "\n\t" \
+            ::  [ctx] "p" (task_current),   \
+                [isr_nesting] "p" (isr_nesting))
 
 #endif /* __OS_PORT_ */
 

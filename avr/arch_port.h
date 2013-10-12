@@ -304,9 +304,9 @@ low address
         "push    r30"           "\n\t" \
         "push    r31"           "\n\t" \
         /* incement isr_nesting */ \
-        "lds     r16, %[isr_nesting]" "\n\t" \
-        "inc     r16"            "\n\t" \
-        "sts     %[isr_nesting], r16" "\n\t" \
+        "lds     r16, isr_nesting" "\n\t" \
+        "inc     r16"              "\n\t" \
+        "sts     isr_nesting, r16" "\n\t" \
         /* prepare frame pointer for future C code (usual ISR prolog skiped \
          * since OS_ISR was used */ \
         "in      r28, __SP_L__" "\n\t" /* load SPL into r28 (means Ya) */ \
@@ -316,13 +316,12 @@ low address
         "cpi     r16, 1"         "\n\t" \
         "brne    isr_contextstore_nested_%=\n\t" \
         /* store SP into task_current->ctx */ \
-        "lds     r30, %[ctx]"   "\n\t"  /* load Z by addr of curent_task */ \
-        "lds     r31, %[ctx]+1" "\n\t"  /* load Z by addr of curent_task */ \
-        "st      Z,   r28"      "\n\t"   /* store SPL into task_curent->ctx */ \
-        "std     Z+1, r29"      "\n\t"   /* store SPH into task_curent->ctx */ \
+        "lds     r30, task_current"  "\n\t"  /* load Z with curent_task pointer */ \
+        "lds     r31, task_curent+1" "\n\t"  /* load Z with curent_task pointer */ \
+        "st      Z,   r28"      "\n\t"   /* store SPL into *(task_curent) */ \
+        "std     Z+1, r29"      "\n\t"   /* store SPH into *(task_curent) */ \
      "isr_contextstore_nested_%=:\n\t" \
-            ::  [ctx] "p" (&(task_current)), \
-                [isr_nesting] "p" (&(isr_nesting)))
+            :: )
 
 /* This function have to:
  - disable IE (in case we achritecture allows for nesting)
@@ -343,18 +342,18 @@ low address
          * handling */ \
         "cli"                         "\n\t" \
         /* decrement isr_nesting */ \
-        "lds     r16, %[isr_nesting]" "\n\t" \
-        "dec     r16"                 "\n\t" \
-        "sts     %[isr_nesting], r16" "\n\t" \
+        "lds     r16, isr_nesting" "\n\t" \
+        "dec     r16"              "\n\t" \
+        "sts     isr_nesting, r16" "\n\t" \
         /* check isr_nesting and skip restoring iof SP if isr_nesting != 0 */ \
         "brne    isr_contextrestore_nested_%=\n\t" \
         /* restore SP from task_current->ctx */ \
-        "lds     r30, %[ctx]"         "\n\t" /* load Z by addr of curent_task */ \
-        "lds     r31, %[ctx]+1"       "\n\t" /* load Z by addr of curent_task */ \
-        "ld      r16, Z"              "\n\t" /* load SPL into task_curent->ctx */ \
-        "ldd     r17, Z+1"            "\n\t" /* load SPH into task_curent->ctx */ \
-        "out     __SP_L__, r16"       "\n\t" /* load SPL from r16 */ \
-        "out     __SP_H__, r17"       "\n\t" /* load SPH from r17 */ \
+        "lds     r30, task_curent"    "\n\t" /* load Z with curent_task pointer */ \
+        "lds     r31, task_current+1" "\n\t" /* load Z with curent_task pointer */ \
+        "ld      r16, Z"              "\n\t" /* load SPL from *(task_curent) */ \
+        "ldd     r17, Z+1"            "\n\t" /* load SPH from *(task_curent) */ \
+        "out     __SP_L__, r16"       "\n\t" /* save SPL */ \
+        "out     __SP_H__, r17"       "\n\t" /* save SPH */ \
      "isr_contextrestore_nested_%=:\n\t" \
         /* restore all register */ \
         "pop    r31"                 "\n\t" \
@@ -396,8 +395,7 @@ low address
         /* restore r0 and reti */           \
         "pop    r0"                  "\n\t" \
         "reti"                       "\n\t" \
-            ::  [ctx] "p" (task_current),   \
-                [isr_nesting] "p" (isr_nesting))
+            :: )
 
 #endif /* __OS_PORT_ */
 

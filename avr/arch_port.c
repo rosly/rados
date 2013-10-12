@@ -88,61 +88,50 @@ void OS_NAKED OS_HOT arch_context_switch(os_task_t * new_task)
        * threated by gcc as call-used */ \
       "in      r28, __SP_L__" "\n\t" /* load SPL into r28 (means Ya) */ \
       "in      r29, __SP_H__" "\n\t" /* load SPH into r29 (means Yb) */ \
-      "adiw    r28, 12"       "\n\t" /* skip 12bytes on stack */ \
-      /* store updated stack pointer (may be needed \TODO realy needed ?) */ \
-      "out     __SP_L__, r28" "\n\t" /* store SPL */ \
-      "out     __SP_H__, r29" "\n\t" /* store SPH */ \
+      "sbiw    r28, 12"       "\n\t" /* skip 12bytes on stack */ \
       /* store SP into task_current->ctx */ \
-      "sts     task_current, %0a\n\t" \
-      "sts     task_current+1, %0b\n\t" \
-
-
-      "lds     r30, %[ctx]"   "\n\t"  /* load Z by addr of curent_task */ \
-      "lds     r31, %[ctx]+1" "\n\t"  /* load Z by addr of curent_task */ \
-      "st      Z,   r28"      "\n\t"   /* store SPL into task_curent->ctx */ \
-      "std     Z+1, r29"      "\n\t"   /* store SPH into task_curent->ctx */ \
-          ::  [new_task] "d" (new_task));
-
-   task_current = new_task;
-
-    __asm__ __volatile__ ( \
-        /* restore SP from task_current->ctx */ \
-        "lds     r30, %[ctx]"         "\n\t" /* load Z by addr of curent_task */ \
-        "lds     r31, %[ctx]+1"       "\n\t" /* load Z by addr of curent_task */ \
-        "ld      r16, Z"              "\n\t" /* load SPL into task_curent->ctx */ \
-        "ldd     r17, Z+1"            "\n\t" /* load SPH into task_curent->ctx */ \
-        "out     __SP_L__, r16"       "\n\t" /* load SPL from r16 */ \
-        "out     __SP_H__, r17"       "\n\t" /* load SPH from r17 */ \
-        /* restore all register */ \
-        /* skip r18-r27 and r30-31 */ \
-        "adiw    r28, 12"            "\n\t" /* skip 12bytes on stack */ \
-        "out     __SP_L__, r28"      "\n\t" /* store SPL */ \
-        "out     __SP_H__, r29"      "\n\t" /* store SPH */ \
-        /* restore call-saved registers */ \
-        "pop    r17"                 "\n\t" \
-        "pop    r16"                 "\n\t" \
-        "pop    r15"                 "\n\t" \
-        "pop    r14"                 "\n\t" \
-        "pop    r13"                 "\n\t" \
-        "pop    r12"                 "\n\t" \
-        "pop    r11"                 "\n\t" \
-        "pop    r10"                 "\n\t" \
-        "pop    r9"                  "\n\t" \
-        "pop    r8"                  "\n\t" \
-        "pop    r7"                  "\n\t" \
-        "pop    r6"                  "\n\t" \
-        "pop    r5"                  "\n\t" \
-        "pop    r4"                  "\n\t" \
-        "pop    r3"                  "\n\t" \
-        "pop    r2"                  "\n\t" \
-        "pop    r29"                 "\n\t" \
-        "pop    r28"                 "\n\t" \
-        "pop    r1"                  "\n\t" \
-        /* dumy SREG and r0 (both can be clobered), then return by ret */ \
-        "pop    r0"                  "\n\t" \
-        "pop    r0"                  "\n\t" \
-        "ret"                       "\n\t" \
-            ::  [ctx] "p" (task_current));
+      "lds     r30, task_current"  "\n\t"  /* load Z with curent_task pointer */ \
+      "lds     r31, task_curent+1" "\n\t"  /* load Z with curent_task pointer */ \
+      "st      Z,   r28"      "\n\t"   /* store SPL into *(task_curent) */ \
+      "std     Z+1, r29"      "\n\t"   /* store SPH into *(task_curent) */ \
+      \
+      /* switch task_current = new_task */ \
+      "sts     task_current, %A0\n\t" \
+      "sts     task_current+1, %B0\n\t" \
+      \
+      /* restore SP from task_current->ctx */ \
+      "movw    r30, %0"             "\n\t" /* load Z with new_task pointer */ \
+      "ld      r28, Z"              "\n\t" /* load SPL from *(task_curent) */ \
+      "ldd     r29, Z+1"            "\n\t" /* load SPH from *(task_curent) */ \
+      /* restore all registers but skip r18-r27 and r30-31 */ \
+      "adiw    r28, 12"            "\n\t" /* skip 12bytes on stack */ \
+      "out     __SP_L__, r28"      "\n\t" /* store SPL */ \
+      "out     __SP_H__, r29"      "\n\t" /* store SPH */ \
+      /* restore call-saved registers */ \
+      "pop    r17"                 "\n\t" \
+      "pop    r16"                 "\n\t" \
+      "pop    r15"                 "\n\t" \
+      "pop    r14"                 "\n\t" \
+      "pop    r13"                 "\n\t" \
+      "pop    r12"                 "\n\t" \
+      "pop    r11"                 "\n\t" \
+      "pop    r10"                 "\n\t" \
+      "pop    r9"                  "\n\t" \
+      "pop    r8"                  "\n\t" \
+      "pop    r7"                  "\n\t" \
+      "pop    r6"                  "\n\t" \
+      "pop    r5"                  "\n\t" \
+      "pop    r4"                  "\n\t" \
+      "pop    r3"                  "\n\t" \
+      "pop    r2"                  "\n\t" \
+      "pop    r29"                 "\n\t" \
+      "pop    r28"                 "\n\t" \
+      "pop    r1"                  "\n\t" \
+      /* dumy SREG and r0 (both can be clobered), then return by ret */ \
+      "pop    r0"                  "\n\t" \
+      "pop    r0"                  "\n\t" \
+      "ret"                       "\n\t" \
+            ::  [new_task] "r" (new_task));
 }
 
 void arch_os_start(void)
@@ -161,10 +150,36 @@ void OS_NAKED arch_task_start(os_taskproc_t proc, void* param)
 - ensure that task will have the interrupts enabled after it enters proc, on some arch this may be also used in arch_task_start
  /param stack pointer to stack end, it will have the same meaning as sp on paticular arch
 */
-void arch_task_init(os_task_t * OS_UNUSED(task), void* OS_UNUSED(stack_param),
-                    size_t OS_UNUSED(stack_size), os_taskproc_t OS_UNUSED(proc),
-                    void* OS_UNUSED(param))
+void arch_task_init(os_task_t * task, void* stack_param,
+                    size_t stack_size, os_taskproc_t proc,
+                    void* param)
 {
+   uint16_t *stack = (uint16_t*)(((uint8_t*)stack_param) + stack_size); /* for AVR we have descending stack */
+
+   /* in AVR stack works in postdectement on push (preincrement on pop) */
+   *(stack--) = (uint16_t)arch_task_start;
+   *(stack--) = 0; /* R0 */
+   *(stack--) = 1 << SREG_I; /* SFR with interupts enabled */
+   *(stack--) = 0; /* R1 */
+
+fuck
+
+   /* enable interrupts after task starts */
+   *(stack--) = (uint16_t)proc; /* R15 */
+   *(stack--) = (uint16_t)param; /* R14 */
+   *(stack--) = 0; /* R13 */
+   *(stack--) = 0; /* R12 */
+   *(stack--) = 0; /* R11 */
+   *(stack--) = 0; /* R10 */
+   *(stack--) = 0; /* R9 */
+   *(stack--) = 0; /* R8 */
+   *(stack--) = 0; /* R7 */
+   *(stack--) = 0; /* R6 */
+   *(stack--) = 0; /* R5 */
+   *(stack--) = 0; /* R4 */
+   stack++; /* in MSP430 stack works in postincrement on pop, in other words sp point to value which will be poped in next op */
+
+   task->ctx.sp = (uint16_t)stack;
 }
 
 void OS_NORETURN OS_COLD arch_halt(void)

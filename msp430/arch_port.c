@@ -44,7 +44,6 @@ hi address
   This function have to:
  - store task context in the same place as arch_contextstore_i (power bits does not have to be necessarly stored, IE have to be stored becouse we need to atomicaly disable the interupts when we will pop this task)
  - perform task_current = new_task;
- - perform task_current->state = TASKSTATE_RUNNING
  - restore context as same as in arch_contextrestore
  - perform actions that will lead to sustain the power enable after poping the SR (task could be stored by ISR so task possibly may have the power bits dis
  - perform actions that will lead to restore after ret the IE flag state saved when task context was dumped (we may swith to peempted task so we ned to enable IE while IE was disabled durring enter of arch_context_switch)
@@ -59,7 +58,6 @@ void OS_NAKED OS_HOT arch_context_switch(os_task_t *new_task)
       "mov r1, @r4\n\t"
          ::  [ctx] "m" (task_current));
    task_current = new_task;
-   task_current->state = TASKSTATE_RUNNING;
    __asm__ __volatile__ (
       "mov %[ctx], r1\n\t"
       "mov @r1, r1\n\t"

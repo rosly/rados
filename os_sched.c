@@ -90,6 +90,7 @@ void os_start(
       /* finaly we switch the context to first user task, (it will have the
        * higher ptiority than idle) (need to be done under critical section) */
       arch_context_switch(os_task_dequeue(&ready_queue));
+      task_current->state = TASKSTATE_RUNNING; /* we are back again in idle task, it is running now */
       arch_critical_exit(cristate);
    }while(0);
 
@@ -331,8 +332,9 @@ void OS_HOT os_schedule(uint_fast8_t higher_prio)
              * switching itself must be perfomed at the end of ISR (see
              * arch_contextrestore_i) */
             task_current = new_task;
-            task_current->state = TASKSTATE_RUNNING;
          }
+         /* in both cases task is running now */
+         task_current->state = TASKSTATE_RUNNING;
       }
    }
 }
@@ -361,9 +363,10 @@ void OS_HOT os_block_andswitch(
   arch_context_switch(os_task_dequeue(&ready_queue));
 
   /* return from arch_context_switch call will be in some of next os_schedule()
-   * call. After return task state is again set to TASKSTATE_RUNING, also
+   * call. After return task state should be again set to TASKSTATE_RUNING, also
    * iterrupts are again disabled here (even it they where enabled for execution
    * of previous task) */
+  task_current->state = TASKSTATE_RUNNING;
 }
 
 void os_task_exit(int retv)

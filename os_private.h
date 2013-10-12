@@ -149,7 +149,8 @@ void os_task_exit(int retv);
 
 /* functions provided by arch port */
 void arch_os_start(void);
-void OS_HOT arch_context_switch(os_task_t *new_task);
+/* we dont mark arch_context_switch as OS_NAKED since not all arch use that */
+void /* OS_NAKED */ OS_HOT arch_context_switch(os_task_t *new_task);
 void OS_NORETURN OS_COLD arch_halt(void);
 void arch_task_init(os_task_t *tcb, void* stack, size_t stack_size, os_taskproc_t proc, void* param);
 void arch_idle(void);

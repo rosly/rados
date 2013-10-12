@@ -229,8 +229,8 @@ typedef uint8_t arch_criticalstate_t; /* size of AVR status register */
       SREG = (_critical_state); \
    }while(0)
 
-#define arch_dint() __builtin_avr_cli()
-#define arch_eint() __builtin_avr_sei()
+#define arch_dint() __asm__ __volatile__ ( "cli\n\t" :: )
+#define arch_eint() __asm__ __volatile__ ( "sei\n\t" :: )
 
 /* format of the context pushed on stack for AVR port
 hi adress
@@ -264,11 +264,17 @@ low address
         /* on AVR interupts are disabled when entering ISR */ \
         /* store r0 for temporary operations */ \
         "push    r0"            "\n\t" \
-        /* store SREG */               \
+        /* store SREG and r1 */        \
         "in      r0, __SREG__"  "\n\t" \
         "push    r0"            "\n\t" \
-        /* store remain registers */    \
         "push    r1"            "\n\t" \
+        /* store remain registers */    \
+        /* gcc uses Y as frame register, it will be easier if we store it \
+         * first */ \
+        "push    r28"           "\n\t" \
+        "push    r29"           "\n\t" \
+        /* gcc threats r2-r17 as call-saved registes, if we store them first * \
+         * then arch_context_swich can be opimized */ \
         "push    r2"            "\n\t" \
         "push    r3"            "\n\t" \
         "push    r4"            "\n\t" \
@@ -295,8 +301,6 @@ low address
         "push    r25"           "\n\t" \
         "push    r26"           "\n\t" \
         "push    r27"           "\n\t" \
-        "push    r28"           "\n\t" \
-        "push    r29"           "\n\t" \
         "push    r30"           "\n\t" \
         "push    r31"           "\n\t" \
         /* incement isr_nesting */ \
@@ -338,7 +342,7 @@ low address
         /* disable interrupts in case some ISR will implement nesting interrupt * \
          * handling */ \
         "cli"                         "\n\t" \
-        /* incement is_nesting */ \
+        /* decrement isr_nesting */ \
         "lds     r16, %[isr_nesting]" "\n\t" \
         "dec     r16"                 "\n\t" \
         "sts     %[isr_nesting], r16" "\n\t" \
@@ -355,8 +359,6 @@ low address
         /* restore all register */ \
         "pop    r31"                 "\n\t" \
         "pop    r30"                 "\n\t" \
-        "pop    r29"                 "\n\t" \
-        "pop    r28"                 "\n\t" \
         "pop    r27"                 "\n\t" \
         "pop    r26"                 "\n\t" \
         "pop    r25"                 "\n\t" \
@@ -383,6 +385,8 @@ low address
         "pop    r4"                  "\n\t" \
         "pop    r3"                  "\n\t" \
         "pop    r2"                  "\n\t" \
+        "pop    r29"                 "\n\t" \
+        "pop    r28"                 "\n\t" \
         "pop    r1"                  "\n\t" \
         /* restore SREG, I bit in popped SEG will not be set since we pushed it * \
          * at the begining of ISR where interrupst where disabled, so restoring * \

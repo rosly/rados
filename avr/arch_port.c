@@ -91,9 +91,9 @@ void OS_NAKED OS_HOT arch_context_switch(os_task_t * new_task)
       "sbiw    r28, 12"       "\n\t" /* skip 12bytes on stack */ \
       /* store SP into task_current->ctx */ \
       "lds     r30, task_current"  "\n\t"  /* load Z with curent_task pointer */ \
-      "lds     r31, task_curent+1" "\n\t"  /* load Z with curent_task pointer */ \
-      "st      Z,   r28"      "\n\t"   /* store SPL into *(task_curent) */ \
-      "std     Z+1, r29"      "\n\t"   /* store SPH into *(task_curent) */ \
+      "lds     r31, task_current+1" "\n\t"  /* load Z with curent_task pointer */ \
+      "st      Z,   r28"      "\n\t"   /* store SPL into *(task_current) */ \
+      "std     Z+1, r29"      "\n\t"   /* store SPH into *(task_current) */ \
       \
       /* switch task_current = new_task */ \
       "sts     task_current, %A0\n\t" \
@@ -101,8 +101,8 @@ void OS_NAKED OS_HOT arch_context_switch(os_task_t * new_task)
       \
       /* restore SP from task_current->ctx */ \
       "movw    r30, %0"             "\n\t" /* load Z with new_task pointer */ \
-      "ld      r28, Z"              "\n\t" /* load SPL from *(task_curent) */ \
-      "ldd     r29, Z+1"            "\n\t" /* load SPH from *(task_curent) */ \
+      "ld      r28, Z"              "\n\t" /* load SPL from *(task_current) */ \
+      "ldd     r29, Z+1"            "\n\t" /* load SPH from *(task_current) */ \
       /* restore all registers but skip r18-r27 and r30-31 */ \
       "adiw    r28, 12"            "\n\t" /* skip 12bytes on stack */ \
       "out     __SP_L__, r28"      "\n\t" /* store SPL */ \
@@ -154,31 +154,52 @@ void arch_task_init(os_task_t * task, void* stack_param,
                     size_t stack_size, os_taskproc_t proc,
                     void* param)
 {
-   uint16_t *stack = (uint16_t*)(((uint8_t*)stack_param) + stack_size); /* for AVR we have descending stack */
+   uint8_t *stack = ((uint8_t*)stack_param) + stack_size; /* for AVR we have descending stack */
+   uint16_t *frame_pointer_reg; 
 
    /* in AVR stack works in postdectement on push (preincrement on pop) */
-   *(stack--) = (uint16_t)arch_task_start;
+   *(stack--) = (((uint16_t)arch_task_start) & 0xff00) << 8;
+   *(stack--) = (((uint16_t)arch_task_start) & 0x00ff);
    *(stack--) = 0; /* R0 */
    *(stack--) = 1 << SREG_I; /* SFR with interupts enabled */
    *(stack--) = 0; /* R1 */
 
-fuck
+   *(stack--) = 0; /* R28 */
+   frame_pointer_reg = (uint16_t*)stack; /* store position of frame pointer reg on stack */
+   *(stack--) = 0; /* R29 Y register frame pointer */
 
-   /* enable interrupts after task starts */
-   *(stack--) = (uint16_t)proc; /* R15 */
-   *(stack--) = (uint16_t)param; /* R14 */
-   *(stack--) = 0; /* R13 */
-   *(stack--) = 0; /* R12 */
-   *(stack--) = 0; /* R11 */
-   *(stack--) = 0; /* R10 */
-   *(stack--) = 0; /* R9 */
-   *(stack--) = 0; /* R8 */
-   *(stack--) = 0; /* R7 */
-   *(stack--) = 0; /* R6 */
-   *(stack--) = 0; /* R5 */
+   *(stack--) = 0; /* R2 */
+   *(stack--) = 0; /* R3 */
    *(stack--) = 0; /* R4 */
-   stack++; /* in MSP430 stack works in postincrement on pop, in other words sp point to value which will be poped in next op */
+   *(stack--) = 0; /* R5 */
+   *(stack--) = 0; /* R6 */
+   *(stack--) = 0; /* R7 */
+   *(stack--) = 0; /* R8 */
+   *(stack--) = 0; /* R9 */
+   *(stack--) = 0; /* R10 */
+   *(stack--) = 0; /* R11 */
+   *(stack--) = 0; /* R12 */
+   *(stack--) = 0; /* R13 */
+   *(stack--) = 0; /* R14 */
+   *(stack--) = 0; /* R15 */
+   *(stack--) = 0; /* R16 */
+   *(stack--) = 0; /* R17 */
+   *(stack--) = 0; /* R18 */
+   *(stack--) = 0; /* R19 */
+   *(stack--) = 0; /* R20 */
+   *(stack--) = (((uint16_t)param) & 0xff00) << 8; /* R21 */
+   *(stack--) = (((uint16_t)param) & 0x00ff);      /* R22 */
+   *(stack--) = (((uint16_t)proc) & 0xff00) << 8;  /* R23 */
+   *(stack--) = (((uint16_t)proc) & 0x00ff);       /* R24 */
+   *(stack--) = 0; /* R25 */
+   *(stack--) = 0; /* R26 */
+   *(stack--) = 0; /* R27 */
+   *(stack--) = 0; /* R30 */
+   *(stack--) = 0; /* R31 */
 
+   /* update the calculaed fame pointer */
+   *frame_pointer_reg = (uint16_t)stack;
+   /* store stack pointer in task context */
    task->ctx.sp = (uint16_t)stack;
 }
 

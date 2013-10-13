@@ -50,7 +50,7 @@ static long int task1_stack[OS_STACK_MINSIZE];
 static os_sem_t sem1;
 static int task1_started = 0;
 
-void idle(void)
+void test_idle(void)
 {
    test_result(task1_started ? 0 : -1);
 }
@@ -68,7 +68,7 @@ int task1_proc(void* OS_UNUSED(param))
    return 0;
 }
 
-void init(void)
+void test_init(void)
 {
    os_sem_create(&sem1, 0);
    os_task_create(&task1, 1, task1_stack, sizeof(task1_stack), task1_proc, NULL);
@@ -77,7 +77,7 @@ void init(void)
 int main(void)
 {
    test_setupmain("Test1");
-   os_start(init, idle);
+   os_start(test_init, test_idle);
    return 0;
 }
 

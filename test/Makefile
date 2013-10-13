@@ -54,21 +54,22 @@ TESTSOURCE += \
 	test_timer.c
 endif
 
-INCLUDES = . .. ../$(ARCH)
+SOURCEDIR = .
 BUILDDIR = ../build/$(ARCH)
+INCLUDEDIR = . .. ../$(ARCH)
 LIBDIR = ../build/$(ARCH)
 LIBS = kernel
 
 #in target.mk for each source the optima optimization level (CFLAGS = -Ox) is defined
 #but here we add CFLAGS += -g if debug build
-ifeq ($(DEBUG),)
+ifneq ($(DEBUG),)
 CFLAGS += -g
 endif
 #regardles architecture we use highest warning level
 CFLAGS += -Wall -Wextra -Werror
 LDFLAGS +=
 
-vpath %.c .
+vpath %.c $(SOURCEDIR)
 vpath %.o $(BUILDDIR)
 vpath %.a $(BUILDDIR)
 DEPEND = $(addprefix $(BUILDDIR)/, $(TESTSOURCE:.c=.d))
@@ -80,11 +81,11 @@ all: $(LIBFILE) $(TARGETS)
 
 $(BUILDDIR)/%.elf: $(BUILDDIR)/%.o $(LIBFILE)
 	@$(ECHO) "[LN]\t$@"
-	@$(CC) $< -L$(LIBDIR) -o $@ $(addprefix -l, $(LIBS)) $(LDFLAGS) 
+	@$(CC) $< -L$(LIBDIR) -o $@ $(addprefix -l, $(LIBS)) $(CFLAGS) $(LDFLAGS) 
 
 $(BUILDDIR)/%.o: %.c
 	@$(ECHO) "[CC]\t$<"
-	@$(CC) -c $(CFLAGS) -o $@ $(addprefix -I, $(INCLUDES)) $<
+	@$(CC) -save-temps=obj -c $(CFLAGS) -o $@ $(addprefix -I, $(INCLUDEDIR)) $<
 
 $(LIBFILE):
 	@$(ECHO) "Missing kernel objects, build the kernel first"
@@ -99,7 +100,7 @@ endif
 # (otherwise use -MM instead of -M)
 $(BUILDDIR)/%.d: %.c
 	@$(ECHO) "[DEP]\t$<"
-	@$(CC) -M ${CFLAGS} $(addprefix -I, $(INCLUDES)) $< >$@
+	@$(CC) -M ${CFLAGS} $(addprefix -I, $(INCLUDEDIR)) $< >$@
 
 .PHONY: clean testrun
 

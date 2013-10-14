@@ -122,7 +122,7 @@ void os_timer_destroy(os_timer_t* timer)
    arch_criticalstate_t cristate;
 
    /* prevent double usage of initialized timer */
-   OS_ASSERT((timer->magic == OS_TIMER_MAGIC1) || 
+   OS_ASSERT((timer->magic == OS_TIMER_MAGIC1) ||
              (timer->magic == OS_TIMER_MAGIC2));
 
    /* timer list is iterated from ISR, we need to disable the interrupts */
@@ -134,17 +134,17 @@ void os_timer_destroy(os_timer_t* timer)
       /* detach from active timer list */
       list_unlink(&(timer->list));
       /* marking timer as expired, prevents double destroy */
-      timer->ticks_rem = 0; 
+      timer->ticks_rem = 0;
       /* clearing the autoreload field, this will allow for safe destroy of
        * timers from the timer_callback (timer will not be restarted if this
        * field is 0) */
-      timer->ticks_reload = 0; 
+      timer->ticks_reload = 0;
    }
 
 #ifdef OS_CONFIG_APICHECK
    /* obstruct magic, additionaly this value helps to spot that this timer was
     * sucessfully destroyed */
-   timer->magic = OS_TIMER_MAGIC2; 
+   timer->magic = OS_TIMER_MAGIC2;
 #endif
 
    arch_critical_exit(cristate);
@@ -265,7 +265,7 @@ static void OS_HOT os_timer_triger(void)
 }
 
 /* \TODO unit test missing */
-os_ticks_t os_ticks_diff(os_ticks_t* restrict ticks_start)
+os_ticks_t os_ticks_diff(os_ticks_t* OS_RESTRICT ticks_start)
 {
   arch_criticalstate_t cristate;
   os_ticks_t ret;
@@ -287,14 +287,14 @@ os_ticks_t os_ticks_diff(os_ticks_t* restrict ticks_start)
 }
 
 /* \TODO unit test missing */
-void os_timeout_start(os_timeout_t* restrict timeout, os_ticks_t ticks)
+void os_timeout_start(os_timeout_t* OS_RESTRICT timeout, os_ticks_t ticks)
 {
   os_ticks_now(&(timeout->ticks_start));
   timeout->ticks_rem = ticks;
 }
 
 /* \TODO unit test missing */
-int os_timeout_check(os_timeout_t* restrict timeout)
+int os_timeout_check(os_timeout_t* OS_RESTRICT timeout)
 {
   os_ticks_t ticks_tmp;
 

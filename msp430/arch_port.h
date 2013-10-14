@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is a part of RadOs project
  * Copyright (c) 2013, Radoslaw Biernaki <radoslaw.biernacki@gmail.com>
  * All rights reserved.
@@ -80,6 +80,8 @@ typedef uint16_t arch_criticalstate_t; /* size of CPU status register */
 #define OS_LIKELY(_cond) __builtin_expect(!!(_cond), 1)
 #define OS_UNLIKELY(_cond) __builtin_expect(!!(_cond), 0)
 #define OS_UNUSED(_x) unused_ ## _x __attribute__((unused))
+#define OS_RESTRICT __restrict__
+#define OS_PROGMEM
 
 #define OS_STACK_DESCENDING
 #define OS_STACK_MINSIZE ((size_t)28 * 4) /* four times of context dump size */

@@ -155,7 +155,7 @@ void arch_task_init(os_task_t * task, void* stack_param,
                     void* param)
 {
    uint8_t *stack = ((uint8_t*)stack_param) + stack_size; /* for AVR we have descending stack */
-   uint16_t *frame_pointer_reg; 
+   uint16_t *frame_pointer_reg;
 
    /* in AVR stack works in postdectement on push (preincrement on pop) */
    *(stack--) = (((uint16_t)arch_task_start) & 0xff00) << 8;
@@ -209,5 +209,10 @@ void OS_NORETURN OS_COLD arch_halt(void)
    while(1) {
       /* \TODO put CPU into relax */
    }
+}
+
+void arch_idle(void)
+{
+  /* \TODO implement power save code */
 }
 

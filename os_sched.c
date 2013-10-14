@@ -49,7 +49,7 @@ static os_task_t task_idle;
 static void arch_task_debug(os_task_t *task, void* stack, size_t stack_size);
 static void os_task_init(os_task_t* task, uint_fast8_t prio);
 
-/* priod and in time of this function call, all interrupts must be disabled */
+/* prior this function call, all interrupts must be disabled */
 void os_start(
    os_initproc_t app_init,
    os_initproc_t app_idle)
@@ -141,7 +141,7 @@ int os_task_join(os_task_t *task)
 
    OS_ASSERT(0 == isr_nesting); /* this function may be called only form user code */
    /* idle task cannot call blocking functions (will crash OS) */
-   OS_ASSERT(task_current->prio_current > 0); 
+   OS_ASSERT(task_current->prio_current > 0);
 
    arch_critical_enter(cristate);
    OS_ASSERT(NULL == task->join_sem); /* only single task can wait for another task */
@@ -185,8 +185,8 @@ void OS_COLD os_halt(void)
 /* --- private functions --- */
 
 void OS_HOT os_task_enqueue(
-   os_taskqueue_t* restrict task_queue,
-   os_task_t* restrict task)
+   os_taskqueue_t* OS_RESTRICT task_queue,
+   os_task_t* OS_RESTRICT task)
 {
    list_append(&(task_queue->tasks[task->prio_current]), &(task->list));
    task->task_queue = task_queue;
@@ -200,7 +200,7 @@ void OS_HOT os_task_enqueue(
  *  operation.Function does not unlink the task! this must be done before
  *  calling this function
  */
-void OS_HOT os_task_queue_reprio(os_taskqueue_t* restrict task_queue)
+void OS_HOT os_task_queue_reprio(os_taskqueue_t* OS_RESTRICT task_queue)
 {
    while( (0 != (task_queue->priomax)) &&
           list_is_empty(&(task_queue->tasks[task_queue->priomax]))) {
@@ -213,7 +213,7 @@ void OS_HOT os_task_queue_reprio(os_taskqueue_t* restrict task_queue)
  *  This is desierd function which should be called when we need to switch to
  *  explicitly pointed task from task_queues
  */
-void OS_HOT os_task_unlink(os_task_t* restrict task)
+void OS_HOT os_task_unlink(os_task_t* OS_RESTRICT task)
 {
    list_unlink(&(task->list));
    os_task_queue_reprio(task->task_queue);
@@ -225,7 +225,7 @@ void OS_HOT os_task_unlink(os_task_t* restrict task)
  *  function which should be called when we need to peek (switch to) most
  *  prioritized task
  */
-os_task_t* OS_HOT os_task_dequeue(os_taskqueue_t* restrict task_queue)
+os_task_t* OS_HOT os_task_dequeue(os_taskqueue_t* OS_RESTRICT task_queue)
 {
    list_t *list = list_detachfirst(&(task_queue->tasks[task_queue->priomax]));
    if( NULL == list ) {
@@ -242,7 +242,7 @@ os_task_t* OS_HOT os_task_dequeue(os_taskqueue_t* restrict task_queue)
  *  than prio passed by param
  */
 os_task_t* OS_HOT os_task_dequeue_prio(
-   os_taskqueue_t* restrict task_queue,
+   os_taskqueue_t* OS_RESTRICT task_queue,
    uint_fast8_t prio)
 {
    if( task_queue->priomax >= prio ) {
@@ -257,7 +257,7 @@ os_task_t* OS_HOT os_task_dequeue_prio(
  *  Use this function only when you are intrested about some property of most
  *  prioritized task on the queue but you dont whant to dqueue this task
  */
-os_task_t* OS_HOT os_task_peekqueue(os_taskqueue_t* restrict task_queue)
+os_task_t* OS_HOT os_task_peekqueue(os_taskqueue_t* OS_RESTRICT task_queue)
 {
    list_t *list = list_peekfirst(&(task_queue->tasks[task_queue->priomax]));
    if( NULL == list ) {
@@ -352,7 +352,7 @@ void OS_HOT os_schedule(uint_fast8_t higher_prio)
  * \warning This function cannot be called from ISR!!
  */
 void OS_HOT os_block_andswitch(
-   os_taskqueue_t* restrict task_queue,
+   os_taskqueue_t* OS_RESTRICT task_queue,
    os_taskblock_t block_type)
 {
   /* block current task on pointed queue */

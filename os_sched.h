@@ -163,9 +163,32 @@ typedef struct os_taskqueue_tag {
 typedef void (*os_initproc_t)(void);
 typedef int (*os_taskproc_t)(void* param);
 
+/** Function initializes all internal OS structure.
+ *
+ * Function should be called form main() and never returns.
+ *
+ * @param app_init Function callback which initializes architecture dependend HW
+ *        and SW components from OS idle task context (for example creation of
+ *        global  mutexts or semaphores, creation of other OS tasks, starting
+ *        of tick timer and all SW components wchich can issue further OS
+ *        function calls).
+ * @param app_idle Function callback which is called by OS on every cycle of
+ *        idle task. If user part of SW should perform any action while idle task
+ *        is scheduled, this is the right place for this. But keep in mind that
+ *        from this function, you cannot call any os OS blocking functions.
+ *
+ * @pre prior this function call, all architecture depended HW setup must be
+ *      done to level which allows stable and uninterrupted C enviroment execution
+ *      (this includes .bss and .data sections initialization, stack and frame
+ *      pointer initialization, watchdog and interrupts disabling etc)
+ * @pre It is important that prior this function call, interrupts must be disabled
+ *
+ * @note It is guarantieed that app_init will be called before app_idle
+ */
 void os_start(
    os_initproc_t app_init,
    os_initproc_t app_idle);
+
 void os_task_create(
    os_task_t *task,
    uint_fast8_t prio,
@@ -173,8 +196,11 @@ void os_task_create(
    size_t stack_size,
    os_taskproc_t proc,
    void* param);
+
 int os_task_join(os_task_t *task);
+
 void OS_HOT os_tick(void);
+
 void OS_COLD os_halt(void);
 
 #endif

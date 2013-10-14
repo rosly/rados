@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is a part of RadOs project
  * Copyright (c) 2013, Radoslaw Biernaki <radoslaw.biernacki@gmail.com>
  * All rights reserved.
@@ -29,31 +29,46 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <os_test.h>
 #include <os_private.h>
+#include <os_test.h>
 
 test_tick_clbck_t test_tick_clbck = NULL;
 
-void test_debug_printf(const char* OS_UNUSED(format), ...)
+/* for documentation check arch_test.h */
+void test_debug_printf(const OS_PROGMEM char* format, ...)
 {
-   /* for mp430 we dont support this functionality */
 }
 
-void test_result(int OS_UNUSED(result))
+/* for documentation check arch_test.h */
+void test_result(int result)
 {
+   arch_criticalstate_t cristate;
+
+   if(0 == result) {
+      test_debug_printf("%s: Test PASSED\n", test_name);
+   } else {
+      test_debug_printf("%s: Test FAILURE\n", test_name);
+   }
+
+   arch_critical_enter(cristate);
    arch_halt();
 }
 
-void test_setupmain(const char* OS_UNUSED(test_name))
+/* for documentation check arch_test.h */
+void test_setupmain(const OS_PROGMEM char* test_name)
 {
    test_assert(0); /* missing implementation */
 }
 
-void test_setuptick(test_tick_clbck_t OS_UNUSED(clbck), unsigned long OS_UNUSED(nsec))
+/* for documentation check arch_test.h */
+void test_setuptick(test_tick_clbck_t clbck, unsigned long nsec)
 {
    test_assert(0); /* missing implementation */
+}
 
-   if( NULL != test_tick_clbck )
-      test_tick_clbck();
+/* for documentation check arch_test.h */
+void test_reqtick(void)
+{
+   test_assert(0); /* missing implementation */
 }
 

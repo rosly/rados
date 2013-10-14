@@ -36,10 +36,45 @@
   test_debug_printf(__FILE__ ":" OS_STR(__LINE__) " " format, ##__VA_ARGS__)
 
 typedef void (*test_tick_clbck_t)(void);
-void test_debug_printf(const char* format, ...);
+
+
+/** Debug function for test verbose output
+  *
+  * This function is setup and architecture dependend and should pass the
+  * verbose debug ouput to console like interface (for instance serial port)
+  */
+void test_debug_printf(const OS_PROGMEM char* format, ...);
+
+/** Function notifies Human User Interface about test result
+  *
+  * Since not all architectures use console output, there can be cases where
+  * only the test result is important (eor e.g automatic test benches).
+  *
+  * @param result result of the test, 0 success, != 0 failure
+  */
 void test_result(int result);
-void test_setupmain(const char* test_name);
+
+/** Function setups all things needed for paticular architecture to run
+  *
+  * Details:
+  * Function setups the signal disposition tick signal, but do not
+  * create the tick timer. This allows tests to handle the manual tick requests
+  * (if needed) but also can be used for periodic tick setup (which is more
+  * usual case). For periodick tick setup test should call test_setuptick */
+void test_setupmain(const OS_PROGMEM char* test_name);
+
+/** Function starts the periodic timer
+  *
+  * @precondition test_setupmain was called beforehand
+  */
 void test_setuptick(test_tick_clbck_t clbck, unsigned long nsec);
+
+/** Function forces manual tick
+  *
+  * This function is used for fine checking the OS rutines which base on tick
+  *
+  * @precondition test_setupmain was called beforehand
+  */
 void test_reqtick(void);
 
 #include "arch_test.h"

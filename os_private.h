@@ -136,14 +136,14 @@ os_taskqueue_t ready_queue; /* visiable only for os files, not for user */
 volatile os_atomic_t sched_lock; /* visiable only for os files, not for user */
 
 void OS_HOT os_task_enqueue(os_taskqueue_t* task_queue, os_task_t* task);
-void OS_HOT os_task_unlink(os_task_t* restrict task);
+void OS_HOT os_task_unlink(os_task_t* OS_RESTRICT task);
 os_task_t* OS_HOT os_task_dequeue(os_taskqueue_t* task_queue);
 os_task_t* OS_HOT os_task_dequeue_prio(os_taskqueue_t* task_queue, uint_fast8_t prio);
-os_task_t* OS_HOT os_task_peekqueue(os_taskqueue_t* restrict task_queue);
+os_task_t* OS_HOT os_task_peekqueue(os_taskqueue_t* OS_RESTRICT task_queue);
 void os_taskqueue_init(os_taskqueue_t *task_queue);
 void OS_HOT os_schedule(uint_fast8_t higher_prio);
 void OS_HOT os_block_andswitch(
-   os_taskqueue_t* restrict task_queue,
+   os_taskqueue_t* OS_RESTRICT task_queue,
    os_taskblock_t block_type);
 void os_task_exit(int retv);
 

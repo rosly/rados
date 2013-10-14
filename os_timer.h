@@ -66,9 +66,9 @@ static inline void os_ticks_now(os_ticks_t *ticks)
   arch_ticks_atomiccpy(ticks, &os_ticks_cnt);
 }
 
-os_ticks_t os_ticks_diff(os_ticks_t* restrict ticks_start);
-void os_timeout_start(os_timeout_t* restrict timeout, os_ticks_t ticks);
-int os_timeout_check(os_timeout_t* restrict timeout);
+os_ticks_t os_ticks_diff(os_ticks_t* OS_RESTRICT ticks_start);
+void os_timeout_start(os_timeout_t* OS_RESTRICT timeout, os_ticks_t ticks);
+int os_timeout_check(os_timeout_t* OS_RESTRICT timeout);
 
 #endif
 

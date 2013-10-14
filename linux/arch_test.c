@@ -41,6 +41,9 @@ static timer_t timer; /**< linux POSIX timer used as an emulation of tick */
 static test_tick_clbck_t test_tick_clbck = NULL; /**< additional callback for emulated tick */
 static const char* test_name = NULL;
 
+/** Linux architecture dependend. Signal handler function for timer tick
+ * emulation
+ */
 static void OS_ISR sig_alrm(int OS_UNUSED(signum), siginfo_t * OS_UNUSED(siginfo), void *ucontext)
 {
    arch_contextstore_i(sig_alrm);
@@ -52,6 +55,7 @@ static void OS_ISR sig_alrm(int OS_UNUSED(signum), siginfo_t * OS_UNUSED(siginfo
    arch_contextrestore_i(sig_alrm);
 }
 
+/* for documentation check arch_test.h */
 void test_debug_printf(const char* format, ...)
 {
    va_list ap;
@@ -63,24 +67,22 @@ void test_debug_printf(const char* format, ...)
    va_end(ap);
 }
 
+/* for documentation check arch_test.h */
 void test_result(int result)
 {
    arch_criticalstate_t cristate;
 
    if(0 == result) {
-      printf("%s: Test PASSED\n", test_name);
+      test_debug_printf("%s: Test PASSED\n", test_name);
    } else {
-      printf("%s: Test FAILURE\n", test_name);
+      test_debug_printf("%s: Test FAILURE\n", test_name);
    }
 
    arch_critical_enter(cristate);
    exit(result);
 }
 
-/** Function setup the signal disposition used for tick but do not create the
- * tick timer. This allows to handle the manual tick requests if needed but also
- * can be used for periodic tick setup if needed (which is usual case). For
- * periodick ticks see test_setuptick */
+/* for documentation check arch_test.h */
 void test_setupmain(const char* name)
 {
    int ret;
@@ -97,10 +99,7 @@ void test_setupmain(const char* name)
    test_name = name;
 }
 
-/** Function starts the periodic timer for tick emulation
-  *
-  * @precondition test_setupmain was called beforehand
-  */
+/* for documentation check arch_test.h */
 void test_setuptick(test_tick_clbck_t clbck, unsigned long nsec)
 {
    int ret;
@@ -131,10 +130,7 @@ void test_setuptick(test_tick_clbck_t clbck, unsigned long nsec)
    test_assert(0 == ret);
 }
 
-/** Function trigers manual tick
-  *
-  * @precondition test_setupmain was called beforehand
-  */
+/* for documentation check arch_test.h */
 void test_reqtick(void)
 {
    raise(SIGALRM);

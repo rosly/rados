@@ -45,7 +45,7 @@
 #define TEST_TIMER_NBR ((size_t)512)
 
 static os_task_t task_main;
-static long int task_main_stack[OS_STACK_MINSIZE];
+static OS_TASKSTACK task_main_stack[OS_STACK_MINSIZE];
 static os_timer_t timers[TEST_TIMER_NBR];
 static bool timer_clbck[TEST_TIMER_NBR];
 

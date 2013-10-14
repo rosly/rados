@@ -82,6 +82,7 @@ typedef uint16_t arch_criticalstate_t; /* size of CPU status register */
 #define OS_UNUSED(_x) unused_ ## _x __attribute__((unused))
 #define OS_RESTRICT __restrict__
 #define OS_PROGMEM
+#define OS_TASKSTACK uint8_t __attribute__ ((aligned (2)))
 
 #define OS_STACK_DESCENDING
 #define OS_STACK_MINSIZE ((size_t)28 * 4) /* four times of context dump size */

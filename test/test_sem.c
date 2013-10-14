@@ -51,13 +51,13 @@
 typedef struct {
    os_task_t task;
    os_sem_t sem;
-   long int task1_stack[OS_STACK_MINSIZE];
+   OS_TASKSTACK task1_stack[OS_STACK_MINSIZE];
    unsigned idx;
    bool result;
 } task_data_t;
 
 static os_task_t task_main;
-static long int task_main_stack[OS_STACK_MINSIZE];
+static OS_TASKSTACK task_main_stack[OS_STACK_MINSIZE];
 static task_data_t worker_tasks[TEST_TASKS];
 
 void idle(void)

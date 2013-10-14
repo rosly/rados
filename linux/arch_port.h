@@ -78,6 +78,7 @@ extern sigset_t arch_crit_signals;
 #define OS_UNUSED(_x) unused_ ## _x __attribute__((unused))
 #define OS_RESTRICT __restrict__
 #define OS_PROGMEM
+#define OS_TASKSTACK uint8_t __attribute__ ((aligned (16)))
 
 #define OS_STACK_DESCENDING
 #define OS_STACK_MINSIZE ((size_t)SIGSTKSZ) /* one 4k page */

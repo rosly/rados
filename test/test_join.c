@@ -49,9 +49,9 @@ static os_task_t task_worker1;
 static os_task_t task_worker2;
 static os_task_t task_join;
 static os_sem_t sem;
-static long int task_worker1_stack[OS_STACK_MINSIZE];
-static long int task_worker2_stack[OS_STACK_MINSIZE];
-static long int task_join_stack[OS_STACK_MINSIZE];
+static OS_TASKSTACK task_worker1_stack[OS_STACK_MINSIZE];
+static OS_TASKSTACK task_worker2_stack[OS_STACK_MINSIZE];
+static OS_TASKSTACK task_join_stack[OS_STACK_MINSIZE];
 
 void OS_ISR sig_alrm(int OS_UNUSED(signum), siginfo_t * OS_UNUSED(siginfo), void *ucontext)
 {

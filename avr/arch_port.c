@@ -103,11 +103,21 @@ void OS_NAKED OS_HOT arch_context_switch(os_task_t * new_task)
       "movw    r30, %0"             "\n\t" /* load Z with new_task pointer */ \
       "ld      r28, Z"              "\n\t" /* load SPL from *(task_current) */ \
       "ldd     r29, Z+1"            "\n\t" /* load SPH from *(task_current) */ \
-      /* restore all registers but skip r18-r27 and r30-31 */ \
-      "adiw    r28, 12"            "\n\t" /* skip 12bytes on stack */ \
       "out     __SP_L__, r28"      "\n\t" /* store SPL */ \
       "out     __SP_H__, r29"      "\n\t" /* store SPH */ \
-      /* restore call-saved registers */ \
+      /* restore all registers */ \
+      "pop    r31"                 "\n\t" \
+      "pop    r30"                 "\n\t" \
+      "pop    r27"                 "\n\t" \
+      "pop    r26"                 "\n\t" \
+      "pop    r25"                 "\n\t" \
+      "pop    r24"                 "\n\t" \
+      "pop    r23"                 "\n\t" \
+      "pop    r22"                 "\n\t" \
+      "pop    r21"                 "\n\t" \
+      "pop    r20"                 "\n\t" \
+      "pop    r19"                 "\n\t" \
+      "pop    r18"                 "\n\t" \
       "pop    r17"                 "\n\t" \
       "pop    r16"                 "\n\t" \
       "pop    r15"                 "\n\t" \
@@ -127,13 +137,17 @@ void OS_NAKED OS_HOT arch_context_switch(os_task_t * new_task)
       "pop    r29"                 "\n\t" \
       "pop    r28"                 "\n\t" \
       "pop    r1"                  "\n\t" \
-      /* dumy SREG and r0 (both can be clobered), then return by ret */ \
+      /* poing SREG is important, since we may restore task which was pushed by \
+       * ISR */ \
       "pop    r0"                  "\n\t" \
+      "out    __SREG__, r0"        "\n\t" \
+      /* restore r0 and ret */            \
       "pop    r0"                  "\n\t" \
       "ret"                       "\n\t" \
             ::  [new_task] "r" (new_task));
 }
 
+/* for description look at os_private.h */
 void arch_os_start(void)
 {
    /* nothing to do */
@@ -154,19 +168,18 @@ void arch_task_init(os_task_t * task, void* stack_param,
                     size_t stack_size, os_taskproc_t proc,
                     void* param)
 {
-   uint8_t *stack = ((uint8_t*)stack_param) + stack_size; /* for AVR we have descending stack */
-   uint16_t *frame_pointer_reg;
+   uint8_t *stack = ((uint8_t*)stack_param) + stack_size - 1; /* for AVR we have descending stack */
 
    /* in AVR stack works in postdectement on push (preincrement on pop) */
-   *(stack--) = (((uint16_t)arch_task_start) & 0xff00) << 8;
-   *(stack--) = (((uint16_t)arch_task_start) & 0x00ff);
+   *(stack--) = (uint8_t)((uint16_t)arch_task_start & 0xFF);
+   *(stack--) = (uint8_t)((uint16_t)arch_task_start >> 8);;
    *(stack--) = 0; /* R0 */
    *(stack--) = 1 << SREG_I; /* SFR with interupts enabled */
    *(stack--) = 0; /* R1 */
 
-   *(stack--) = 0; /* R28 */
-   frame_pointer_reg = (uint16_t*)stack; /* store position of frame pointer reg on stack */
-   *(stack--) = 0; /* R29 Y register frame pointer */
+   /* store position of frame pointer reg on stack */
+   *(stack--) = (((uint16_t)((uint8_t*)stack_param) + stack_size - 1) & 0x00ff); /* R28 */
+   *(stack--) = (((uint16_t)((uint8_t*)stack_param) + stack_size - 1) & 0xff00) >> 8; /* R29 */
 
    *(stack--) = 0; /* R2 */
    *(stack--) = 0; /* R3 */
@@ -187,9 +200,9 @@ void arch_task_init(os_task_t * task, void* stack_param,
    *(stack--) = 0; /* R18 */
    *(stack--) = 0; /* R19 */
    *(stack--) = 0; /* R20 */
-   *(stack--) = (((uint16_t)param) & 0xff00) << 8; /* R21 */
+   *(stack--) = (((uint16_t)param) & 0xff00) >> 8; /* R21 */
    *(stack--) = (((uint16_t)param) & 0x00ff);      /* R22 */
-   *(stack--) = (((uint16_t)proc) & 0xff00) << 8;  /* R23 */
+   *(stack--) = (((uint16_t)proc) & 0xff00) >> 8;  /* R23 */
    *(stack--) = (((uint16_t)proc) & 0x00ff);       /* R24 */
    *(stack--) = 0; /* R25 */
    *(stack--) = 0; /* R26 */
@@ -197,8 +210,6 @@ void arch_task_init(os_task_t * task, void* stack_param,
    *(stack--) = 0; /* R30 */
    *(stack--) = 0; /* R31 */
 
-   /* update the calculaed fame pointer */
-   *frame_pointer_reg = (uint16_t)stack;
    /* store stack pointer in task context */
    task->ctx.sp = (uint16_t)stack;
 }

@@ -148,8 +148,24 @@ void OS_HOT os_block_andswitch(
 void os_task_exit(int retv);
 
 /* functions provided by arch port */
+
+/** Architecture and platform dependent low level initialization
+  *
+  * This function is called from the inside of os_start() after idle task
+  * creation, but before it is started. This function should initialize remain
+  * resources which are needed for OS to run the idle task. In contrast to all
+  * platform dependent actions done in main (before calling os_start()), this
+  * function may interact with kernel internals (but not external API), since
+  * basic structures are initialized. Keep in mind that things like timer for
+  * ticks setup should be leaved up to app (user) so it will have more freedom
+  * while assigning HW resources for his app. Also this function cannot create
+  * tasks, mutexet ect, since this should be done in app_init()
+  * In general this function will be emply for most platforms, since all
+  * necessary preparations are usualy done in main, before calling os_start()
+  */
 void arch_os_start(void);
-/* we dont mark arch_context_switch as OS_NAKED since not all arch use that */
+
+/* \note we dont mark arch_context_switch as OS_NAKED since not all arch use that */
 void /* OS_NAKED */ OS_HOT arch_context_switch(os_task_t *new_task);
 void OS_NORETURN OS_COLD arch_halt(void);
 void arch_task_init(os_task_t *tcb, void* stack, size_t stack_size, os_taskproc_t proc, void* param);
@@ -166,6 +182,14 @@ static inline void os_scheduler_lock(void) {
 
 static inline void os_scheduler_unlock(void) {
    os_atomic_dec(sched_lock);
+   /* \TODO we should call os_schedule() external API here since we may be not
+    * in attomic section while it may be that we need to schedule task right
+    * away. The reason for that is that usualy os_scheduler_lock() was called
+    * for temporary locking in some critical section of user code, and that
+    * after unlock() we usualy should schedule(). This situation is for instance
+    * in os_start() where after creating idle task and unlocking the scheduler,
+    * any user task should be scheduled right away() (those created in
+    * app_init() */
 }
 
 static inline void os_task_makeready(os_task_t *task)

@@ -66,7 +66,7 @@ static const char test_debug_star[] = { '-', '\\', '|', '/' };
 
 typedef struct {
    os_task_t task;
-   long int task1_stack[OS_STACK_MINSIZE];
+   OS_TASKSTACK task1_stack[OS_STACK_MINSIZE];
    unsigned idx;
    os_waitqueue_t wait_queue;
    volatile unsigned spin_intcond;
@@ -79,7 +79,7 @@ typedef struct {
 } task_data_t;
 
 static os_task_t task_main;
-static long int task_main_stack[OS_STACK_MINSIZE];
+static OS_TASKSTACK task_main_stack[OS_STACK_MINSIZE];
 static task_data_t worker_tasks[TEST_TASKS];
 static os_waitqueue_t global_wait_queue;
 static os_sem_t global_sem;
@@ -401,7 +401,7 @@ int testcase_6regresion(void)
 
    /* cleanup and finish test case */
    os_waitqueue_finish();
-   
+
    return 0;
 }
 

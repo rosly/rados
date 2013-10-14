@@ -51,8 +51,8 @@
 
 static os_task_t task1;
 static os_task_t task2;
-static long int task1_stack[OS_STACK_MINSIZE];
-static long int task2_stack[OS_STACK_MINSIZE];
+static OS_TASKSTACK task1_stack[OS_STACK_MINSIZE];
+static OS_TASKSTACK task2_stack[OS_STACK_MINSIZE];
 static os_sem_t sem1;
 static os_sem_t sem2;
 static os_atomic_t task1_idx = 0;

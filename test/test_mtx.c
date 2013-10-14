@@ -48,9 +48,9 @@
 #define TEST_LOOPS ((unsigned)1000)
 
 static os_task_t task_worker[4];
-static long int task_stack[4][OS_STACK_MINSIZE];
+static OS_TASKSTACK task_stack[4][OS_STACK_MINSIZE];
 static os_task_t task_coordinator;
-static long int coordinator_stack[OS_STACK_MINSIZE];
+static OS_TASKSTACK coordinator_stack[OS_STACK_MINSIZE];
 static os_mtx_t test_mtx[2];
 static os_sem_t test_sem[3];
 

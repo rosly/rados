@@ -1,5 +1,5 @@
 MCU_OPSET = avr4
-MCU_TYPE  = ATmega8
+MCU_TYPE  = ATmega32
 
 CC       = avr-gcc
 LD       = avr-ld
@@ -23,7 +23,7 @@ ifeq ($(DEBUG),)
 CFLAGS   += -Os
 else
 #for debug buld we use -O0 do not obstruct the generated code
-CFLAGS   += -O0
+CFLAGS   += -Os
 endif
 LDFLAGS  =
 

@@ -46,7 +46,7 @@
 #include <os_test.h>
 
 static os_task_t task1;
-static long int task1_stack[OS_STACK_MINSIZE];
+static OS_TASKSTACK task1_stack[OS_STACK_MINSIZE];
 static os_sem_t sem1;
 static int task1_started = 0;
 

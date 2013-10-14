@@ -87,6 +87,7 @@ typedef uint8_t arch_criticalstate_t; /* size of AVR status register */
 #define OS_UNUSED(_x) unused_ ## _x __attribute__((unused))
 #define OS_RESTRICT __restrict__
 #define OS_PROGMEM __flash
+#define OS_TASKSTACK uint8_t
 
 #define OS_STACK_DESCENDING
 #define OS_STACK_MINSIZE ((size_t)35 * 4) /* four times of context dump size */
@@ -99,7 +100,7 @@ typedef uint8_t arch_criticalstate_t; /* size of AVR status register */
     arch_critical_enter(cristate); \
     (_atomic)++; \
     arch_critical_exit(cristate); \
-  }while(1)
+  }while(0)
 
 #if 0
   do { \
@@ -125,7 +126,7 @@ typedef uint8_t arch_criticalstate_t; /* size of AVR status register */
     arch_critical_enter(cristate); \
     --(_atomic); \
     arch_critical_exit(cristate); \
-  }while(1)
+  }while(0)
 
 #if 0
   do { \

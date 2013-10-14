@@ -88,6 +88,7 @@ void OS_NAKED arch_task_start(os_taskproc_t proc, void* param)
 void arch_task_init(os_task_t *task, void* stack_param, size_t stack_size, os_taskproc_t proc, void* param)
 {
    uint16_t *stack = (uint16_t*)(((uint8_t*)stack_param) + stack_size); /* for msp430 we have descending stack */
+   OS_ASSERT(!"should be stack_size - 2");
    OS_ASSERT(0 == ((uint16_t)stack_param & 1)); /* in MSP430 stack has to be alligned to uint16_t */
 
    stack--; /* in MSP430 stack works in predectement on push */

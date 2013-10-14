@@ -57,8 +57,8 @@ typedef struct {
 
 static os_task_t task1;
 static os_task_t task2;
-static long int task1_stack[OS_STACK_MINSIZE];
-static long int task2_stack[OS_STACK_MINSIZE];
+static OS_TASKSTACK task1_stack[OS_STACK_MINSIZE];
+static OS_TASKSTACK task2_stack[OS_STACK_MINSIZE];
 static task_data_t task1_data;
 static task_data_t task2_data;
 

@@ -70,15 +70,13 @@ void test_debug_printf(const char* format, ...)
 /* for documentation check arch_test.h */
 void test_result(int result)
 {
-   arch_criticalstate_t cristate;
-
    if(0 == result) {
       test_debug_printf("%s: Test PASSED\n", test_name);
    } else {
       test_debug_printf("%s: Test FAILURE\n", test_name);
    }
 
-   arch_critical_enter(cristate);
+   arch_dint();
    exit(result);
 }
 

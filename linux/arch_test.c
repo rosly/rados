@@ -34,8 +34,8 @@
 #include <stdio.h>
 #include <time.h>
 
-#include "os_test.h"
 #include "os_private.h"
+#include "os_test.h"
 
 static timer_t timer; /**< linux POSIX timer used as an emulation of tick */
 static test_tick_clbck_t test_tick_clbck = NULL; /**< additional callback for emulated tick */
@@ -55,7 +55,7 @@ static void OS_ISR sig_alrm(int OS_UNUSED(signum), siginfo_t * OS_UNUSED(siginfo
    arch_contextrestore_i(sig_alrm);
 }
 
-/* for documentation check arch_test.h */
+/* for documentation check os_test.h */
 void test_debug_printf(const char* format, ...)
 {
    va_list ap;
@@ -67,7 +67,7 @@ void test_debug_printf(const char* format, ...)
    va_end(ap);
 }
 
-/* for documentation check arch_test.h */
+/* for documentation check os_test.h */
 void test_result(int result)
 {
    if(0 == result) {
@@ -80,7 +80,7 @@ void test_result(int result)
    exit(result);
 }
 
-/* for documentation check arch_test.h */
+/* for documentation check os_test.h */
 void test_setupmain(const char* name)
 {
    int ret;
@@ -97,7 +97,7 @@ void test_setupmain(const char* name)
    test_name = name;
 }
 
-/* for documentation check arch_test.h */
+/* for documentation check os_test.h */
 void test_setuptick(test_tick_clbck_t clbck, unsigned long nsec)
 {
    int ret;
@@ -128,7 +128,7 @@ void test_setuptick(test_tick_clbck_t clbck, unsigned long nsec)
    test_assert(0 == ret);
 }
 
-/* for documentation check arch_test.h */
+/* for documentation check os_test.h */
 void test_reqtick(void)
 {
    raise(SIGALRM);

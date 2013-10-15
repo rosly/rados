@@ -320,9 +320,9 @@ low address
         "brne    isr_contextstore_nested_%=\n\t" \
         /* store SP into task_current->ctx */ \
         "lds     r30, task_current"  "\n\t"  /* load Z with curent_task pointer */ \
-        "lds     r31, task_curent+1" "\n\t"  /* load Z with curent_task pointer */ \
-        "st      Z,   r28"      "\n\t"   /* store SPL into *(task_curent) */ \
-        "std     Z+1, r29"      "\n\t"   /* store SPH into *(task_curent) */ \
+        "lds     r31, task_current+1" "\n\t"  /* load Z with curent_task pointer */ \
+        "st      Z,   r28"      "\n\t"   /* store SPL into *(task_current) */ \
+        "std     Z+1, r29"      "\n\t"   /* store SPH into *(task_current) */ \
      "isr_contextstore_nested_%=:\n\t" \
             :: )
 
@@ -345,16 +345,16 @@ low address
          * handling */ \
         "cli"                         "\n\t" \
         /* decrement isr_nesting */ \
-        "lds     r16, isr_nesting" "\n\t" \
-        "dec     r16"              "\n\t" \
-        "sts     isr_nesting, r16" "\n\t" \
+        "lds     r16, isr_nesting"    "\n\t" \
+        "dec     r16"                 "\n\t" \
+        "sts     isr_nesting, r16"    "\n\t" \
         /* check isr_nesting and skip restoring iof SP if isr_nesting != 0 */ \
         "brne    isr_contextrestore_nested_%=\n\t" \
         /* restore SP from task_current->ctx */ \
-        "lds     r30, task_curent"    "\n\t" /* load Z with curent_task pointer */ \
+        "lds     r30, task_current"   "\n\t" /* load Z with curent_task pointer */ \
         "lds     r31, task_current+1" "\n\t" /* load Z with curent_task pointer */ \
-        "ld      r16, Z"              "\n\t" /* load SPL from *(task_curent) */ \
-        "ldd     r17, Z+1"            "\n\t" /* load SPH from *(task_curent) */ \
+        "ld      r16, Z"              "\n\t" /* load SPL from *(task_current) */ \
+        "ldd     r17, Z+1"            "\n\t" /* load SPH from *(task_current) */ \
         "out     __SP_L__, r16"       "\n\t" /* save SPL */ \
         "out     __SP_H__, r17"       "\n\t" /* save SPH */ \
      "isr_contextrestore_nested_%=:\n\t" \

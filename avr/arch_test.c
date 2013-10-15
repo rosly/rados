@@ -32,15 +32,18 @@
 #include <os_private.h>
 #include <os_test.h>
 
-test_tick_clbck_t test_tick_clbck = NULL;
-int result_store;
+#define AVR_CPU_HZ 1000000ul
 
-/* for documentation check arch_test.h */
+static test_tick_clbck_t test_tick_clbck = NULL;
+static int result_store;
+
+/* for documentation check os_test.h */
 void test_debug_printf(const OS_PROGMEM char* OS_UNUSED(format), ...)
 {
+  /* missing implementation */
 }
 
-/* for documentation check arch_test.h */
+/* for documentation check os_test.h */
 void test_result(int result)
 {
   result_store = result;
@@ -53,21 +56,47 @@ void test_result(int result)
    arch_halt();
 }
 
-/* for documentation check arch_test.h */
+/* for documentation check os_test.h */
 void test_setupmain(const OS_PROGMEM char* OS_UNUSED(test_name))
 {
    //test_assert(0); /* missing implementation */
 }
 
-/* for documentation check arch_test.h */
-void test_setuptick(test_tick_clbck_t OS_UNUSED(clbck), unsigned long OS_UNUSED(nsec))
+/* for documentation check os_test.h */
+void test_setuptick(test_tick_clbck_t clbck, unsigned long nsec)
+{
+  test_tick_clbck = clbck;
+
+  /* Set timer 1 compare match value for configured system tick with a prescaler of 256 */
+  //OCR1A = AVR_CPU_HZ / 256ul * nsec / 1000000000;
+  OCR1A = 2;
+  nsec = nsec;
+
+  /* Enable compare match 1A interrupt */
+#ifdef TIMSK
+  TIMSK = _BV(OCIE1A);
+#else
+  TIMSK1 = _BV(OCIE1A);
+#endif
+
+  /* Set prescaler 256 */
+  TCCR1B = _BV(CS12) | _BV(WGM12);
+}
+
+/* for documentation check os_test.h */
+void test_reqtick(void)
 {
    test_assert(0); /* missing implementation */
 }
 
-/* for documentation check arch_test.h */
-void test_reqtick(void)
+void OS_ISR TIMER1_COMPA_vect(void)
 {
-   test_assert(0); /* missing implementation */
+   arch_contextstore_i(tick);
+   if( NULL != test_tick_clbck )
+   {
+      test_tick_clbck();
+   }
+   os_tick();
+   arch_contextrestore_i(tick);
 }
 

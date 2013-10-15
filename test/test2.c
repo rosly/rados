@@ -47,69 +47,53 @@
 #include "os.h"
 #include <os_test.h>
 
-#define TEST_CYCLES ((os_atomic_t)10000)
+#define TEST_CYCLES ((unsigned)100)
 
-static os_task_t task1;
-static os_task_t task2;
+static os_task_t    task1;
+static os_task_t    task2;
 static OS_TASKSTACK task1_stack[OS_STACK_MINSIZE];
 static OS_TASKSTACK task2_stack[OS_STACK_MINSIZE];
-static os_sem_t sem1;
-static os_sem_t sem2;
-static os_atomic_t task1_idx = 0;
-static os_atomic_t task2_idx = 0;
+static os_sem_t     sem[2];
+static unsigned     loop[2];
 
-void idle(void)
+void test_idle(void)
 {
-   /* both task must run exacly 10000 times, smaller value means OS scheduling bug */
-   test_assert(TEST_CYCLES == task1_idx);
-   test_assert(TEST_CYCLES == task2_idx);
+   /* both task must run exacly X times, smaller value means OS scheduling bug */
+   test_assert(TEST_CYCLES == loop[0]);
+   test_assert(TEST_CYCLES == loop[1]);
    test_result(0);
 }
 
-int task1_proc(void* param)
+int task_proc(void* param)
 {
    int ret;
-   os_atomic_t *idx = (os_atomic_t*)param;
+   unsigned idx = (unsigned)param;
 
-   while((*idx) < TEST_CYCLES)
+   while(loop[idx] < TEST_CYCLES)
    {
-      (*idx)++;
-      os_sem_up(&sem2);
-      ret = os_sem_down(&sem1, OS_TIMEOUT_INFINITE);
+      ++(loop[idx]);
+      os_sem_up(&(sem[(idx + 1) % 2]));
+      ret = os_sem_down(&(sem[idx]), OS_TIMEOUT_INFINITE);
       test_assert(0 == ret);
    }
 
    return 0;
 }
 
-int task2_proc(void* param)
+void test_init(void)
 {
-   int ret;
-   os_atomic_t *idx = (os_atomic_t*)param;
-
-   while((*idx) < TEST_CYCLES)
-   {
-      (*idx)++;
-      os_sem_up(&sem1);
-      ret = os_sem_down(&sem2, OS_TIMEOUT_INFINITE);
-      test_assert(0 == ret);
-   }
-
-   return 0;
-}
-
-void init(void)
-{
-   os_sem_create(&sem1, 0);
-   os_sem_create(&sem2, 0);
-   os_task_create(&task1, 1, task1_stack, sizeof(task1_stack), task1_proc, (void*)&task1_idx);
-   os_task_create(&task2, 1, task2_stack, sizeof(task2_stack), task2_proc, (void*)&task2_idx);
+   loop[0] = 0;
+   loop[1] = 0;
+   os_sem_create(&(sem[0]), 0);
+   os_sem_create(&(sem[1]), 0);
+   os_task_create(&task1, 1, task1_stack, sizeof(task1_stack), task_proc, (void*)0);
+   os_task_create(&task2, 1, task2_stack, sizeof(task2_stack), task_proc, (void*)1);
 }
 
 int main(void)
 {
    test_setupmain("Test2");
-   os_start(init, idle);
+   os_start(test_init, test_idle);
    return 0;
 }
 

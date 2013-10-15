@@ -51,13 +51,14 @@
 #include "os.h"
 #include <os_test.h>
 
-#define TEST_CYCLES ((os_atomic_t)1000000)
+#define TEST_CYCLES ((unsigned)100)
 
 static os_task_t task1;
 static os_task_t task2;
 static OS_TASKSTACK task1_stack[OS_STACK_MINSIZE];
 static OS_TASKSTACK task2_stack[OS_STACK_MINSIZE];
-static os_atomic_t counter[2] = { 0, 0 };
+/* keep it small to allow 8bit processor to increment in few cycles */
+static uint8_t counter[2] = { 0, 0 };
 
 void idle(void)
 {
@@ -70,7 +71,7 @@ void idle(void)
 
 int task_proc(void* param)
 {
-   unsigned idx = (unsigned)(long)param;
+   unsigned idx = (unsigned)param;
 
    while((counter[idx]) < TEST_CYCLES) {
       (counter[idx])++;
@@ -78,13 +79,14 @@ int task_proc(void* param)
    /* check that second task was scheduled at least once while this task is
     * still in working state, this will confirm that both tasks share the
     * priority */
-   test_assert(0 != counter[(idx++) % 2]);
+   test_assert(0 != counter[(idx + 1) % 2]);
 
    return 0;
 }
 
 void init(void)
 {
+   /* 1ns tick should force almost flood of tick ISR on any arch */
    test_setuptick(NULL, 1);
 
    os_task_create(&task1, 1, task1_stack, sizeof(task1_stack), task_proc, (void*)0);

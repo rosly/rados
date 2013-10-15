@@ -34,12 +34,12 @@
 
 test_tick_clbck_t test_tick_clbck = NULL;
 
-/* for documentation check arch_test.h */
+/* for documentation check os_test.h */
 void test_debug_printf(const char* format, ...)
 {
 }
 
-/* for documentation check arch_test.h */
+/* for documentation check os_test.h */
 void test_result(int result)
 {
    arch_criticalstate_t cristate;
@@ -54,13 +54,13 @@ void test_result(int result)
    arch_halt();
 }
 
-/* for documentation check arch_test.h */
+/* for documentation check os_test.h */
 void test_setupmain(const char* name)
 {
    test_assert(0); /* missing implementation */
 }
 
-/* for documentation check arch_test.h */
+/* for documentation check os_test.h */
 void test_setuptick(test_tick_clbck_t clbck, unsigned long nsec)
 {
    test_assert(0); /* missing implementation */

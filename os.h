@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is a part of RadOs project
  * Copyright (c) 2013, Radoslaw Biernaki <radoslaw.biernacki@gmail.com>
  * All rights reserved.
@@ -50,7 +50,7 @@
       } \
    }while(0)
 
-extern os_task_t *task_current; /* need to be visiable for user because of arch_contextstore_i macros */
+extern os_task_t* task_current; /* need to be visiable for user because of arch_contextstore_i macros */
 extern volatile os_atomic_t isr_nesting; /* need to be visiable for user because of arch_contextstore_i macros */
 
 #endif

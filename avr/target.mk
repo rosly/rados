@@ -1,5 +1,5 @@
 MCU_OPSET = avr4
-MCU_TYPE  = ATmega32
+MCU_TYPE  = ATmega8
 
 CC       = avr-gcc
 LD       = avr-ld

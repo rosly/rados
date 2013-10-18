@@ -45,10 +45,10 @@
  * /{
  */
 
-#include <os.h>
-#include <os_test.h>
+#include "os.h"
+#include "os_test.h"
 
-#define TEST_CYCLES ((os_atomic_t)50)
+#define TEST_CYCLES ((unsigned)50)
 
 typedef struct {
    os_sem_t sem;
@@ -59,18 +59,17 @@ static os_task_t task1;
 static os_task_t task2;
 static OS_TASKSTACK task1_stack[OS_STACK_MINSIZE];
 static OS_TASKSTACK task2_stack[OS_STACK_MINSIZE];
-static task_data_t task1_data;
-static task_data_t task2_data;
+static task_data_t task_data[2];
 
 void tick_clbck(void)
 {
-   os_sem_up(&(task1_data.sem));
-   os_sem_up(&(task2_data.sem));
+   os_sem_up(&(task_data[0].sem));
+   os_sem_up(&(task_data[1].sem));
 }
 
-void idle(void)
+void test_idle(void)
 {
-   if((task1_data.idx < TEST_CYCLES) || (task2_data.idx < TEST_CYCLES))
+   if((task_data[0].idx < TEST_CYCLES) || (task_data[1].idx < TEST_CYCLES))
    {
      return; /* this is not the end, continue */
    }
@@ -94,26 +93,26 @@ int task_proc(void* param)
    return 0;
 }
 
-void init(void)
+void test_init(void)
 {
-   memset(&task1_data, 0, sizeof(task1_data));
-   memset(&task2_data, 0, sizeof(task2_data));
+   memset(&task_data[0], 0, sizeof(task_data_t));
+   memset(&task_data[1], 0, sizeof(task_data_t));
+   os_sem_create(&(task_data[0].sem), 0);
+   os_sem_create(&(task_data[1].sem), 0);
+   os_task_create(&task1, 1, task1_stack, sizeof(task1_stack), task_proc, &task_data[0]);
+   os_task_create(&task2, 1, task2_stack, sizeof(task2_stack), task_proc, &task_data[1]);
 
-   os_sem_create(&(task1_data.sem), 0);
-   os_sem_create(&(task2_data.sem), 0);
-
-   os_task_create(&task1, 1, task1_stack, sizeof(task1_stack), task_proc, &task1_data);
-   os_task_create(&task2, 1, task2_stack, sizeof(task2_stack), task_proc, &task2_data);
-
-  /* frequent ticks help test race conditions.  The best would be to call tick ISR
-   * every instruction */
-   test_setuptick(tick_clbck, 1);
+   /* frequent ticks help test race conditions.  The best would be to call tick
+    * ISR every instruction, 1ns tick should force almost flood of tick ISR on
+    * any arch */
+   /* but using 1ms for debuging */
+   test_setuptick(tick_clbck, 1000000);
 }
 
 int main(void)
 {
    test_setupmain("Test4");
-   os_start(init, idle);
+   os_start(test_init, test_idle);
    return 0;
 }
 

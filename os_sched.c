@@ -81,6 +81,8 @@ void os_start(
    os_scheduler_unlock();
    arch_eint(); /* we are ready for scheduler actions, enable the interrupts */
 
+   /* after all initialization actions, force switch to other task than idle
+      \TODO instead of folowing nasty code we can just use os_schedule(0) */
    do
    {
       arch_criticalstate_t cristate;
@@ -88,13 +90,13 @@ void os_start(
       arch_critical_enter(cristate);
       os_task_makeready(task_current); /* task_current means task_idle here */
       /* finaly we switch the context to first user task, (it will have the
-       * higher ptiority than idle) (need to be done under critical section) */
+       * higher priority than idle) (need to be done under critical section) */
       arch_context_switch(os_task_dequeue(&ready_queue));
       task_current->state = TASKSTATE_RUNNING; /* we are back again in idle task, it is running now */
       arch_critical_exit(cristate);
    }while(0);
 
-   /* after all initialization actions, idle task will spin in idle loop */
+   /* idle task will spin in idle loop */
    while(1)
    {
       /* user supplied idle function */

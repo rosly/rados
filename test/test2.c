@@ -45,22 +45,26 @@
  */
 
 #include "os.h"
-#include <os_test.h>
+#include "os_test.h"
 
 #define TEST_CYCLES ((unsigned)100)
+
+typedef struct {
+   os_sem_t sem;
+   unsigned loop;
+} task_data_t;
 
 static os_task_t    task1;
 static os_task_t    task2;
 static OS_TASKSTACK task1_stack[OS_STACK_MINSIZE];
 static OS_TASKSTACK task2_stack[OS_STACK_MINSIZE];
-static os_sem_t     sem[2];
-static unsigned     loop[2];
+static task_data_t  task_data[2];
 
 void test_idle(void)
 {
    /* both task must run exacly X times, smaller value means OS scheduling bug */
-   test_assert(TEST_CYCLES == loop[0]);
-   test_assert(TEST_CYCLES == loop[1]);
+   test_assert(TEST_CYCLES == task_data[0].loop);
+   test_assert(TEST_CYCLES == task_data[1].loop);
    test_result(0);
 }
 
@@ -69,11 +73,11 @@ int task_proc(void* param)
    int ret;
    unsigned idx = (unsigned)(size_t)param;
 
-   while(loop[idx] < TEST_CYCLES)
+   while(task_data[idx].loop < TEST_CYCLES)
    {
-      ++(loop[idx]);
-      os_sem_up(&(sem[(idx + 1) % 2]));
-      ret = os_sem_down(&(sem[idx]), OS_TIMEOUT_INFINITE);
+      ++(task_data[idx].loop);
+      os_sem_up(&(task_data[(idx + 1) % 2].sem));
+      ret = os_sem_down(&(task_data[idx].sem), OS_TIMEOUT_INFINITE);
       test_assert(0 == ret);
    }
 
@@ -82,10 +86,10 @@ int task_proc(void* param)
 
 void test_init(void)
 {
-   loop[0] = 0;
-   loop[1] = 0;
-   os_sem_create(&(sem[0]), 0);
-   os_sem_create(&(sem[1]), 0);
+   memset(&task_data[0], 0, sizeof(task_data_t));
+   memset(&task_data[1], 0, sizeof(task_data_t));
+   os_sem_create(&(task_data[0].sem), 0);
+   os_sem_create(&(task_data[1].sem), 0);
    os_task_create(&task1, 1, task1_stack, sizeof(task1_stack), task_proc, (void*)0);
    os_task_create(&task2, 1, task2_stack, sizeof(task2_stack), task_proc, (void*)1);
 }

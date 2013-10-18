@@ -29,8 +29,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <os_private.h>
-#include <os_test.h>
+#include "os_private.h"
+#include "os_test.h"
 
 #define AVR_CPU_HZ 1000000ul
 
@@ -98,11 +98,11 @@ void test_reqtick(void)
 void OS_ISR TIMER1_COMPA_vect(void)
 {
    arch_contextstore_i(tick);
+   os_tick();
    if( NULL != test_tick_clbck )
    {
       test_tick_clbck();
    }
-   os_tick();
    arch_contextrestore_i(tick);
 }
 

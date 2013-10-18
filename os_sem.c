@@ -128,7 +128,8 @@ void os_sem_up_sync(os_sem_t* sem, bool sync)
    arch_criticalstate_t cristate;
    os_task_t *task;
 
-   OS_ASSERT(sem->value < SIG_ATOMIC_MAX); /* check the semaphore value limit */
+   /* check the semaphore value limit (-1 to be able to detect overflow) */
+   OS_ASSERT(sem->value < (OS_ATOMIC_MAX - 1)); 
 
    /* \TODO implement nbr in function param so we can increase the semaphore
     * number more than once. To make it work in this way we have also to wake

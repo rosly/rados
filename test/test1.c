@@ -42,8 +42,8 @@
  * /{
  */
 
-#include <os.h>
-#include <os_test.h>
+#include "os.h"
+#include "os_test.h"
 
 static os_task_t task1;
 static OS_TASKSTACK task1_stack[OS_STACK_MINSIZE];

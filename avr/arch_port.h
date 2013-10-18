@@ -61,6 +61,7 @@ typedef struct {
  * architecure. Therefore even for 8bit increment we need do disable interupts,
  * to make this operation atomic */
 typedef uint8_t arch_atomic_t;
+#define ARCH_ATOMIC_MAX UINT8_MAX
 /** exactly 16 bits, minimal reasonable type for ticks, requires special
  * handling code */
 typedef uint16_t arch_ticks_t;
@@ -390,9 +391,9 @@ low address
         "pop    r29"                 "\n\t" \
         "pop    r28"                 "\n\t" \
         "pop    r1"                  "\n\t" \
-        /* restore SREG, I bit in popped SEG will not be set since we pushed it * \
-         * at the begining of ISR where interrupst where disabled, so restoring * \
-         * SREG will not enable interrupts until we execute reti */ \
+        /* in poped SEG, I bit will not be set since when we pushed it * \
+         * at the begining of ISR, interrupts where disabled, so interupts \
+         * will not be enabled until we execute reti */ \
         "pop    r0"                  "\n\t" \
         "out    __SREG__, r0"        "\n\t" \
         /* restore r0 and reti */           \

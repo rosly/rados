@@ -38,8 +38,8 @@
 
 #include <stdlib.h>
 
-#include <os.h>
-#include <os_test.h>
+#include "os.h"
+#include "os_test.h"
 
 #define container_of(_ptr, _type, _member) ({ \
    const typeof( ((_type *)0)->_member ) *_mptr = (_ptr); \

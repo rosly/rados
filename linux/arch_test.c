@@ -47,11 +47,11 @@ static const char* test_name = NULL;
 static void OS_ISR sig_alrm(int OS_UNUSED(signum), siginfo_t * OS_UNUSED(siginfo), void *ucontext)
 {
    arch_contextstore_i(sig_alrm);
+   os_tick();
    if( NULL != test_tick_clbck )
    {
       test_tick_clbck();
    }
-   os_tick();
    arch_contextrestore_i(sig_alrm);
 }
 

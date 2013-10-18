@@ -32,7 +32,7 @@
 #ifndef __OS_TIMER_
 #define __OS_TIMER_
 
-#define OS_TIMEOUT_INFINITE (ARCH_TICKS_MAX)
+#define OS_TIMEOUT_INFINITE (OS_TICKS_MAX)
 #define OS_TIMEOUT_TRY ((os_ticks_t)0)
 
 typedef void (*timer_proc_t)(void* param);

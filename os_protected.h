@@ -50,15 +50,17 @@
   enum { OS_CONCAT(static_assert_, __LINE__) = 1/(!!(_e)) }
 //char OS_CONCAT(static_assert_, __LINE__)[0 - 1*!(_e)];
 
-/** definition of system atomic value, it need to at least 8bits wide and access
- * to it by os_atomic_inc and os_atomic_dec need to be atomic */
+/** definition of system atomic value, it need to at least 8bits wide, unsigned */
 typedef volatile arch_atomic_t os_atomic_t;
-OS_STATIC_ASSERT(sizeof(os_atomic_t) >= sizeof(uint8_t));
+OS_STATIC_ASSERT(ARCH_ATOMIC_MAX >= (UINT8_MAX - 1));
+#define OS_ATOMIC_MAX ARCH_ATOMIC_MAX
 
 /** definition of system tick, it is defined by arch but never can be smaller
  * than uint16_t */
 typedef arch_ticks_t os_ticks_t;
 OS_STATIC_ASSERT(sizeof(os_ticks_t) >= sizeof(uint16_t));
+OS_STATIC_ASSERT(ARCH_TICKS_MAX >= (UINT16_MAX - 1));
+#define OS_TICKS_MAX ARCH_TICKS_MAX
 
 #endif
 

@@ -38,7 +38,7 @@
  * which don't call any of OS functions.  In backgroung tick procedure should
  * kick the preemption and switch betwen tasks. If test_setuptick() is
  * implemented corectly to call os_tick(), tasks should  be forced to give up
- * the CPU to the other task. When both task will finish, idle task should be
+ * the CPU to the other task. When both task will finish, test_idle task should be
  * scheduled() and check the results.
  *
  * Test in following services are
@@ -49,7 +49,7 @@
  */
 
 #include "os.h"
-#include <os_test.h>
+#include "os_test.h"
 
 #define TEST_CYCLES ((unsigned)100)
 
@@ -60,7 +60,7 @@ static OS_TASKSTACK task2_stack[OS_STACK_MINSIZE];
 /* keep it small to allow 8bit processor to increment in few cycles */
 static uint8_t counter[2] = { 0, 0 };
 
-void idle(void)
+void test_idle(void)
 {
    /* check if both task was run to the end */
    test_assert(TEST_CYCLES == counter[0]);
@@ -84,7 +84,7 @@ int task_proc(void* param)
    return 0;
 }
 
-void init(void)
+void test_init(void)
 {
    /* 1ns tick should force almost flood of tick ISR on any arch */
    /* but using 1ms for debuging */
@@ -97,7 +97,7 @@ void init(void)
 int main(void)
 {
    test_setupmain("Test3");
-   os_start(init, idle);
+   os_start(test_init, test_idle);
    return 0;
 }
 

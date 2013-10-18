@@ -36,8 +36,8 @@
  * /{
  */
 
-#include <os.h>
-#include <os_test.h>
+#include "os.h"
+#include "os_test.h"
 
 #define min(_x, _y) ({ \
    typeof(_x) _min1 = (_x); \

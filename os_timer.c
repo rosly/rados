@@ -274,7 +274,7 @@ os_ticks_t os_ticks_diff(os_ticks_t* OS_RESTRICT ticks_start)
   if(*ticks_start > os_ticks_cnt)
     {
       OS_ASSERT(0); /* \TODO \FIXME check this under debugger!!!! */
-      ret = ARCH_TICKS_MAX - *ticks_start + 1 + os_ticks_cnt;
+      ret = OS_TICKS_MAX - *ticks_start + 1 + os_ticks_cnt;
     }
   else
     {

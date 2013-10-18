@@ -71,7 +71,7 @@ void idle(void)
 
 int task_proc(void* param)
 {
-   unsigned idx = (unsigned)param;
+   unsigned idx = (unsigned)(size_t)param;
 
    while((counter[idx]) < TEST_CYCLES) {
       (counter[idx])++;
@@ -87,7 +87,8 @@ int task_proc(void* param)
 void init(void)
 {
    /* 1ns tick should force almost flood of tick ISR on any arch */
-   test_setuptick(NULL, 1);
+   /* but using 1ms for debuging */
+   test_setuptick(NULL, 1000000);
 
    os_task_create(&task1, 1, task1_stack, sizeof(task1_stack), task_proc, (void*)0);
    os_task_create(&task2, 1, task2_stack, sizeof(task2_stack), task_proc, (void*)1);

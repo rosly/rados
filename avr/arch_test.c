@@ -68,9 +68,7 @@ void test_setuptick(test_tick_clbck_t clbck, unsigned long nsec)
   test_tick_clbck = clbck;
 
   /* Set timer 1 compare match value for configured system tick with a prescaler of 256 */
-  //OCR1A = AVR_CPU_HZ / 256ul * nsec / 1000000000;
-  OCR1A = 2;
-  nsec = nsec;
+  OCR1A = AVR_CPU_HZ / 256ul * nsec / 1000000000;
 
   /* Enable compare match 1A interrupt */
 #ifdef TIMSK

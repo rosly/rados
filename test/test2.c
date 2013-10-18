@@ -67,7 +67,7 @@ void test_idle(void)
 int task_proc(void* param)
 {
    int ret;
-   unsigned idx = (unsigned)param;
+   unsigned idx = (unsigned)(size_t)param;
 
    while(loop[idx] < TEST_CYCLES)
    {

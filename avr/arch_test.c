@@ -67,18 +67,15 @@ void test_setuptick(test_tick_clbck_t clbck, unsigned long nsec)
 {
   test_tick_clbck = clbck;
 
-  /* Set timer 1 compare match value for configured system tick with a prescaler of 256 */
+  /* Set timer 1 compare value for configured system tick with a prescaler of 256 */
   OCR1A = AVR_CPU_HZ / 256ul * nsec / 1000000000;
-
-  /* Enable compare match 1A interrupt */
-#ifdef TIMSK
-  TIMSK = _BV(OCIE1A);
-#else
-  TIMSK1 = _BV(OCIE1A);
-#endif
 
   /* Set prescaler 256 */
   TCCR1B = _BV(CS12) | _BV(WGM12);
+
+  /* Enable compare match 1A interrupt */
+  TIMSK1 = _BV(OCIE1A);
+
 
 #if 0
 DDRB = (1 << PB1);  // Imposta il pin PB1 come di uscita

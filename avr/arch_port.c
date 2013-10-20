@@ -56,6 +56,8 @@ low address
    IE while IE was disabled durring enter of arch_context_switch)
  - return by ret
 */
+#ifndef __AVR_3_BYTE_PC__
+//#ifndef __AVR_HAVE_RAMPZ__
 void OS_NAKED OS_HOT arch_context_switch(os_task_t * new_task)
 {
   __asm__ __volatile__ ( \
@@ -146,6 +148,107 @@ void OS_NAKED OS_HOT arch_context_switch(os_task_t * new_task)
       "ret"                       "\n\t" \
             ::  [new_task] "r" (new_task));
 }
+#else
+//#error 3byte PC is not supported yet
+void OS_NAKED OS_HOT arch_context_switch(os_task_t * new_task)
+{
+  __asm__ __volatile__ ( \
+      /* calling of this function requires that interupts are disabled */ \
+      /* store dummy for r0 and SREG (both can be clobered), then store r1 */ \
+      "push    r0"            "\n\t" \
+      "push    r1"            "\n\t" \
+      "push    r1"            "\n\t" \
+      /* store old fame pointer keept in Y */ \
+      "push    r28"           "\n\t" \
+      "push    r29"           "\n\t" \
+      /* then all call-saved registers */ \
+      "push    r2"            "\n\t" \
+      "push    r3"            "\n\t" \
+      "push    r4"            "\n\t" \
+      "push    r5"            "\n\t" \
+      "push    r6"            "\n\t" \
+      "push    r7"            "\n\t" \
+      "push    r8"            "\n\t" \
+      "push    r9"            "\n\t" \
+      "push    r10"           "\n\t" \
+      "push    r11"           "\n\t" \
+      "push    r12"           "\n\t" \
+      "push    r13"           "\n\t" \
+      "push    r14"           "\n\t" \
+      "push    r15"           "\n\t" \
+      "push    r16"           "\n\t" \
+      "push    r17"           "\n\t" \
+      /* remain registers r18-r27 and r30-r31 we can skip since they are \
+       * threated by gcc as call-used */ \
+      "in      r28, __SP_L__" "\n\t" /* load SPL into r28 (means Ya) */ \
+      "in      r29, __SP_H__" "\n\t" /* load SPH into r29 (means Yb) */ \
+      "sbiw    r28, 12"       "\n\t" /* skip 12bytes on stack */ \
+      "in r0,_SFR_IO_ADDR(RAMPZ)\n\t" \
+      "push r0"               "\n\t" \
+      "in r0,_SFR_IO_ADDR(EIND)\n\t" \
+      "push r0"               "\n\t" \
+      /* store SP into task_current->ctx */ \
+      "lds     r30, task_current"  "\n\t"  /* load Z with curent_task pointer */ \
+      "lds     r31, task_current+1" "\n\t"  /* load Z with curent_task pointer */ \
+      "st      Z,   r28"      "\n\t"   /* store SPL into *(task_current) */ \
+      "std     Z+1, r29"      "\n\t"   /* store SPH into *(task_current) */ \
+      \
+      /* switch task_current = new_task */ \
+      "sts     task_current, %A0\n\t" \
+      "sts     task_current+1, %B0\n\t" \
+      \
+      /* restore SP from task_current->ctx */ \
+      "movw    r30, %0"             "\n\t" /* load Z with new_task pointer */ \
+      "ld      r28, Z"              "\n\t" /* load SPL from *(task_current) */ \
+      "ldd     r29, Z+1"            "\n\t" /* load SPH from *(task_current) */ \
+      "out     __SP_L__, r28"      "\n\t" /* store SPL */ \
+      "out     __SP_H__, r29"      "\n\t" /* store SPH */ \
+      /* restore all registers */ \
+      "pop r0"                     "\n\t" \
+      "in r0,_SFR_IO_ADDR(EIND)"   "\n\t" \
+      "pop r0"                     "\n\t" \
+      "in r0,_SFR_IO_ADDR(RAMPZ)"  "\n\t" \
+      "pop    r31"                 "\n\t" \
+      "pop    r30"                 "\n\t" \
+      "pop    r27"                 "\n\t" \
+      "pop    r26"                 "\n\t" \
+      "pop    r25"                 "\n\t" \
+      "pop    r24"                 "\n\t" \
+      "pop    r23"                 "\n\t" \
+      "pop    r22"                 "\n\t" \
+      "pop    r21"                 "\n\t" \
+      "pop    r20"                 "\n\t" \
+      "pop    r19"                 "\n\t" \
+      "pop    r18"                 "\n\t" \
+      "pop    r17"                 "\n\t" \
+      "pop    r16"                 "\n\t" \
+      "pop    r15"                 "\n\t" \
+      "pop    r14"                 "\n\t" \
+      "pop    r13"                 "\n\t" \
+      "pop    r12"                 "\n\t" \
+      "pop    r11"                 "\n\t" \
+      "pop    r10"                 "\n\t" \
+      "pop    r9"                  "\n\t" \
+      "pop    r8"                  "\n\t" \
+      "pop    r7"                  "\n\t" \
+      "pop    r6"                  "\n\t" \
+      "pop    r5"                  "\n\t" \
+      "pop    r4"                  "\n\t" \
+      "pop    r3"                  "\n\t" \
+      "pop    r2"                  "\n\t" \
+      "pop    r29"                 "\n\t" \
+      "pop    r28"                 "\n\t" \
+      "pop    r1"                  "\n\t" \
+      /* poing SREG is important, since we may restore task which was pushed by \
+       * ISR */ \
+      "pop    r0"                  "\n\t" \
+      "out    __SREG__, r0"        "\n\t" \
+      /* restore r0 and ret */            \
+      "pop    r0"                  "\n\t" \
+      "ret"                       "\n\t" \
+            ::  [new_task] "r" (new_task));
+}
+#endif
 
 /* for description look at os_private.h */
 void arch_os_start(void)
@@ -200,11 +303,11 @@ void arch_task_init(os_task_t * task, void* stack_param,
    *(stack--) = 0; /* R18 */
    *(stack--) = 0; /* R19 */
    *(stack--) = 0; /* R20 */
-   *(stack--) = (((uint16_t)param) & 0xff00) >> 8; /* R21 */
+   *(stack--) = 0; /* R21 */
    *(stack--) = (((uint16_t)param) & 0x00ff);      /* R22 */
-   *(stack--) = (((uint16_t)proc) & 0xff00) >> 8;  /* R23 */
+   *(stack--) = (((uint16_t)param) & 0xff00) >> 8; /* R23 */
    *(stack--) = (((uint16_t)proc) & 0x00ff);       /* R24 */
-   *(stack--) = 0; /* R25 */
+   *(stack--) = (((uint16_t)proc) & 0xff00) >> 8;  /* R25 */
    *(stack--) = 0; /* R26 */
    *(stack--) = 0; /* R27 */
    *(stack--) = 0; /* R30 */

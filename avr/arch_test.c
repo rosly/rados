@@ -46,7 +46,7 @@ void test_debug_printf(const OS_PROGMEM char* OS_UNUSED(format), ...)
 /* for documentation check os_test.h */
 void test_result(int result)
 {
-  result_store = result;
+   result_store = result;
    if(0 == result) {
       test_debug_printf("Test PASSED\n");
    } else {
@@ -74,7 +74,11 @@ void test_setuptick(test_tick_clbck_t clbck, unsigned long nsec)
   TCCR1B = _BV(CS12) | _BV(WGM12);
 
   /* Enable compare match 1A interrupt */
+#ifdef TIMSK
+  TIMSK = _BV(OCIE1A);
+#else
   TIMSK1 = _BV(OCIE1A);
+#endif
 
 
 #if 0

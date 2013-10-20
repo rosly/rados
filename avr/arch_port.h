@@ -268,20 +268,24 @@ low address
 //#ifndef __AVR_HAVE_RAMPZ__
 #define arch_contextstore_i(_isrName) \
     __asm__ __volatile__ ( \
-        /* on AVR interupts are disabled when entering ISR */ \
-        /* store r0 for temporary operations */ \
-        "push    r0"            "\n\t" \
-        /* store SREG and r1 */        \
-        "in      r0, __SREG__"  "\n\t" \
-        "push    r0"            "\n\t" \
-        "push    r1"            "\n\t" \
-        /* store remain registers */    \
+        /* store r16 for temporary operations */ \
+        "push    r16"           "\n\t" \
+        /* on AVR interupts will be masked when entering ISR \
+           but since we entered ISR it means that they where enabled. \
+           Therefore we need to save a content of SREG as if global interupt \
+           flag was set. using sbr r16, 0x80 for that */ \
+        "in      r16, __SREG__" "\n\t" \
+        "sbr     r16, 0x80"     "\n\t" \
+        "push    r16"           "\n\t" \
+        /* store remain registers */   \
         /* gcc uses Y as frame register, it will be easier if we store it \
          * first */ \
         "push    r28"           "\n\t" \
         "push    r29"           "\n\t" \
         /* gcc threats r2-r17 as call-saved registes, if we store them first * \
          * then arch_context_swich can be opimized */ \
+        "push    r0"            "\n\t" \
+        "push    r1"            "\n\t" \
         "push    r2"            "\n\t" \
         "push    r3"            "\n\t" \
         "push    r4"            "\n\t" \
@@ -296,7 +300,7 @@ low address
         "push    r13"           "\n\t" \
         "push    r14"           "\n\t" \
         "push    r15"           "\n\t" \
-        "push    r16"           "\n\t" \
+        /* skip  r16 - already saved */ \
         "push    r17"           "\n\t" \
         "push    r18"           "\n\t" \
         "push    r19"           "\n\t" \
@@ -319,7 +323,7 @@ low address
         "in      r28, __SP_L__" "\n\t" /* load SPL into r28 (means Ya) */ \
         "in      r29, __SP_H__" "\n\t" /* load SPH into r29 (means Yb) */ \
         "eor     r1, r1"        "\n\t" /* clear r1 */ \
-        /* check isr_nesting and skip SP storing if != 1 */ \
+        /* skip SP update if isr_nesting != 1 */ \
         "cpi     r16, 1"         "\n\t" \
         "brne    isr_contextstore_nested_%=\n\t" \
         /* store SP into task_current->ctx */ \
@@ -331,72 +335,11 @@ low address
             :: )
 #else
 #define arch_contextstore_i(_isrName) \
-    __asm__ __volatile__ ( \
-        /* on AVR interupts are disabled when entering ISR */ \
-        /* store r0 for temporary operations */ \
-        "push    r0"            "\n\t" \
-        /* store SREG and r1 */        \
-        "in      r0, __SREG__"  "\n\t" \
-        "push    r0"            "\n\t" \
-        "push    r1"            "\n\t" \
-        /* store remain registers */    \
-        /* gcc uses Y as frame register, it will be easier if we store it \
-         * first */ \
-        "push    r28"           "\n\t" \
-        "push    r29"           "\n\t" \
-        /* gcc threats r2-r17 as call-saved registes, if we store them first * \
-         * then arch_context_swich can be opimized */ \
-        "push    r2"            "\n\t" \
-        "push    r3"            "\n\t" \
-        "push    r4"            "\n\t" \
-        "push    r5"            "\n\t" \
-        "push    r6"            "\n\t" \
-        "push    r7"            "\n\t" \
-        "push    r8"            "\n\t" \
-        "push    r9"            "\n\t" \
-        "push    r10"           "\n\t" \
-        "push    r11"           "\n\t" \
-        "push    r12"           "\n\t" \
-        "push    r13"           "\n\t" \
-        "push    r14"           "\n\t" \
-        "push    r15"           "\n\t" \
-        "push    r16"           "\n\t" \
-        "push    r17"           "\n\t" \
-        "push    r18"           "\n\t" \
-        "push    r19"           "\n\t" \
-        "push    r20"           "\n\t" \
-        "push    r21"           "\n\t" \
-        "push    r22"           "\n\t" \
-        "push    r23"           "\n\t" \
-        "push    r24"           "\n\t" \
-        "push    r25"           "\n\t" \
-        "push    r26"           "\n\t" \
-        "push    r27"           "\n\t" \
-        "push    r30"           "\n\t" \
-        "push    r31"           "\n\t" \
-        "in r0,_SFR_IO_ADDR(RAMPZ)\n\t" \
-        "push r0"               "\n\t" \
-        "in r0,_SFR_IO_ADDR(EIND)\n\t" \
-        "push r0"               "\n\t" \
-        /* incement isr_nesting */ \
-        "lds     r16, isr_nesting" "\n\t" \
-        "inc     r16"              "\n\t" \
-        "sts     isr_nesting, r16" "\n\t" \
-        /* prepare frame pointer for future C code (usual ISR prolog skiped \
-         * since OS_ISR was used */ \
-        "in      r28, __SP_L__" "\n\t" /* load SPL into r28 (means Ya) */ \
-        "in      r29, __SP_H__" "\n\t" /* load SPH into r29 (means Yb) */ \
-        "eor     r1, r1"        "\n\t" /* clear r1 */ \
-        /* check isr_nesting and skip SP storing if != 1 */ \
-        "cpi     r16, 1"         "\n\t" \
-        "brne    isr_contextstore_nested_%=\n\t" \
-        /* store SP into task_current->ctx */ \
-        "lds     r30, task_current"  "\n\t"  /* load Z with curent_task pointer */ \
-        "lds     r31, task_current+1" "\n\t"  /* load Z with curent_task pointer */ \
-        "st      Z,   r28"      "\n\t"   /* store SPL into *(task_current) */ \
-        "std     Z+1, r29"      "\n\t"   /* store SPH into *(task_current) */ \
-     "isr_contextstore_nested_%=:\n\t" \
-            :: )
+#error CPU with extended memory registers are not supported yet
+/*      "in r0,_SFR_IO_ADDR(RAMPZ)\n\t"
+        "push r0"               "\n\t"
+        "in r0,_SFR_IO_ADDR(EIND)\n\t"
+        "push r0"               "\n\t" */
 #endif
 
 /* This function have to:
@@ -416,8 +359,7 @@ low address
 //#ifndef __AVR_HAVE_RAMPZ__
 #define arch_contextrestore_i(_isrName) \
     __asm__ __volatile__ ( \
-        /* disable interrupts in case some ISR will implement nesting interrupt * \
-         * handling */ \
+        /* disable interrupts in case we add nesting interrupt support */ \
         "cli"                         "\n\t" \
         /* decrement isr_nesting */ \
         "lds     r16, isr_nesting"    "\n\t" \
@@ -447,7 +389,7 @@ low address
         "pop    r19"                 "\n\t" \
         "pop    r18"                 "\n\t" \
         "pop    r17"                 "\n\t" \
-        "pop    r16"                 "\n\t" \
+        /* skip r16 - will pop later */ \
         "pop    r15"                 "\n\t" \
         "pop    r14"                 "\n\t" \
         "pop    r13"                 "\n\t" \
@@ -462,87 +404,33 @@ low address
         "pop    r4"                  "\n\t" \
         "pop    r3"                  "\n\t" \
         "pop    r2"                  "\n\t" \
+        "pop    r1"                  "\n\t" \
+        "pop    r0"                  "\n\t" \
         "pop    r29"                 "\n\t" \
         "pop    r28"                 "\n\t" \
-        "pop    r1"                  "\n\t" \
-        /* in poped SEG, I bit may be either set or not this depends if popped \
-         * task had interupts disabled (was switched out by * arch_context_switch) \
-         * or enabled (swithed out by os_tick() */ \
-        "pop    r0"                  "\n\t" \
-        "out    __SREG__, r0"        "\n\t" \
-        "pop    r0"                  "\n\t" \
-        /* we cannot return by reti (even if we are in ISR), this is because on \
-         * AVR reti always enable interrupts, while if we pick up task switched \
-         * out by arch_context_switch then interrupts must stay disabled */ \
+        /* in poped SEG, I bit may be either set or cleared depending if popped \
+         * task had interupts disabled (was switched out by internal OS call) \
+         * or enabled (swithed out by os_tick() from interrupt */ \
+        "pop    r16"                 "\n\t" \
+        "out    __SREG__, r16"       "\n\t" \
+        "pop    r16"                 "\n\t" \
+        /* in this moment we can get interrupt !!!! \
+         \TODO this may be critical in case of constant interrupt, we will end \
+         up in filling the stack!!! */ \
+        /* we cannot return by reti (even if we are in ISR here), this is \
+         * because on AVR reti always enable interrupts, while it can be \
+         * that we picked up task switched out by arch_context_switch, so \
+         * interrupts must stay disabled (we cannot use reti, it will switch \
+         * them on!) */ \
         "ret"                        "\n\t" \
             :: )
 #else
 #define arch_contextrestore_i(_isrName) \
-    __asm__ __volatile__ ( \
-        /* disable interrupts in case some ISR will implement nesting interrupt * \
-         * handling */ \
-        "cli"                         "\n\t" \
-        /* decrement isr_nesting */ \
-        "lds     r16, isr_nesting"    "\n\t" \
-        "dec     r16"                 "\n\t" \
-        "sts     isr_nesting, r16"    "\n\t" \
-        /* check isr_nesting and skip restoring iof SP if isr_nesting != 0 */ \
-        "brne    isr_contextrestore_nested_%=\n\t" \
-        /* restore SP from task_current->ctx */ \
-        "lds     r30, task_current"   "\n\t" /* load Z with curent_task pointer */ \
-        "lds     r31, task_current+1" "\n\t" /* load Z with curent_task pointer */ \
-        "ld      r16, Z"              "\n\t" /* load SPL from *(task_current) */ \
-        "ldd     r17, Z+1"            "\n\t" /* load SPH from *(task_current) */ \
-        "out     __SP_L__, r16"       "\n\t" /* save SPL */ \
-        "out     __SP_H__, r17"       "\n\t" /* save SPH */ \
-     "isr_contextrestore_nested_%=:\n\t" \
-        /* restore all register */ \
-        "pop r0"                     "\n\t" \
+#error CPU with extended memory registers are not supported yet
+/*      "pop r0"                     "\n\t" \
         "in r0,_SFR_IO_ADDR(EIND)"   "\n\t" \
         "pop r0"                     "\n\t" \
-        "in r0,_SFR_IO_ADDR(RAMPZ)"  "\n\t" \
-        "pop    r31"                 "\n\t" \
-        "pop    r30"                 "\n\t" \
-        "pop    r27"                 "\n\t" \
-        "pop    r26"                 "\n\t" \
-        "pop    r25"                 "\n\t" \
-        "pop    r24"                 "\n\t" \
-        "pop    r23"                 "\n\t" \
-        "pop    r22"                 "\n\t" \
-        "pop    r21"                 "\n\t" \
-        "pop    r20"                 "\n\t" \
-        "pop    r19"                 "\n\t" \
-        "pop    r18"                 "\n\t" \
-        "pop    r17"                 "\n\t" \
-        "pop    r16"                 "\n\t" \
-        "pop    r15"                 "\n\t" \
-        "pop    r14"                 "\n\t" \
-        "pop    r13"                 "\n\t" \
-        "pop    r12"                 "\n\t" \
-        "pop    r11"                 "\n\t" \
-        "pop    r10"                 "\n\t" \
-        "pop    r9"                  "\n\t" \
-        "pop    r8"                  "\n\t" \
-        "pop    r7"                  "\n\t" \
-        "pop    r6"                  "\n\t" \
-        "pop    r5"                  "\n\t" \
-        "pop    r4"                  "\n\t" \
-        "pop    r3"                  "\n\t" \
-        "pop    r2"                  "\n\t" \
-        "pop    r29"                 "\n\t" \
-        "pop    r28"                 "\n\t" \
-        "pop    r1"                  "\n\t" \
-        /* in poped SEG, I bit may be either set or not this depends if popped \
-         * task had interupts disabled (was switched out by * arch_context_switch) \
-         * or enabled (swithed out by os_tick() */ \
-        "pop    r0"                  "\n\t" \
-        "out    __SREG__, r0"        "\n\t" \
-        "pop    r0"                  "\n\t" \
-        /* we cannot return by reti (even if we are in ISR), this is because on \
-         * AVR reti always enable interrupts, while if we pick up task switched \
-         * out by arch_context_switch then interrupts must stay disabled */ \
-        "ret"                        "\n\t" \
-            :: )
+        "in r0,_SFR_IO_ADDR(RAMPZ)"  "\n\t" */
 #endif
 
 #endif /* __OS_PORT_ */

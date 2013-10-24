@@ -39,12 +39,6 @@
 #include "os.h"
 #include "os_test.h"
 
-#define min(_x, _y) ({ \
-   typeof(_x) _min1 = (_x); \
-   typeof(_y) _min2 = (_y); \
-   (void) (&_min1 == &_min2); \
-   _min1 < _min2 ? _min1 : _min2; })
-
 #define TEST_TASKS ((unsigned)10)
 
 #if 1

@@ -52,7 +52,7 @@
 
 typedef struct {
    os_sem_t sem;
-   os_atomic_t idx;
+   unsigned idx;
 } task_data_t;
 
 static os_task_t task1;

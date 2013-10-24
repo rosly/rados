@@ -31,17 +31,17 @@
 ECHO = /bin/echo -e
 
 #by defining ARCH enviroment variable, user can compile for different architectures
-#if no ARCH variable is defined, architecture is defined by target.mk
 ifeq ($(ARCH),)
 $(error ARCH is not defined, check your enviroment ARCH variable)
 endif
 #each architecture have its own target.mk file where CC, ARCHSOURCES, CFLAGS
 #variables are defined
-include $(ARCH)/target.mk
+include arch/$(ARCH)/target.mk
 
-SOURCEDIR = .
+SOURCEDIR = source
 BUILDDIR = build/$(ARCH)
-INCLUDEDIR = . $(ARCH)
+ARCHDIR = arch/$(ARCH)
+INCLUDEDIR = $(ARCHDIR) $(SOURCEDIR)
 SOURCES = \
 	os_sched.c \
 	os_sem.c \
@@ -59,7 +59,7 @@ endif
 CFLAGS += -Wall -Wextra -Werror
 LDFLAGS +=
 
-vpath %.c $(SOURCEDIR) $(ARCH)
+vpath %.c $(SOURCEDIR) $(ARCHDIR)
 vpath %.o $(BUILDDIR)
 vpath %.elf $(BUILDDIR)
 DEPEND = $(addprefix $(BUILDDIR)/, $(SOURCES:.c=.d))

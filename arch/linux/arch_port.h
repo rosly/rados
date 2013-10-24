@@ -59,11 +59,20 @@ typedef struct {
     ucontext_t context;
 } arch_context_t;
 
-typedef sig_atomic_t arch_atomic_t; /* this is guaranteed to be at least 24 bits wide from POSIX */
-typedef uint_fast16_t arch_ticks_t;
-#define ARCH_TICKS_MAX ((arch_ticks_t)UINT_FAST16_MAX)
-typedef sigset_t arch_criticalstate_t;
+/* this is guaranteed to be at least 24 bits wide from POSIX */
+typedef sig_atomic_t arch_atomic_t;
+#define ARCH_ATOMIC_MAX SIG_ATOMIC_MAX
 
+/** Architecture dependent tick type definition, uint16 is ennough but to make
+ * it convinient for 32 and 64 CPU's, we use uint_fast16_t (so it will be the
+ * smallest and fastest type for paticular CPU */
+typedef uint_fast16_t arch_ticks_t;
+#define ARCH_TICKS_MAX ((arch_ticks_t)UINT16_MAX)
+
+typedef sigset_t arch_criticalstate_t;
+/** signal set used to mask Linux port sensitive signals
+ *  we keep them in global variable initialized in arch_os_start()
+ */
 extern sigset_t arch_crit_signals;
 
 #define OS_ISR /* not naked since signal in linux are handling the context registers via parameter. Signal handler always sees clobered registers */

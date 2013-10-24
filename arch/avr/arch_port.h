@@ -58,14 +58,17 @@ typedef struct {
 } arch_context_t;
 
 /* AVR does not support direct memory manipulation since AVR is LOAD-STORE
- * architecure. Therefore even for 8bit increment we need do disable interupts,
- * to make this operation atomic */
+ * architecure. At least we can read 8bit values without masking interrupts
+ * But from other hand for 8bit increment we need do disable interupts,
+ * to make this operation atomic (load-increment-store) */
 typedef uint8_t arch_atomic_t;
 #define ARCH_ATOMIC_MAX UINT8_MAX
+
 /** exactly 16 bits, minimal reasonable type for ticks, requires special
  * handling code */
 typedef uint16_t arch_ticks_t;
 #define ARCH_TICKS_MAX ((arch_ticks_t)UINT16_MAX)
+
 typedef uint8_t arch_criticalstate_t; /* size of AVR status register */
 
 /* for ISR we use:

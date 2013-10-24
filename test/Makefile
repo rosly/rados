@@ -34,11 +34,11 @@ ECHO = /bin/echo -e
 #by defining ARCH enviroment variable, user can compile for different architectures
 #if no ARCH variable is defined, architecture is defined by target.mk
 ifeq ($(ARCH),)
-include ../target.mk
+$(error ARCH is not defined, check your enviroment ARCH variable)
 endif
 #each architecture have its own target.mk file where CC, ARCHSOURCES, CFLAGS
 #variables are defined
-include ../$(ARCH)/target.mk
+include ../arch/$(ARCH)/target.mk
 
 TESTSOURCE = \
 	test1.c \
@@ -56,7 +56,7 @@ endif
 
 SOURCEDIR = .
 BUILDDIR = ../build/$(ARCH)
-INCLUDEDIR = . .. ../$(ARCH)
+INCLUDEDIR = . ../arch/$(ARCH) ../source
 LIBDIR = ../build/$(ARCH)
 LIBS = kernel
 

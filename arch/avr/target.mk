@@ -46,10 +46,6 @@ CFLAGS   += -Os
 endif
 LDFLAGS  =
 
-ARCHSOURCES = \
-	arch_port.c \
-	arch_test.c
-
 # taken from http://www.nongnu.org/avr-libc/user-manual/using_tools.html
 #avr1    at90s1200       __AVR_AT90S1200__
 #avr1    attiny11        __AVR_ATtiny11__

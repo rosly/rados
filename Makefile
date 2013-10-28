@@ -34,9 +34,10 @@ ECHO = /bin/echo -e
 ifeq ($(ARCH),)
 $(error ARCH is not defined, check your enviroment ARCH variable)
 endif
-#each architecture have its own target.mk file where CC, ARCHSOURCES, CFLAGS
-#variables are defined
-include arch/$(ARCH)/target.mk
+#each architecture have its own target.mk file where CC, CFLAGS variables are defined
+include $(TARGET)/arch/$(ARCH)/target.mk
+#ARCHSOURCES are defined separately
+include arch/$(ARCH)/source.mk
 
 SOURCEDIR = source
 BUILDDIR = build/$(ARCH)

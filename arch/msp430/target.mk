@@ -21,7 +21,3 @@ MV       = mv
 CFLAGS   = -mmcu=$(MCU) -Os -std=gnu99 
 LDFLAGS  = -mmcu=$(MCU) -mdisable-watchdog
 
-ARCHSOURCES = \
-	arch_port.c \
-	arch_test.c
-

@@ -24,7 +24,3 @@ endif
 CFLAGS   += -std=gnu99 
 LDFLAGS  = -lrt
 
-ARCHSOURCES = \
-	arch_port.c \
-	arch_test.c
-

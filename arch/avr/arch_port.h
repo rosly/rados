@@ -267,11 +267,23 @@ low address
  The reason why we skip the stack pointer storage in case of nesing is obvous. In case of nesting we was not in task but in other ISR. So the SP will not be the task SP.
  But we have to store all registers anyway. This is why we store all registers and then optionaly store the SP in context of tcb */
 
+
+#ifdef __AVR_HAVE_RAMPZ__
+# define arch_push_rampz(__arg) \
+        "in r16, "#__arg         "\n\t" \
+        "push r16"               "\n\t"
+# define arch_contextstore_args \
+         :: "I" (_SFR_IO_ADDR(RAMPZ))
+#else
+# define arch_push_rampz
+# define arch_contextstore_args \
+         ::
+#endif
+
 #ifndef __AVR_3_BYTE_PC__
-//#ifndef __AVR_HAVE_RAMPZ__
-#define arch_contextstore_i(_isrName) \
+# define arch_contextstore_i(_isrName) \
     __asm__ __volatile__ ( \
-        /* store r16 for temporary operations */ \
+        /* store r16 and use it as temporary register */ \
         "push    r16"           "\n\t" \
         /* on AVR interupts will be masked when entering ISR \
            but since we entered ISR it means that they where enabled. \
@@ -280,6 +292,8 @@ low address
         "in      r16, __SREG__" "\n\t" \
         "sbr     r16, 0x80"     "\n\t" \
         "push    r16"           "\n\t" \
+        /* push RAMPZ if pressent */   \
+        arch_push_rampz(%0)            \
         /* store remain registers */   \
         /* gcc uses Y as frame register, it will be easier if we store it \
          * first */ \
@@ -335,7 +349,8 @@ low address
         "st      Z,   r28"      "\n\t"   /* store SPL into *(task_current) */ \
         "std     Z+1, r29"      "\n\t"   /* store SPH into *(task_current) */ \
      "isr_contextstore_nested_%=:\n\t" \
-            :: )
+        arch_contextstore_args \
+        )
 #else
 #define arch_contextstore_i(_isrName) \
 #error CPU with extended memory registers are not supported yet
@@ -358,6 +373,19 @@ low address
  This is because we disabled them for task_current manipulation in first step. But we need to enable them because:
  - in case of not nested they was for sure enabled (need to be enabled because we enter ISR ;) )
  - in case of nested the was also for sure enabled (from the same reason, we enter nested ISR) */
+
+#ifdef __AVR_HAVE_RAMPZ__
+# define arch_pop_rampz(__arg) \
+        "pop r16"                   "\n\t" \
+        "out "#__arg", r16"    "\n\t"
+# define arch_contextrestore_args \
+         :: "I" (_SFR_IO_ADDR(RAMPZ))
+#else
+# define arch_pop_rampz
+# define arch_contextrestore_args \
+         ::
+#endif
+
 #ifndef __AVR_3_BYTE_PC__
 //#ifndef __AVR_HAVE_RAMPZ__
 #define arch_contextrestore_i(_isrName) \
@@ -411,6 +439,8 @@ low address
         "pop    r0"                  "\n\t" \
         "pop    r29"                 "\n\t" \
         "pop    r28"                 "\n\t" \
+        /* pop RAMPZ if pressent */         \
+        arch_pop_rampz(%0)                  \
         /* in poped SEG, I bit may be either set or cleared depending if popped \
          * task had interupts disabled (was switched out by internal OS call) \
          * or enabled (swithed out by os_tick() from interrupt */ \
@@ -426,7 +456,8 @@ low address
          * interrupts must stay disabled (we cannot use reti, it will switch \
          * them on!) */ \
         "ret"                        "\n\t" \
-            :: )
+        arch_contextrestore_args \
+        )
 #else
 #define arch_contextrestore_i(_isrName) \
 #error CPU with extended memory registers are not supported yet

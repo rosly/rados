@@ -32,13 +32,18 @@
 ECHO = /bin/echo -e
 
 #by defining ARCH enviroment variable, user can compile for different architectures
-#if no ARCH variable is defined, architecture is defined by target.mk
 ifeq ($(ARCH),)
 $(error ARCH is not defined, check your enviroment ARCH variable)
 endif
-#each architecture have its own target.mk file where CC, ARCHSOURCES, CFLAGS
-#variables are defined
-include ../arch/$(ARCH)/target.mk
+#each subproject should use the same master configuration taken from master
+#project, if master project configdir is not given then use the local one
+ifeq ($(CONFIGDIR),)
+export CONFIGDIR=$(CURDIR)/..
+endif
+#each architecture have its own target.mk file where CC, CFLAGS variables are defined
+include $(CONFIGDIR)/arch/$(ARCH)/target.mk
+#ARCHSOURCES are defined separately
+include ../arch/$(ARCH)/source.mk
 
 TESTSOURCE = \
 	test1.c \
@@ -114,4 +119,5 @@ clean:
 	@$(RM) $(TARGETS); $(ECHO) "[RM]\t$(TARGETS)"
 	@$(RM) $(OBJECTS); $(ECHO) "[RM]\t$(OBJECTS)"
 	@$(RM) $(DEPEND); $(ECHO) "[RM]\t$(DEPEND)"
+	@$(RM) $(BUILDDIR)/*.s $(BUILDDIR)/*i; $(ECHO) "[RM]\t[temps]"
 

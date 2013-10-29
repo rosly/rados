@@ -17,8 +17,8 @@
 #MCU_TYPE  = ATmega8
 #MCU_OPSET = avr5
 #MCU_TYPE  = ATmega16A
-#MCU_OPSET = avr51
-#MCU_TYPE  = ATmega1284P
+MCU_OPSET = avr51
+MCU_TYPE  = ATmega1284P
 
 CC       = avr-gcc
 LD       = avr-ld

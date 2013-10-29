@@ -57,15 +57,6 @@ low address
  - return by ret
 */
 
-#ifdef __AVR_HAVE_RAMPZ__
-# define arch_context_switch_args \
-         :: [new_task] "r" (new_task), \
-            "I" (_SFR_IO_ADDR(RAMPZ))
-#else
-# define arch_context_switch_args \
-         :: [new_task] "r" (new_task)
-#endif
-
 #ifndef __AVR_3_BYTE_PC__
 void OS_NAKED OS_HOT arch_context_switch(os_task_t * new_task)
 {
@@ -77,7 +68,7 @@ void OS_NAKED OS_HOT arch_context_switch(os_task_t * new_task)
       "eor     r16,r16"       "\n\t" \
       "push    r16"           "\n\t" \
       /* push RAMPZ if pressent */   \
-      arch_push_rampz(%1)            \
+      arch_push_rampz                \
       /* store old fame pointer keept in Y */ \
       "push    r28"           "\n\t" \
       "push    r29"           "\n\t" \
@@ -155,7 +146,7 @@ void OS_NAKED OS_HOT arch_context_switch(os_task_t * new_task)
       "pop    r29"                 "\n\t" \
       "pop    r28"                 "\n\t" \
       /* pop RAMPZ if pressent */         \
-      arch_pop_rampz(%1)                  \
+      arch_pop_rampz                      \
       /* poping true value of SREG is important here, since we may restore task \
        * which was pushed by ISR (for instance preemption tick) */ \
       "pop    r16"                 "\n\t" \
@@ -166,7 +157,7 @@ void OS_NAKED OS_HOT arch_context_switch(os_task_t * new_task)
          \TODO this may be critical in case of constant interrupt, we will end \
          up in filling the stack!!! */
       "ret"                        "\n\t" \
-      arch_context_switch_args            \
+      :: [new_task] "r" (new_task)        \
       );
 }
 #else
@@ -190,6 +181,8 @@ void OS_NAKED arch_task_start(os_taskproc_t proc, void* param)
 - ensure that task will have the interrupts enabled after it enters proc, on some arch this may be also used in arch_task_start
  /param stack pointer to stack end, it will have the same meaning as sp on paticular arch
 */
+
+
 void arch_task_init(os_task_t * task, void* stack_param,
                     size_t stack_size, os_taskproc_t proc,
                     void* param)
@@ -201,6 +194,9 @@ void arch_task_init(os_task_t * task, void* stack_param,
    *(stack--) = (uint8_t)((uint16_t)arch_task_start >> 8);;
    *(stack--) = 0; /* R16 */
    *(stack--) = 1 << SREG_I; /* SFR with interupts enabled */
+#ifdef __AVR_HAVE_RAMPZ__
+   *(stack--) = 0; /* RAMPZ */
+#endif
 
    /* store position of frame pointer reg on stack */
    *(stack--) = (((uint16_t)((uint8_t*)stack_param) + stack_size - 3) & 0x00ff); /* R28 */

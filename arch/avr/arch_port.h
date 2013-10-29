@@ -435,17 +435,30 @@ low address
          * task had interupts disabled (was switched out by internal OS call) \
          * or enabled (swithed out by os_tick() from interrupt */ \
         "pop    r16"                 "\n\t" \
+        /* check if interupts should be enabled after return, if not then we \
+         * must use ret instead of reti, cause reti always enables interrupts \
+         * interrupts must stay disabled if picked task to which we are switching \
+         * now was pushed by arch_context_switch from inside of critical section \
+         * of OS */ \
+        "sbrc   r16, 7"              "\n\t" \
+        "rjmp   isr_contextrestore_enableint_%=\n\t" \
         "out    __SREG__, r16"       "\n\t" \
         "pop    r16"                 "\n\t" \
-        /* in this moment we can get interrupt !!!! \
-         \TODO this may be critical in case of constant interrupt, we will end \
-         up in filling the stack!!! */ \
-        /* we cannot return by reti (even if we are in ISR here), this is \
-         * because on AVR reti always enable interrupts, while it can be \
-         * that we picked up task switched out by arch_context_switch, so \
-         * interrupts must stay disabled (we cannot use reti, it will switch \
-         * them on!) */ \
+        /* we will not get interrupt here even if we modify SREG and 2 \
+         * instruction passed, since we know that I bit in SREG is disabled */ \
         "ret"                        "\n\t" \
+     "isr_contextrestore_enableint_%=:\n\t" \
+        /* here we know that I bit in SREG is enabled, we must enable interupts * \
+         * after return, but since betwen updating SREG and return we will have * \
+         * more that 2 instructions we need to temporarly disable the I bit and * \
+         * enable interrupts by reti */ \
+        "cbr r16, 0x80"              "\n\t" \
+        "out    __SREG__, r16"       "\n\t" \
+        "pop    r16"                 "\n\t" \
+        /* since we return by reti, always one more instruction is executed \
+         * after reti and we can use ISR's to implement OS single stepping \
+         * debugger */ \
+        "reti"                       "\n\t" \
         :: )
 #else
 #define arch_contextrestore_i(_isrName) \

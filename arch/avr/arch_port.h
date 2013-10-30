@@ -107,6 +107,10 @@ typedef uint8_t arch_criticalstate_t; /* size of AVR status register */
   }while(0)
 
 #if 0
+/* \TODO following two instructions can be exchanged, since on AVR alvays one
+ * more instruction is executed after enabling interrupts
+ * "out __SREG__, %0\n\t"
+ * "st %[atomic], __tmp_reg__\n\t" */
   do { \
     uint8_t _tmp_reg2; \
     __asm__ __volatile__ ( \
@@ -236,6 +240,9 @@ typedef uint8_t arch_criticalstate_t; /* size of AVR status register */
       SREG = (_critical_state); \
    }while(0)
 
+/* do not mark memory as clobered, since this will destroy all compiler
+ * optimizations for memory access and not add any beneficial value to generated
+ * code */
 #define arch_dint() __asm__ __volatile__ ( "cli\n\t" :: )
 #define arch_eint() __asm__ __volatile__ ( "sei\n\t" :: )
 

@@ -56,16 +56,19 @@ low address
    IE while IE was disabled durring enter of arch_context_switch)
  - return by ret
 */
+
 #ifndef __AVR_3_BYTE_PC__
-//#ifndef __AVR_HAVE_RAMPZ__
 void OS_NAKED OS_HOT arch_context_switch(os_task_t * new_task)
 {
   __asm__ __volatile__ ( \
-      /* calling of this function requires that interupts are disabled */ \
+      /* store r16 and use it as temporary register */ \
       "push    r16"           "\n\t" \
-      /* store dummy cleared SREG (can be clobered) */ \
+      /* calling of this function requires that interupts are disabled */ \
+      /* store dummy cleared SREG (can be clobered, I bit must be cleared) */ \
       "eor     r16,r16"       "\n\t" \
       "push    r16"           "\n\t" \
+      /* push RAMPZ if pressent */   \
+      arch_push_rampz                \
       /* store old fame pointer keept in Y */ \
       "push    r28"           "\n\t" \
       "push    r29"           "\n\t" \
@@ -104,7 +107,7 @@ void OS_NAKED OS_HOT arch_context_switch(os_task_t * new_task)
       "sts     task_current+1, %B0\n\t" \
       \
       /* restore SP from task_current->ctx */ \
-      "movw    r30, %0"             "\n\t" /* load Z with new_task pointer */ \
+      "movw    r30, %0"             "\n\t" /* load Z with new_task pointer */
       "ld      r28, Z"              "\n\t" /* load SPL from *(task_current) */ \
       "ldd     r29, Z+1"            "\n\t" /* load SPH from *(task_current) */ \
       "out     __SP_L__, r28"      "\n\t" /* restore new SPL */ \
@@ -142,6 +145,8 @@ void OS_NAKED OS_HOT arch_context_switch(os_task_t * new_task)
       "pop    r0"                  "\n\t" \
       "pop    r29"                 "\n\t" \
       "pop    r28"                 "\n\t" \
+      /* pop RAMPZ if pressent */         \
+      arch_pop_rampz                      \
       /* poping true value of SREG is important here, since we may restore task \
        * which was pushed by ISR (for instance preemption tick) */ \
       "pop    r16"                 "\n\t" \
@@ -152,7 +157,8 @@ void OS_NAKED OS_HOT arch_context_switch(os_task_t * new_task)
          \TODO this may be critical in case of constant interrupt, we will end \
          up in filling the stack!!! */
       "ret"                        "\n\t" \
-            ::  [new_task] "r" (new_task));
+      :: [new_task] "r" (new_task)        \
+      );
 }
 #else
 #error 3byte PC is not supported yet
@@ -175,6 +181,8 @@ void OS_NAKED arch_task_start(os_taskproc_t proc, void* param)
 - ensure that task will have the interrupts enabled after it enters proc, on some arch this may be also used in arch_task_start
  /param stack pointer to stack end, it will have the same meaning as sp on paticular arch
 */
+
+
 void arch_task_init(os_task_t * task, void* stack_param,
                     size_t stack_size, os_taskproc_t proc,
                     void* param)
@@ -186,6 +194,9 @@ void arch_task_init(os_task_t * task, void* stack_param,
    *(stack--) = (uint8_t)((uint16_t)arch_task_start >> 8);;
    *(stack--) = 0; /* R16 */
    *(stack--) = 1 << SREG_I; /* SFR with interupts enabled */
+#ifdef __AVR_HAVE_RAMPZ__
+   *(stack--) = 0; /* RAMPZ */
+#endif
 
    /* store position of frame pointer reg on stack */
    *(stack--) = (((uint16_t)((uint8_t*)stack_param) + stack_size - 3) & 0x00ff); /* R28 */

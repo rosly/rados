@@ -274,11 +274,19 @@ low address
  The reason why we skip the stack pointer storage in case of nesing is obvous. In case of nesting we was not in task but in other ISR. So the SP will not be the task SP.
  But we have to store all registers anyway. This is why we store all registers and then optionaly store the SP in context of tcb */
 
+
+#ifdef __AVR_HAVE_RAMPZ__
+# define arch_push_rampz \
+        "in r16, __RAMPZ__"      "\n\t" \
+        "push r16"               "\n\t"
+#else
+# define arch_push_rampz
+#endif
+
 #ifndef __AVR_3_BYTE_PC__
-//#ifndef __AVR_HAVE_RAMPZ__
-#define arch_contextstore_i(_isrName) \
+# define arch_contextstore_i(_isrName) \
     __asm__ __volatile__ ( \
-        /* store r16 for temporary operations */ \
+        /* store r16 and use it as temporary register */ \
         "push    r16"           "\n\t" \
         /* on AVR interupts will be masked when entering ISR \
            but since we entered ISR it means that they where enabled. \
@@ -287,6 +295,8 @@ low address
         "in      r16, __SREG__" "\n\t" \
         "sbr     r16, 0x80"     "\n\t" \
         "push    r16"           "\n\t" \
+        /* push RAMPZ if pressent */   \
+        arch_push_rampz                \
         /* store remain registers */   \
         /* gcc uses Y as frame register, it will be easier if we store it \
          * first */ \
@@ -342,7 +352,7 @@ low address
         "st      Z,   r28"      "\n\t"   /* store SPL into *(task_current) */ \
         "std     Z+1, r29"      "\n\t"   /* store SPH into *(task_current) */ \
      "isr_contextstore_nested_%=:\n\t" \
-            :: )
+        :: )
 #else
 #define arch_contextstore_i(_isrName) \
 #error CPU with extended memory registers are not supported yet
@@ -365,8 +375,16 @@ low address
  This is because we disabled them for task_current manipulation in first step. But we need to enable them because:
  - in case of not nested they was for sure enabled (need to be enabled because we enter ISR ;) )
  - in case of nested the was also for sure enabled (from the same reason, we enter nested ISR) */
+
+#ifdef __AVR_HAVE_RAMPZ__
+# define arch_pop_rampz \
+        "pop r16"               "\n\t" \
+        "out __RAMPZ__, r16"    "\n\t"
+#else
+# define arch_pop_rampz
+#endif
+
 #ifndef __AVR_3_BYTE_PC__
-//#ifndef __AVR_HAVE_RAMPZ__
 #define arch_contextrestore_i(_isrName) \
     __asm__ __volatile__ ( \
         /* disable interrupts in case we add nesting interrupt support */ \
@@ -418,22 +436,37 @@ low address
         "pop    r0"                  "\n\t" \
         "pop    r29"                 "\n\t" \
         "pop    r28"                 "\n\t" \
+        /* pop RAMPZ if pressent */         \
+        arch_pop_rampz                      \
         /* in poped SEG, I bit may be either set or cleared depending if popped \
          * task had interupts disabled (was switched out by internal OS call) \
          * or enabled (swithed out by os_tick() from interrupt */ \
         "pop    r16"                 "\n\t" \
+        /* check if interupts should be enabled after return, if not then we \
+         * must use ret instead of reti, cause reti always enables interrupts \
+         * interrupts must stay disabled if picked task to which we are switching \
+         * now was pushed by arch_context_switch from inside of critical section \
+         * of OS */ \
+        "sbrc   r16, 7"              "\n\t" \
+        "rjmp   isr_contextrestore_enableint_%=\n\t" \
         "out    __SREG__, r16"       "\n\t" \
         "pop    r16"                 "\n\t" \
-        /* in this moment we can get interrupt !!!! \
-         \TODO this may be critical in case of constant interrupt, we will end \
-         up in filling the stack!!! */ \
-        /* we cannot return by reti (even if we are in ISR here), this is \
-         * because on AVR reti always enable interrupts, while it can be \
-         * that we picked up task switched out by arch_context_switch, so \
-         * interrupts must stay disabled (we cannot use reti, it will switch \
-         * them on!) */ \
+        /* we will not get interrupt here even if we modify SREG and 2 \
+         * instruction passed, since we know that I bit in SREG is disabled */ \
         "ret"                        "\n\t" \
-            :: )
+     "isr_contextrestore_enableint_%=:\n\t" \
+        /* here we know that I bit in SREG is enabled, we must enable interupts * \
+         * after return, but since betwen updating SREG and return we will have * \
+         * more that 2 instructions we need to temporarly disable the I bit and * \
+         * enable interrupts by reti */ \
+        "cbr r16, 0x80"              "\n\t" \
+        "out    __SREG__, r16"       "\n\t" \
+        "pop    r16"                 "\n\t" \
+        /* since we return by reti, always one more instruction is executed \
+         * after reti and we can use ISR's to implement OS single stepping \
+         * debugger */ \
+        "reti"                       "\n\t" \
+        :: )
 #else
 #define arch_contextrestore_i(_isrName) \
 #error CPU with extended memory registers are not supported yet

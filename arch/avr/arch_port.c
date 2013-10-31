@@ -33,7 +33,7 @@
 
 /* format of the context on stack for MSP430
 hi address
-    PC - pushed frst
+    PC - pushed first
     R0 - stored to gain one free register
     SREG
     R1 - R31 - pusched last

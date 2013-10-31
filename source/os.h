@@ -50,8 +50,11 @@
       } \
    }while(0)
 
-extern os_task_t* task_current; /* need to be visiable for user because of arch_contextstore_i macros */
-extern volatile os_atomic_t isr_nesting; /* need to be visiable for user because of arch_contextstore_i macros */
+/* need to be visiable for user because of arch_contextstore_i macros */
+extern os_task_t* task_current; 
+
+/* need to be visiable for user because of arch_contextstore_i macros */
+extern volatile os_atomic_t isr_nesting; 
 
 #endif
 

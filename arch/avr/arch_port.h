@@ -69,6 +69,9 @@ typedef uint8_t arch_atomic_t;
 typedef uint16_t arch_ticks_t;
 #define ARCH_TICKS_MAX ((arch_ticks_t)UINT16_MAX)
 
+/** we use 8bit to allow fast HW multiply on AVR CPU */
+typedef uint8_t arch_tickshz_t;
+
 typedef uint8_t arch_criticalstate_t; /* size of AVR status register */
 
 /* for ISR we use:

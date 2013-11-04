@@ -38,7 +38,7 @@ endif
 #each subproject should use the same master configuration taken from master
 #project, if master project configdir is not given then use the local one
 ifeq ($(CONFIGDIR),)
-export CONFIGDIR=$(CURDIR)/..
+export CONFIGDIR = $(CURDIR)/..
 endif
 #each architecture have its own target.mk file where CC, CFLAGS variables are defined
 include $(CONFIGDIR)/arch/$(ARCH)/target.mk
@@ -60,7 +60,7 @@ TESTSOURCE += \
 endif
 
 SOURCEDIR = .
-BUILDDIR = ../build/$(ARCH)
+BUILDDIR ?= ../build/$(ARCH)
 INCLUDEDIR = . ../arch/$(ARCH) ../source
 LIBDIR = ../build/$(ARCH)
 LIBS = kernel

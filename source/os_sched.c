@@ -46,7 +46,7 @@ volatile os_atomic_t sched_lock = 0;
 static os_task_t task_idle;
 
 /* private function forward declarations */
-static void arch_task_debug(os_task_t *task, void* stack, size_t stack_size);
+static void os_task_check_init(os_task_t *task, void* stack, size_t stack_size);
 static void os_task_init(os_task_t* task, uint_fast8_t prio);
 
 /* prior this function call, all interrupts must be disabled */
@@ -124,7 +124,7 @@ void os_task_create(
 
    os_task_init(task, prio);
 
-   arch_task_debug(task, stack, stack_size);
+   os_task_check_init(task, stack, stack_size);
    arch_task_init(task, stack, stack_size, proc, param);
 
    arch_critical_enter(cristate);
@@ -167,6 +167,16 @@ int os_task_join(os_task_t *task)
    arch_critical_exit(cristate);
 
    return task->ret_value;
+}
+
+void os_task_check(os_task_t *task)
+{
+#ifdef OS_CONFIG_CHECKSTACK
+   if(OS_UNLIKELY(OS_STACK_FILLPATERN != *((uint8_t*)task->stack_end)))
+   {
+      arch_halt();
+   }
+#endif
 }
 
 void OS_HOT os_tick(void)
@@ -417,7 +427,7 @@ void os_task_exit(int retv)
 
 /* --- private functions --- */
 
-static void arch_task_debug(os_task_t *task, void* stack, size_t stack_size)
+static void os_task_check_init(os_task_t *task, void* stack, size_t stack_size)
 {
 #ifdef OS_CONFIG_CHECKSTACK
    memset(stack, OS_STACK_FILLPATERN, stack_size);
@@ -425,7 +435,7 @@ static void arch_task_debug(os_task_t *task, void* stack, size_t stack_size)
 #ifdef OS_STACK_DESCENDING
    task->stack_end = stack;
 #else
-   task->stack_end = (void*)(((uint8_t*)stack) + stack_size);
+   task->stack_end = (void*)(((uint8_t*)stack) + stack_size - 1);
 #endif
 #endif
 }

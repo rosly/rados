@@ -147,16 +147,34 @@ void OS_NAKED OS_HOT arch_context_switch(os_task_t * new_task)
       "pop    r28"                 "\n\t" \
       /* pop RAMPZ if pressent */         \
       arch_pop_rampz                      \
-      /* poping true value of SREG is important here, since we may restore task \
-       * which was pushed by ISR (for instance preemption tick) */ \
+      /* in poped SEG, I bit may be either set or cleared depending if popped \
+       * task had interupts disabled (was switched out by internal OS call) \
+       * or enabled (swithed out by os_tick() from interrupt */ \
       "pop    r16"                 "\n\t" \
+      /* check if interupts should be enabled after return, if not then we \
+       * must use ret instead of reti, cause reti always enables interrupts \
+       * interrupts must stay disabled if picked task to which we are switching \
+       * now was pushed by arch_context_switch from inside of critical section \
+       * of OS */ \
+      "sbrc   r16, 7"              "\n\t" \
+      "rjmp   arch_context_switch_enableint_%=\n\t" \
       "out    __SREG__, r16"       "\n\t" \
-      /* restore r16 and ret */           \
-      "pop    r16"                  "\n\t" \
-      /* in this moment we can get interrupt !!!! \
-         \TODO this may be critical in case of constant interrupt, we will end \
-         up in filling the stack!!! */
+      "pop    r16"                 "\n\t" \
+      /* we will not get interrupt here even if we modify SREG and 2 \
+       * instruction passed, since we know that I bit in SREG is disabled */ \
       "ret"                        "\n\t" \
+   "arch_context_switch_enableint_%=:\n\t" \
+      /* here we know that I bit in SREG is enabled, we must enable interupts * \
+       * after return, but since betwen updating SREG and return we will have * \
+       * more that 2 instructions we need to temporarly disable the I bit and * \
+       * enable interrupts by reti */ \
+      "cbr r16, 0x80"              "\n\t" \
+      "out    __SREG__, r16"       "\n\t" \
+      "pop    r16"                 "\n\t" \
+      /* since we return by reti, always one more instruction is executed \
+       * after reti and we can use ISR's to implement OS single stepping \
+       * debugger */ \
+      "reti"                       "\n\t" \
       :: [new_task] "r" (new_task)        \
       );
 }
@@ -237,7 +255,7 @@ void arch_task_init(os_task_t * task, void* stack_param,
    task->ctx.sp = (uint16_t)stack;
 }
 
-void OS_NORETURN OS_COLD arch_halt(void)
+void /* \TODO removed because of missing backstack OS_NORETURN */ OS_COLD arch_halt(void)
 {
    arch_dint();
    while(1) {

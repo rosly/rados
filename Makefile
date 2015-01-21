@@ -98,11 +98,9 @@ ifneq ($(MAKECMDGOALS), clean)
 -include $(DEPEND)
 endif
 # dependencies file
-# includes also considered, since some of these are our own
-# (otherwise use -MM instead of -M)
 $(BUILDDIR)/%.d: %.c
 	@$(ECHO) "[DEP]\t$<"
-	@$(CC) -M ${CFLAGS} $(addprefix -I, $(INCLUDEDIR)) $< >$@
+	@$(CC) -MM -MT $(@:.d=.o) ${CFLAGS} $(addprefix -I, $(INCLUDEDIR)) $< >$@
 
 .PHONY: clean test testrun testloop lst size
 

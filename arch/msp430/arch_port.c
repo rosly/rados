@@ -17,7 +17,7 @@
  *    may be used to endorse or promote products derived from this software without
  *    specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE RADOS PROJET AND CONTRIBUTORS "AS IS" AND
+ * THIS SOFTWARE IS PROVIDED BY THE RADOS PROJECT AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
  * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
@@ -40,9 +40,9 @@ hi address
 */
 
 /*
-  \note Interrupts will be disabled durring execution of below code. they ned to be disabled becouse of preemption (concurent access to task_current)
+  \note Interrupts will be disabled durring execution of below code. they ned to be disabled because of preemption (concurent access to task_current)
   This function have to:
- - store task context in the same place as arch_contextstore_i (power bits does not have to be necessarly stored, IE have to be stored becouse we need to atomicaly disable the interupts when we will pop this task)
+ - store task context in the same place as arch_contextstore_i (power bits does not have to be necessarly stored, IE have to be stored because we need to atomicaly disable the interupts when we will pop this task)
  - perform task_current = new_task;
  - restore context as same as in arch_contextrestore
  - perform actions that will lead to sustain the power enable after poping the SR (task could be stored by ISR so task possibly may have the power bits dis

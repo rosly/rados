@@ -17,7 +17,7 @@
  *    may be used to endorse or promote products derived from this software without
  *    specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE RADOS PROJET AND CONTRIBUTORS "AS IS" AND
+ * THIS SOFTWARE IS PROVIDED BY THE RADOS PROJECT AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
  * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
@@ -33,26 +33,32 @@
 #define __OS_MTX_
 
 /**
-   Mutex are second synchronization primitive. Comparing to semaphores it has
-   following differences:
-   - mutex has only two states locked/unlocked while semaphore has multiple
-     values
-   - mutex has concept of ownership, so locked mutex can be unlocked only by the
-     owner (task which recently lock it), unlocking from another task will reasult
-     in assertion, this may be seen as error checking feature of the mutex
-   - mutex prevents from priority iversion problem while semaphores does not.
-     Priority inversion algotithm will boost the priority of task that holds the
-     mutex to level 1 bigger than most prioritized thread that trys to obtain
-     the lock
-   - mutex suport the recusrive locks (it tracks the owner). To free the mutex
-     it must be unlocked the same number of times as many lock operations was done
-   - mutex lock operation does not have the timeout (they are not needed sine
-     the only reason which I now is detecting deadlocks BUGS, using timeout for
-     this is realy bad idea).
-   */
+ * Mutex is synchronization primitive. Comparing to semaphores it has
+ * following differences:
+ * - mutex cannot be used from ISR
+ * - mutex can have only two states: locked/unlocked (works as a flag),
+ *   while semaphore can have multiple values (works as a counter)
+ * - mutex has concept of ownership. The locked mutex can be unlocked only by
+ *   the owner (task which recently lock it up), unlocking from another task will
+ *   result in assertion, this may be seen as error checking feature of the mutex
+ *   but it will assert only when OS_CONFIG_APICHECK is defined
+ * - mutex prevents from priority inversion problem while semaphores does not.
+ *   Priority inheritance will boost the priority of task that holds the mutex
+ *   to level of most prioritized thread which try's to obtain the lock
+ * - mutex support the recursive locks. In other words owner which try's to lock
+ *   the mutex again will not be blocked but simply increment the level of
+ *   recursive lock (mutex tracks the owner). To free the mutex it must be
+ *   unlocked the same number of times as many lock operations were done.
+ * - mutex lock operation does not have the timeout (they are not needed sine
+ *   the first reason of timeout for mutexes in RTOS is mitigating deadlocks
+ *   BUGS. Using timeout as a solution for deadlock BUGS is really bad idea.
+ *   Other reasons where timeout for mtx are needed are usually when application
+ *   is not well designed and it cannot meet real-time constrains.  All
+ *   requirement's and limitation of CPU and OS should be known prior coding).
+ */
 
 typedef struct {
-   /** list header that allows to place mtx'es on various lists */
+   /** list header that allows to place this mtx on various lists */
    list_t listh;
 
    /** Task which currently owns the mutex */
@@ -62,16 +68,16 @@ typedef struct {
    os_taskqueue_t task_queue;
 
    /** Recursive locks count for owner
-       (it does not need to be sig_atomic_t since mutexes cannot be used in ISR
-       and also only the owner will change recusrive state) */
+    * (it does not need to be sig_atomic_t since only the owner task can change
+    * this value and using of mtx form ISR is forbidden */
    uint_fast8_t recur;
 
 } os_mtx_t;
 
 void os_mtx_create(os_mtx_t* mtx);
 void os_mtx_destroy(os_mtx_t* mtx);
-/**
-   Following function has return value which should be checked. The reason for this is mutex removal from other thread */
+/** Following function return value should always be checked. The reason for this
+ * is mutex removal from other thread */
 os_retcode_t OS_WARN_UNUSEDRET os_mtx_lock(os_mtx_t* mtx);
 void os_mtx_unlock(os_mtx_t* mtx);
 

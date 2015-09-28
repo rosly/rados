@@ -17,7 +17,7 @@
  *    may be used to endorse or promote products derived from this software without
  *    specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE RADOS PROJET AND CONTRIBUTORS "AS IS" AND
+ * THIS SOFTWARE IS PROVIDED BY THE RADOS PROJECT AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
  * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
@@ -150,7 +150,7 @@ int testcase_regresion(void)
 {
    /* regresion test - two tasks hanged on semaphore, higher prioritized with
     * timeout, once timeout expire signalize the semaphore to wake up the low
-    * prioritized, in case of bug low priority task will be not woken up becouse
+    * prioritized, in case of bug low priority task will be not woken up because
     * issing priomax update in task_queue */
    os_sem_create(&(worker_tasks[0].sem), 0);
    os_task_create(

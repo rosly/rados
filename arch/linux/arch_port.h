@@ -17,7 +17,7 @@
  *    may be used to endorse or promote products derived from this software without
  *    specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE RADOS PROJET AND CONTRIBUTORS "AS IS" AND
+ * THIS SOFTWARE IS PROVIDED BY THE RADOS PROJECT AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
  * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
@@ -138,7 +138,7 @@ extern sigset_t arch_crit_signals;
  - store all registers (power control bits does not have to be necessarly stored)
  - increment the isr_nesting
  - if isr_nesting is = 1 then
-    - store the context curr_tcb->ctx (may take benfit from allready stored
+    - store the context curr_tcb->ctx (may take benfit from already stored
       registers by storing only the stack pointer)
  - end
 
@@ -171,7 +171,7 @@ extern sigset_t arch_crit_signals;
  which is restoring the register context. */
 #define arch_contextstore_i(_isrName) \
     do { \
-      /* context of the task is allready saved on stack by linux kernel, so we
+      /* context of the task is already saved on stack by linux kernel, so we
        * can freely use C here (we wont destroy any regs) */ \
       if( 1 >= (++isr_nesting) ) { \
          /* here we copy the context prepared by linux kernel on current stack \

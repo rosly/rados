@@ -17,7 +17,7 @@
  *    may be used to endorse or promote products derived from this software without
  *    specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE RADOS PROJET AND CONTRIBUTORS "AS IS" AND
+ * THIS SOFTWARE IS PROVIDED BY THE RADOS PROJECT AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
  * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
@@ -76,9 +76,8 @@ int task_proc(void* param)
    while((counter[idx]) < TEST_CYCLES) {
       (counter[idx])++;
    }
-   /* check that second task was scheduled at least once while this task is
-    * still in working state, this will confirm that both tasks share the
-    * priority */
+   /* check that second task preempted this one. Such test will confirm that both
+    * tasks share the CPU time because of equal priorities */
    test_assert(0 != counter[(idx + 1) % 2]);
 
    return 0;
@@ -86,8 +85,8 @@ int task_proc(void* param)
 
 void test_init(void)
 {
-   /* 1ns tick should force almost flood of tick ISR on any arch */
-   /* but using 1ms for debuging */
+   /* it would be better to use 1ns tick since it can force "tick ISR flood" on any arch
+    * but using 1ms for easier debuging */
    test_setuptick(NULL, 1000000);
 
    os_task_create(&task1, 1, task1_stack, sizeof(task1_stack), task_proc, (void*)0);

@@ -17,7 +17,7 @@
  *    may be used to endorse or promote products derived from this software without
  *    specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE RADOS PROJET AND CONTRIBUTORS "AS IS" AND
+ * THIS SOFTWARE IS PROVIDED BY THE RADOS PROJECT AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
  * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
@@ -37,7 +37,7 @@ typedef struct os_sem_tag {
    os_taskqueue_t task_queue;
 
    /* Semaphore value (initialiy it was uint_fast8_t but os_atomic_t is the only
-    * sfe type here, becouse semaphores can be incremented from ISR) */
+    * sfe type here, because semaphores can be incremented from ISR) */
    os_atomic_t value;
 } os_sem_t;
 

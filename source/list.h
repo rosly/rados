@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is a part of RadOs project
  * Copyright (c) 2013, Radoslaw Biernaki <radoslaw.biernacki@gmail.com>
  * All rights reserved.
@@ -17,7 +17,7 @@
  *    may be used to endorse or promote products derived from this software without
  *    specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE RADOS PROJET AND CONTRIBUTORS "AS IS" AND
+ * THIS SOFTWARE IS PROVIDED BY THE RADOS PROJECT AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
  * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
@@ -31,6 +31,8 @@
 
 #ifndef __LIST_H_
 #define __LIST_H_ 1
+
+/* --- public structures --- */
 
 /*
  * Extra fast implementation of doubly linked list
@@ -46,6 +48,33 @@ typedef struct _listprio_t {
 	unsigned short prio;
 } listprio_t;
 
+/* --- private functions --- */
+
+/*
+ * Insert a new element between the two adjacent elements 'prev' and 'next'.
+ * Internal function.
+ */
+static inline void __list_put_in_between (
+	list_t *elem, list_t *left, list_t *right)
+{
+	right->prev = elem;
+	elem->next = right;
+	elem->prev = left;
+	left->next = elem;
+}
+
+/*
+ * Connect two elements together, thus removing all elements in between.
+ * Internal function.
+ */
+static inline void __list_connect_together (list_t *left, list_t *right)
+{
+	right->prev = left;
+	left->next = right;
+}
+
+/* --- public functions --- */
+
 /*
  * Initialize an empty list, or an unlinked element.
  * Both pointers are linked to the list header itself.
@@ -57,33 +86,10 @@ static inline void list_init (list_t *l)
 }
 
 /*
- * Insert a new element between the two neigbour elements 'prev' and 'next'.
- * Internal function.
- */
-static inline void __list_put_in_between (list_t *elem, list_t *left, list_t *right)
-{
-	right->prev = elem;
-	elem->next = right;
-	elem->prev = left;
-	left->next = elem;
-}
-
-/*
- * Connect two elements together, thus removing all in between.
- * Internal function.
- */
-static inline void __list_connect_together (list_t *left, list_t *right)
-{
-	right->prev = left;
-	left->next = right;
-}
-
-/*
- * Insert an element at the begginning of the list.
+ * Insert an element at the begin of the list.
  */
 static inline void list_prepend (list_t *l, list_t *elem)
 {
-	//__list_connect_together (elem->prev, elem->next);
 	__list_put_in_between (elem, l, l->next);
 }
 
@@ -92,19 +98,16 @@ static inline void list_prepend (list_t *l, list_t *elem)
  */
 static inline void list_append (list_t *l, list_t *elem)
 {
-	//__list_connect_together (elem->prev, elem->next);
 	__list_put_in_between (elem, l->prev, l);
 }
 
 static inline void list_put_after(list_t *itr, list_t *ele)
 {
-   //__list_connect_together (ele->prev, ele->next);
    __list_put_in_between (ele, itr, itr->next);
 }
 
 static inline void list_put_before(list_t *itr, list_t *ele)
 {
-   //__list_connect_together (ele->prev, ele->next);
    __list_put_in_between (ele, itr->prev, itr);
 }
 
@@ -127,7 +130,7 @@ static inline bool list_is_empty(const list_t *l)
 
 
 /**
- * Initialzes the itr for iteration, it should be used in conjuction to list_itr_end
+ * Initializes the "itr" for iteration, it should be used in conjunction to list_itr_end
  * Do not use in other cases, it is important to not mistake this function with list_peekfirst */
 static inline list_t *list_itr_begin(const list_t *l)
 {
@@ -161,7 +164,7 @@ static inline list_t *list_detachfirst (const list_t *l)
 {
    list_t *elem = l->next;
    if( elem == l ) {
-      return NULL; /* means list is empty, check similarity to list_is_empty */
+      return NULL; /* means list is empty */
    }
    __list_connect_together(elem->prev, elem->next);
    list_init (elem);
@@ -169,7 +172,7 @@ static inline list_t *list_detachfirst (const list_t *l)
 }
 
 /*
- * Adds the element to the prio list i proper place which will sustain the sorting order
+ * Adds the element to the prio list in proper place which will sustain the sorting order
  * In case of multiple elements with the same prio, it will be added at the end of
  * the block of those elements
  */
@@ -191,11 +194,11 @@ static inline listprio_t *listprio_detachfirst(const listprio_t *l)
 {
    list_t *elem = l->list.next;
    if( elem == (list_t*)l ) {
-      return NULL; /* means list is empty, check similarity to list_is_empty */
+      return NULL; /* means list is empty */
    }
    __list_connect_together (elem->prev, elem->next);
    list_init(elem);
-   return (listprio_t*)elem; /* list_t list is at begining of listprio_t */
+   return (listprio_t*)elem; /* list_t list is at begin of listprio_t */
 }
 
 #endif /* __LIST_H_ */

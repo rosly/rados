@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is a part of RadOs project
  * Copyright (c) 2013, Radoslaw Biernaki <radoslaw.biernacki@gmail.com>
  * All rights reserved.
@@ -17,7 +17,7 @@
  *    may be used to endorse or promote products derived from this software without
  *    specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE RADOS PROJET AND CONTRIBUTORS "AS IS" AND
+ * THIS SOFTWARE IS PROVIDED BY THE RADOS PROJECT AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
  * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
@@ -32,18 +32,73 @@
 #ifndef __OS_CONFIG_
 #define __OS_CONFIG_
 
-/* If defined the stack will be checked in some points to check for stack overflow */
-#define OS_CONFIG_CHECKSTACK (1) /**< Define this if you would like to check the tasks stack integrity, this requires a few additional resources (memory in os_task_t structure and CU at each stak check operation (may be quite expensive)), this define should be used during development while disabled before production if you are sure that your app does not exceed the assigned stacks */
-#define OS_CONFIG_APICHECK (1) /**< Define this if you would like to check the API calls and general system assumption, if defined while your application broke some of important rules you will have an assertion, if not defined while appliation broke some rules the behaviour is not defined, this define should be enabled durring the development to chech the application behaviour and removed during the production compilation to achiv maximal performance (but keep in minthat if you dont test your app deeply before you can encounter serious problems) */
-#define OS_CONFIG_SELFCHECKING (1) /**< Durring development is goot to enable selfchecking asserts, which verify the internal state of OS. It is easy to broke something or forgot about some constrains. Those checks are placed around the code to keep things more resonable */
-#define OS_CONFIG_PRIOCNT ((unsigned)4) /**< Maximal number of priorities, this number should be as low as possible, not larget than required for paticular application compleity, this is because number of priorities significantly increase the memory consumption. Each mutex, semaphore etc uses a os_taskqueue_t which require task buckets, in count of available priorities */
+/** Define OS_CONFIG_CHECKSTACK if you would like to check the tasks stack
+ * integrity. This requires a few additional resources (memory in os_task_t
+ * structure and CU at each stack check operation (may be quite expensive)), this
+ * define should be used during development while disabled for production if
+ * you are sure that your threads does not exceed assigned stacks */
+#define OS_CONFIG_CHECKSTACK (1)
 
-/* in future ;) */
-//#define OS_CONFIG_PREEMPTION (1) /**< Define if you whant to have preemption, disabling preemption can make kernel less featuread/responsive but should make it faster, this can be beneficial for some very onstrained enviroments where we dont have preemption at all */
-//#define OS_CONFIG_SEMAPHORE /**< Define if you whant to have mutexes */
-//#define OS_CONFIG_MUTEX /**< Define if you whant to have semaphores, keep in mind that semaphores is internaly used for task termination os_task_join call, if not defined os_task_join will return imidiately, this may change the bahaviour of aplication if it dont use semaphores explicitly bus use os_task_join call */
-//#define OS_CONFIG_TIMER /**< remove if you dont whant to use timers, keep in mind that this will also remove all timeguards for blocking primitives such semaphores, this can change the bahaviour of aplication if it dont use timers explicitly (eg not calling the os_timer_x functions but use timeouts on os_sem_x functions), this may same some code spae and also decrease the os_tick run time, may be beneficial os mome very constrained systems where we dont what to have the preemprion and timers while still use the scheduler for task switching */
+/** Define OS_CONFIG_APICHECK if you would like to check the API call parameters
+ * and general system assertions. If defined while your application broke some
+ * of OS rules you will have an assertion, if not defined while application
+ * broke some OS rules the behaviour and consequences are undefined, this define
+ * should be enabled during application development to verify the application
+ * behaviour and removed for the production compilation to achieve maximal
+ * performance */
+#define OS_CONFIG_APICHECK (1)
+
+/**< Define OS_CONFIG_SELFCHECKING to enable additional OS self checking
+ * asserts. In comparison to OS_CONFIG_APICHECK this enables additional internal
+ * OS state checks for implied rules. Those checks are placed around the OS code
+ * to check the constrains during OS development. This define should be enabled
+ * when developing the RadOS, this define does not have to be enabled for
+ * application development */
+#define OS_CONFIG_SELFCHECKING (1)
+
+/** Maximal number of priorities. This number should be as low as possible, this
+ * is because number of priorities significantly increase the memory consumption
+ * (by increasing the task buckets count). Each synchronization primitive such
+ * as mutex, semaphore etc. uses os_taskqueue_t which require task buckets */
+#define OS_CONFIG_PRIOCNT ((unsigned)4)
+
+/* --- in (not so distant) future ;) --- */
+
+/** Define to enable preemption. Disabling preemption can make kernel less
+ * responsive but should make it faster, this can be beneficial for some very
+ * constrained environments where we don't need preemption at all */
+//#define OS_CONFIG_PREEMPTION (1)
+
+/** Define to enable semaphores. Keep in mind that semaphores is internally
+ * used for os_task_join() call, if OS_CONFIG_SEMAPHORE is not defined
+ * os_task_join() will return immediately. This may change the behaviour of
+ * application even if it doesn't use semaphores explicitly but use
+ * os_task_join() call */
+//#define OS_CONFIG_SEMAPHORE
+
+/** Define to enable mutexes */
+//#define OS_CONFIG_MUTEX
+
+/** Define to enable recursive mutexes */
+//#define OS_CONFIG_MUTEX_RECURSIVE
+
+/** Define to enable priority inheritance for mutex */
+//#DEFINE OS_CONFIG_MUTEX_PRIO_INHERITANCE
+
+/** Define to enable timers. Keep in mind that timers are used for time guard's
+ * for blocking primitives such semaphores. This may change the behaviour of
+ * application even if it doesn't use timers explicitly (eg not calling the
+ * os_timer_x() functions but use timeouts on os_sem_x() functions). On the
+ * other hand disabling timers should save some code space and also decrease the
+ * os_tick() run time. This may be beneficial for some very constrained systems
+ * where we both preemption and timers are not needed while still using the
+ * scheduler for task switching */
+//#define OS_CONFIG_TIMER
+
+/** Define to enable wait queues (synchronization primitive) */
 //#define OS_CONFIG_WAITQUEUE
+
+/** Define to enable conditionals (synchronization primitive) */
 //#define OS_CONFG_CONDITIONAL
 
 #endif /* __OS_CONFIG_ */

@@ -17,7 +17,7 @@
  *    may be used to endorse or promote products derived from this software without
  *    specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE RADOS PROJET AND CONTRIBUTORS "AS IS" AND
+ * THIS SOFTWARE IS PROVIDED BY THE RADOS PROJECT AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
  * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
@@ -136,7 +136,7 @@ hi address
  - store all registers (power control bits does not have to be necessarly stored)
  - increment the isr_nesting
  - if isr_nesting is = 1 then
-    - store the context curr_tcb->ctx (may take benfit from allready stored registers by storing only the stack pointer)
+    - store the context curr_tcb->ctx (may take benfit from already stored registers by storing only the stack pointer)
  - end
 
  - in some near future down in the ISR enable interrupts to support the nesting interrupts

@@ -17,7 +17,7 @@
  *    may be used to endorse or promote products derived from this software without
  *    specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE RADOS PROJET AND CONTRIBUTORS "AS IS" AND
+ * THIS SOFTWARE IS PROVIDED BY THE RADOS PROJECT AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
  * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
@@ -51,10 +51,10 @@
    }while(0)
 
 /* need to be visiable for user because of arch_contextstore_i macros */
-extern os_task_t* task_current; 
+extern os_task_t* task_current;
 
 /* need to be visiable for user because of arch_contextstore_i macros */
-extern volatile os_atomic_t isr_nesting; 
+extern volatile os_atomic_t isr_nesting;
 
 #endif
 

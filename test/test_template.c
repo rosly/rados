@@ -17,7 +17,7 @@
  *    may be used to endorse or promote products derived from this software without
  *    specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE RADOS PROJET AND CONTRIBUTORS "AS IS" AND
+ * THIS SOFTWARE IS PROVIDED BY THE RADOS PROJECT AND CONTRIBUTORS "AS IS" AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
  * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
  * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
@@ -49,7 +49,7 @@ void sig_alrm(int signum, siginfo_t *siginfo, void *ucontext);
 static timer_t timer;
 
 /* test for OS port
-- test if task_procedure is called and if it can block on semaphore, test if idle procedure will be called (becouse of task block)
+- test if task_procedure is called and if it can block on semaphore, test if idle procedure will be called (because of task block)
 - create two tasks and two semaphores and test if task can be switched betwen each other while blocking on sem and signalizing the oposite, this will test if context swithichg is working
 - two task with endles loop, add timer ISR and call os_tick inside, task should switch during tiemr ISR
 - create two tasks and two semaphores, tasks should block on sem, the semaphores should be signalized by timer ISR, by driving the timer freq all tree types of switching may be tested, intresting case is when timer is generated eah CPU cycle (can be used to test the critical sections)

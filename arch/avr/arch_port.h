@@ -263,7 +263,7 @@ low address
  - store all registers (power control bits does not have to be necessarly stored)
  - increment the isr_nesting
  - if isr_nesting is = 1 then
-    - store the context curr_tcb->ctx (may take benfit from allready stored registers by storing only the stack pointer)
+    - store the context curr_tcb->ctx (may take benfit from already stored registers by storing only the stack pointer)
  - end
 
  - in some near future down in the ISR enable interrupts to support the nesting interrupts

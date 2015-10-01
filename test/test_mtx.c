@@ -159,7 +159,7 @@ int test_scen2_workerL(void* OS_UNUSED(param))
    /* take the ownership of mutex, as we would be owner of mtx H should boost
     * our prio during their lock for mtx */
    ret = os_mtx_lock(&test_mtx[0]);
-   test_assert(0 == ret );
+   test_assert(0 == ret);
 
    /* now signalize/wake up the H and M */
    /* following call will cause context switch to H and prio boost of this thread */
@@ -175,7 +175,7 @@ int test_scen2_workerL(void* OS_UNUSED(param))
     * verify values in test_atomic[0] and also exit the thread function. */
    os_mtx_unlock(&test_mtx[0]);
 
-   /* finaly after yet another context switch we should return here
+   /* finally after yet another context switch we should return here
     * verify that M finished thread function */
    test_assert(2 == test_atomic[0]);
 
@@ -185,23 +185,13 @@ int test_scen2_workerL(void* OS_UNUSED(param))
 /**
  * Test scenario:
  * Recursive priority inversion problem
- * Priority decrease/sustain while unlocking mutex
- * 4 tasks with 2 different prio H (top prio) M, LM, L (low prio)
- * H blocks on sem[0]
- * M is scheduled and locks the mtx[0] then blocks on sem[1]
- * LM is scheduled and locks the mtx[1] then tries to lock the mtx[0]
- * L is scheduled, it signalizes sem[1] (no context switch) and sem[0] which cause the context switch to H
- * H is scheduled, it tries to lock of mtx[1], this should cause the prio boost of LM but since it is locked also the prio boost of M
- * M is scheduled (not L, also LM is still blocked), chek the prio if it is the same as H, unlock the mtx[0], this will drop the prio to base and context will be switched to LM (since it has boosted prio)
- * LM is scheduled (it should have the prio of H, check it), unlock the mtx[0] (no context switch) and mtx[1] which will drop the prio to base and switch the context to H
- * H is scheduled, unlock the mtx[1] allow flag of L schedule test_result
- * if M is scheduled check if it has again the base prio test_result
- * if LM is scheduled, chek if it has again the base prio, test_result
- * if L is scheduled, check the scheduling alowance flag and prio (all should be base), test_result
+ * To not duplicate description of the problem please refer to Comment 2 in
+ * os_mtx.c
  *
- * the main point of the test it to check if priority boost is propagated through the blocking chain
- * L is not in blocking chain so it should not be sheduled until we allow for that (chedule allowance atom flag)
- * L and LM should have the bootsed prio for some time (check that by accessing their os_task_t)
+ * Task L locks only mtx2
+ * Task LN locks both mtx1 and mtx2
+ * Task H locks only mtx1
+ * Task M does not lock any mtx
  */
 int test_scen3_workerH(void* OS_UNUSED(param))
 {
@@ -211,14 +201,17 @@ int test_scen3_workerH(void* OS_UNUSED(param))
    ret = os_sem_down(&test_sem[0], OS_TIMEOUT_INFINITE);
    test_assert(0 == ret);
 
-   /* mtx[1] is already locked by M and LM, so if H will try to lock it both M and LM should get boosted prio, while H will lock on following operation */
-   ret = os_mtx_lock(&test_mtx[1]);
+   /* we should return here from L */
+   test_assert(5 == test_atomic[0]); /* verify the valid progress of test state */
+   test_atomic[0] = 6;
+
+   /* try to lock mtx0, this will preempt and switch to L */
+   ret = os_mtx_lock(&test_mtx[0]);
    test_assert(0 == ret);
 
-   /* when get here both M and LM already ended, L should not be scheduled until now,
-      signalize that L can be scheduled unlock the mtx[1] and test_result */
-   test_atomic[0] = 1;
-   os_mtx_unlock(&test_mtx[1]);
+   /* we should return here when LM will unlock mtx0 */
+   test_assert(10 == test_atomic[0]); /* verify the valid progress of test state */
+   test_atomic[0] = 11;
 
    return 0;
 }
@@ -227,23 +220,13 @@ int test_scen3_workerM(void* OS_UNUSED(param))
 {
    int ret;
 
-   /* lock the mtx1 */
-   ret = os_mtx_lock(&test_mtx[0]);
+   /* block on sem, allow L to progress */
+   ret = os_sem_down(&test_sem[0], OS_TIMEOUT_INFINITE);
    test_assert(0 == ret);
 
-   /* wait on sem2, context will be scheduled to LM */
-   ret = os_sem_down(&test_sem[1], OS_TIMEOUT_INFINITE);
-   test_assert(0 == ret);
-
-   /* if we get here it means that L signalized sem[1]
-      in mean time we should got boosted prio by H, check that */
-   test_assert(2 == task_worker[1].prio_current);
-
-   /* unlock the mtx[0], this will drop prio to base and ontext swith to LM (since it has higher, boosted prio by H) */
-   os_mtx_unlock(&test_mtx[0]);
-
-   /*chek if prio is again as base */
-   test_assert(1 == task_worker[1].prio_current);
+   /* we should return here when H will finish */
+   test_assert(11 == test_atomic[0]); /* verify the valid progress of test state */
+   test_atomic[0] = 12;
 
    return 0;
 }
@@ -252,43 +235,94 @@ int test_scen3_workerLM(void* OS_UNUSED(param))
 {
    int ret;
 
-   /* lock the mtx1 then mtx0 (second will switch the context to L)*/
-   ret = os_mtx_lock(&test_mtx[1]);
+   /* block on sem, allow LM and L to progress */
+   ret = os_sem_down(&test_sem[1], OS_TIMEOUT_INFINITE);
    test_assert(0 == ret);
+
+   test_assert(2 == test_atomic[0]); /* verify the valid progress of test state */
+   test_atomic[0] = 3;
+
+   /* lock the mtx0 then mtx1 (second will switch the context to L)*/
    ret = os_mtx_lock(&test_mtx[0]);
    test_assert(0 == ret);
+   test_assert(3 == test_atomic[0]); /* verify the valid progress of test state */
+   test_atomic[0] = 4;
+   ret = os_mtx_lock(&test_mtx[1]);
+   test_assert(0 == ret);
 
-   /* if we get here it means that M unlocked mtx[0] a it has the base prio
-      while this LM should have the boosted prio (check both mentioned conditions) */
-   test_assert(1 == task_worker[1].prio_current);
-   test_assert(2 == task_worker[2].prio_current);
+   /* we should return here when L will unlock mtx1 */
+   test_assert(8 == test_atomic[0]); /* verify the valid progress of test state */
+   test_atomic[0] = 9;
+   /* also this means that LM should still have p(H) */
+   test_assert(4 == task_worker[2].prio_current);
+   /* while L should have its original prio */
+   test_assert(1 == task_worker[3].prio_current);
 
-   /* unlock the mtx[0], no context switch no prio drop (check) */
-   os_mtx_unlock(&test_mtx[0]);
-   test_assert(2 == task_worker[2].prio_current);
-   /* unlock the mtx[1], prio drop and context switch to H*/
+   /* unlock mtx1 and mtx0, last one should cause switch to H */
    os_mtx_unlock(&test_mtx[1]);
-   test_assert(1 == task_worker[2].prio_current);
+   /* no context switch */
+   test_assert(9 == test_atomic[0]); /* verify the valid progress of test state */
+   test_atomic[0] = 10;
+   os_mtx_unlock(&test_mtx[0]);
+
+   /* we should return here when H and M will finish */
+   test_assert(12 == test_atomic[0]); /* verify the valid progress of test state */
+   test_atomic[0] = 13;
+   /* also this means that LM should have original prio */
+   test_assert(2 == task_worker[2].prio_current);
 
    return 0;
 }
 
 int test_scen3_workerL(void* OS_UNUSED(param))
 {
-   /* signalizes sem[1] (no context switch) and sem[0] which cause the context switch to H */
-   os_sem_up(&test_sem[1]);
-   os_sem_up(&test_sem[0]);
+   int ret;
 
-   /* check if L could be scheduled then test_result */
-   test_assert(1 ==  test_atomic[0]);
+   test_assert(0 == test_atomic[0]); /* verify the valid progress of test state */
+   test_atomic[0] = 1;
+
+   /* lock mtx2, switch to Idle and then to LM */
+   ret = os_mtx_lock(&test_mtx[1]);
+   test_assert(0 == ret);
+
+   test_assert(1 == test_atomic[0]); /* verify the valid progress of test state */
    test_atomic[0] = 2;
 
-   return 0;
-}
+   /* switch context to LM */
+   os_sem_up(&test_sem[1]);
 
-int test_deadlock_workerA(void* OS_UNUSED(param))
-{
-   test_assert(0);
+   /* we will return here when LM will lock on mtx1 */
+   test_assert(4 == test_atomic[0]); /* verify the valid progress of test state */
+   test_atomic[0] = 5;
+   /* also this means that L should now have p(LM) */
+   test_assert(2 == task_worker[3].prio_current);
+
+   /* switch context to LM */
+   os_sem_up(&test_sem[0]);
+
+   /* we will return here when H will lock on mtx1 */
+   test_assert(6 == test_atomic[0]); /* verify the valid progress of test state */
+   test_atomic[0] = 7;
+   /* also this means that L should now have p(H) and LM also should have p(H) */
+   test_assert(4 == task_worker[2].prio_current);
+   test_assert(4 == task_worker[3].prio_current);
+
+   /* try to woke up the M but this should not cause context switch */
+   os_sem_up(&test_sem[0]);
+
+   test_assert(7 == test_atomic[0]); /* verify the valid progress of test state */
+   test_atomic[0] = 8;
+
+   /* release mtx2, whis should cause switch to LM */
+   os_mtx_unlock(&test_mtx[1]);
+
+   /* we will return here when all task will finish */
+   test_assert(13 == test_atomic[0]); /* verify the valid progress of test state */
+   test_atomic[0] = 14;
+   /* also this means that L should now have original prio */
+   test_assert(1 == task_worker[3].prio_current);
+
+   return 0;
 }
 
 /**
@@ -351,7 +385,7 @@ int test_coordinator(void* OS_UNUSED(param))
    {
       /* created task will be not scheduled because current task has the highest available priority */
       os_task_create(
-         &task_worker[i], (0 == i) ? 2 : 1,
+         &task_worker[i], OS_CONFIG_PRIOCNT - 1 - i,
          task_stack[i], sizeof(task_stack[i]),
          scen3_worker_proc[i], (void*)(long)i);
    }
@@ -360,7 +394,7 @@ int test_coordinator(void* OS_UNUSED(param))
    {
       os_task_join(&task_worker[i]);
    }
-   test_assert(2 == test_atomic[0]); /* check if D was scheduled in time */
+   test_assert(14 == test_atomic[0]);
 
    test_result(0);
    return 0;

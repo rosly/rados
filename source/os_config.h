@@ -60,30 +60,39 @@
  * is because number of priorities significantly increase the memory consumption
  * (by increasing the task buckets count). Each synchronization primitive such
  * as mutex, semaphore etc. uses os_taskqueue_t which require task buckets */
-#define OS_CONFIG_PRIOCNT ((unsigned)4)
-
-/* --- in (not so distant) future ;) --- */
+#define OS_CONFIG_PRIOCNT ((unsigned)5)
 
 /** Define to enable preemption. Disabling preemption can make kernel less
  * responsive but should make it faster, this can be beneficial for some very
  * constrained environments where we don't need preemption at all */
-//#define OS_CONFIG_PREEMPTION (1)
+//TBD #define OS_CONFIG_PREEMPTION (1)
 
 /** Define to enable semaphores. Keep in mind that semaphores is internally
  * used for os_task_join() call, if OS_CONFIG_SEMAPHORE is not defined
  * os_task_join() will return immediately. This may change the behaviour of
  * application even if it doesn't use semaphores explicitly but use
  * os_task_join() call */
-//#define OS_CONFIG_SEMAPHORE
+//TBD #define OS_CONFIG_SEMAPHORE
 
 /** Define to enable mutexes */
-//#define OS_CONFIG_MUTEX
+//TBD #define OS_CONFIG_MUTEX
 
 /** Define to enable recursive mutexes */
-//#define OS_CONFIG_MUTEX_RECURSIVE
+//TBD #define OS_CONFIG_MUTEX_RECURSIVE
 
 /** Define to enable priority inheritance for mutex */
-//#DEFINE OS_CONFIG_MUTEX_PRIO_INHERITANCE
+#define OS_CONFIG_MUTEX_PRIO_INHERITANCE
+
+/** Define to enable optimization of priority inheritance code during
+ * os_mtx_unlock(). This define is effective only when priority inheritance was
+ * enabled by OS_CONFIG_MUTEX_PRIO_INHERITANCE. If defined than thread will keep
+ * boosted priority until last mtx held by this thread would be unlocked. It
+ * will also enable the assertion for checking if the unlock sequence is really
+ * a reverse locking sequence (asserts can still be disabled by un-defining
+ * OS_CONFIG_API_CHECK). If not defined than os_mtx_unlock() will recalculate
+ * the dynamic priority of the thread with usage of recursive algorithm which
+ * worst complexity is O(n) where n is number of mutexes in the system */
+#define OS_CONFIG_MUTEX_REV_UNLOCK_SEQ
 
 /** Define to enable timers. Keep in mind that timers are used for time guard's
  * for blocking primitives such semaphores. This may change the behaviour of
@@ -93,13 +102,13 @@
  * os_tick() run time. This may be beneficial for some very constrained systems
  * where we both preemption and timers are not needed while still using the
  * scheduler for task switching */
-//#define OS_CONFIG_TIMER
+//TBD #define OS_CONFIG_TIMER
 
 /** Define to enable wait queues (synchronization primitive) */
-//#define OS_CONFIG_WAITQUEUE
+//TBD #define OS_CONFIG_WAITQUEUE
 
 /** Define to enable conditionals (synchronization primitive) */
-//#define OS_CONFG_CONDITIONAL
+//TBD #define OS_CONFG_CONDITIONAL
 
 #endif /* __OS_CONFIG_ */
 

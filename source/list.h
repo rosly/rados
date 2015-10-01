@@ -172,6 +172,18 @@ static inline list_t *list_detachfirst (const list_t *l)
 }
 
 /*
+ * Get the first list item.
+ */
+static inline list_t *list_peeklast (const list_t *l)
+{
+   if( l->prev == l ) {
+      return NULL;
+   } else {
+	return l->prev;
+   }
+}
+
+/*
  * Adds the element to the prio list in proper place which will sustain the sorting order
  * In case of multiple elements with the same prio, it will be added at the end of
  * the block of those elements

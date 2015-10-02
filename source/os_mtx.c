@@ -51,7 +51,7 @@ static inline void os_mtx_clear_owner(os_mtx_t *mtx)
    list_unlink(&(mtx->listh));
 }
 
-static void mtx_unlock_prio_reset(os_mtx_t *mtx)
+static void mtx_unlock_prio_reset(void)
 {
 
    if (task_current->prio_current != task_current->prio_base)
@@ -65,8 +65,6 @@ static void mtx_unlock_prio_reset(os_mtx_t *mtx)
       if (list_is_empty(&task_current->mtx_list)) {
 	      task_current->prio_current = task_current->prio_base;
       }
-      /* mtx parameter unused - silent the compiler */
-      mtx = mtx;
 #else
       /* In case unlocking sequence is not guaranteed to be reversed locking
        * sequence, calculation of new priority is quite complicated since we may
@@ -76,9 +74,10 @@ static void mtx_unlock_prio_reset(os_mtx_t *mtx)
        * We need to iterate over all mtx held by this thread and new prio will
        * be the max(p(wating_task)).  Following code is the same in concept as
        * code in os_mtx_lock() */
-      uint_fast8_t prio_new;
+      os_task_t *task;
       list_t *itr;
       os_mtx_t *itr_mtx;
+      uint_fast8_t prio_new;
 
       /* new prio will be not less than prio_base of the task */
       prio_new = task_current->prio_base;
@@ -90,7 +89,15 @@ static void mtx_unlock_prio_reset(os_mtx_t *mtx)
          itr_mtx = os_container_of(itr, os_mtx_t, listh);
 	 /* peek (not dequeue) top prio task that waits for this mtx */
 	 task = os_task_peekqueue(&(itr_mtx->task_queue));
-	 prio_new = os_max(prio_new, task->prio_current); /* take bigger from two */
+	 if (task) {
+		 /* os_max() means take bigger from two. It is important that we use
+		  * task->prio_current not task->prio_base since we would like to
+		  * include nested lock dependency. Therefore if some task has inherited
+		  * priority due lock dependency and waits for mtx which we still own,
+		  * we would like to also inherit this priority (not only inherit the
+		  * base priority of this task) */
+		 prio_new = os_max(prio_new, task->prio_current);
+	 }
 	 itr = itr->next; /* advance to next mtx on list */
       }
 
@@ -128,7 +135,7 @@ void os_mtx_destroy(os_mtx_t* mtx)
       /* set the mtx state as unlocked (remove ownership) */
       os_mtx_clear_owner(mtx);
       /* recalculate the prio of owner */
-      mtx_unlock_prio_reset(mtx);
+      mtx_unlock_prio_reset();
 
       /* wake up all tasks from mtx->task_queue */
       while( NULL != (task = os_task_dequeue(&(mtx->task_queue))) ) {
@@ -238,7 +245,7 @@ void os_mtx_unlock(os_mtx_t* mtx)
 #ifdef OS_CONFIG_MUTEX_PRIO_INHERITANCE
       /* before os_schedule we need to check if task_current does not have the
        * priority boosted and revert it to original priority if needed */
-      mtx_unlock_prio_reset(mtx);
+      mtx_unlock_prio_reset();
 #endif
 
       /* since we unlocking the mtx we need to transfer the ownership to top

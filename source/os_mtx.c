@@ -65,7 +65,8 @@ static void mtx_unlock_prio_reset(void)
        * boost calculated in os_mutex_lock() (the highest priority of any
        * waiting thread of the owned mtx) */
       if (list_is_empty(&task_current->mtx_list)) {
-	      task_current->prio_current = task_current->prio_base;
+         /* since task_current is RUNNING we can just modify prio_current */
+         task_current->prio_current = task_current->prio_base;
       }
 #else
       /* In case unlocking order is not guaranteed to be reversed locking
@@ -103,7 +104,8 @@ static void mtx_unlock_prio_reset(void)
 	 itr = itr->next; /* advance to next mtx on list */
       }
 
-      /* apply newly calculated prio */
+      /* apply newly calculated prio
+       * since task_current is RUNNING we can just modify prio_current */
       task_current->prio_current = prio_new;
 #endif
    }
@@ -189,10 +191,11 @@ os_retcode_t OS_WARN_UNUSEDRET os_mtx_lock(os_mtx_t* mtx)
 
          task = mtx->owner;
          while(1) {
+            uint_fast8_t prio_new;
 
-            /* boost the prio of task which hold mtx and blocks the task_current */
-            task->prio_current = os_max(task_current->prio_current,
-                                        task->prio_current);
+            /* boost the prio of task which hold mtx */
+            prio_new = os_max(task_current->prio_current, task->prio_current);
+            os_task_reprio(task, prio_new);
 
 	    /* in case such task is also blocked on mtx, go down into the
 	     * blocking chain boost the prio of their blockers */

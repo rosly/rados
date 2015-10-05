@@ -137,6 +137,7 @@ volatile os_atomic_t sched_lock; /* visiable only for os files, not for user */
 
 void OS_HOT os_task_enqueue(os_taskqueue_t* task_queue, os_task_t* task);
 void OS_HOT os_task_unlink(os_task_t* OS_RESTRICT task);
+void OS_HOT os_task_reprio( os_task_t* task, uint_fast8_t new_prio);
 os_task_t* OS_HOT os_task_dequeue(os_taskqueue_t* task_queue);
 os_task_t* OS_HOT os_task_dequeue_prio(os_taskqueue_t* task_queue, uint_fast8_t prio);
 os_task_t* OS_HOT os_task_peekqueue(os_taskqueue_t* OS_RESTRICT task_queue);

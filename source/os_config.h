@@ -92,7 +92,7 @@
  * OS_CONFIG_API_CHECK). If not defined than os_mtx_unlock() will recalculate
  * the dynamic priority of the thread with usage of recursive algorithm which
  * worst complexity is O(n) where n is number of mutexes in the system */
-#define OS_CONFIG_MUTEX_REV_UNLOCK_ORDER
+//#define OS_CONFIG_MUTEX_REV_UNLOCK_ORDER
 
 /** Define to enable timers. Keep in mind that timers are used for time guard's
  * for blocking primitives such semaphores. This may change the behaviour of

@@ -208,11 +208,11 @@ void OS_HOT os_task_enqueue(
 }
 
 /**
- *  Function realculate the priomax inside task_queue after task unlink
+ *  Function recalculates the priomax inside task_queue after task unlink
  *  operation.Function does not unlink the task! this must be done before
  *  calling this function
  */
-void OS_HOT os_task_queue_reprio(os_taskqueue_t* OS_RESTRICT task_queue)
+void OS_HOT os_taskqueue_remax(os_taskqueue_t* OS_RESTRICT task_queue)
 {
    while( (0 != (task_queue->priomax)) &&
           list_is_empty(&(task_queue->tasks[task_queue->priomax]))) {
@@ -228,8 +228,31 @@ void OS_HOT os_task_queue_reprio(os_taskqueue_t* OS_RESTRICT task_queue)
 void OS_HOT os_task_unlink(os_task_t* OS_RESTRICT task)
 {
    list_unlink(&(task->list));
-   os_task_queue_reprio(task->task_queue);
+   os_taskqueue_remax(task->task_queue);
    task->task_queue = NULL;
+}
+
+void OS_HOT os_task_reprio(
+   os_task_t* task,
+   uint_fast8_t new_prio)
+{
+   os_taskqueue_t *task_queue;
+
+   /* TODO following code is slow since we recalculate priomax twice
+    * this remax() should be replaced with bitfield algorithm which would allow
+    * to calculate the new priomax with single CPU cycle (at least on some
+    * machines) */
+
+   /* check if we really change the prio so we do not unnecessarily change the
+    * order of waiting tasks */
+   if (task->prio_current != new_prio) {
+      task_queue = task->task_queue;
+      task->prio_current = new_prio;
+      if (task_queue) {
+         os_task_unlink(task);
+         os_task_enqueue(task_queue, task);
+      }
+   }
 }
 
 /**
@@ -244,7 +267,7 @@ os_task_t* OS_HOT os_task_dequeue(os_taskqueue_t* OS_RESTRICT task_queue)
       return NULL;
    }
    os_task_t *task = os_container_of(list, os_task_t, list);
-   os_task_queue_reprio(task_queue);
+   os_taskqueue_remax(task_queue);
    task->task_queue = NULL;
    return task;
 }

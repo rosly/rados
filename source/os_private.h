@@ -30,9 +30,9 @@
  */
 
 /* This file  contains all definitions used by various kernel modules which
-   cannot be exposed for user view (in other words they are shared betwen kernel
+   cannot be exposed for user view (in other words they are shared between kernel
    modules). Those definitions can be used only by the internal kernel code
-   (similarity to private class clausule in C++)*/
+   (similarity to private class clause in C++)*/
 
 #ifndef __OS_PRIVATE_
 #define __OS_PRIVATE_

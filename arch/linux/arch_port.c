@@ -67,7 +67,7 @@ void arch_os_start(void)
    OS_ASSERT(0 == ret);
 
    /* setup the signal disposition for SIGUSR1, to call arch_sig_switch */
-   ret = sigfillset(&sigmask_all); /* we forbid the signal nesting while handling SIGUSR1, we cannot be interupted while handling SIGUSR1 or it will break everything */ 
+   ret = sigfillset(&sigmask_all); /* we forbid the signal nesting while handling SIGUSR1, we cannot be interupted while handling SIGUSR1 or it will break everything */
    OS_ASSERT(0 == ret);
    switch_sigaction.sa_mask = sigmask_all;
    ret = sigaction(SIGUSR1, &switch_sigaction, NULL);
@@ -125,7 +125,7 @@ void OS_NORETURN OS_COLD arch_halt(void)
 {
    while(1) {
       raise(SIGABRT);
-      exit(-1); /* signalize error bail out */
+      abort();
    }
 }
 

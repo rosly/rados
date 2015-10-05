@@ -44,8 +44,10 @@ static inline void os_mtx_set_owner(os_mtx_t *mtx, os_task_t *task)
 
 static inline void os_mtx_clear_owner(os_mtx_t *mtx)
 {
-#ifdef OS_CONFIG_MUTEX_REV_UNLOCK_SEQUENCE
-   OS_ASSERT(list_peeklast(&mtx->owner->mtx_list) == mtx);
+#ifdef OS_CONFIG_MUTEX_REV_UNLOCK_ORDER
+   os_mtx_t *last_mtx =
+      os_container_of(list_peeklast(&mtx->owner->mtx_list), os_mtx_t, listh);
+   OS_ASSERT(last_mtx == mtx);
 #endif
    mtx->owner = NULL;
    list_unlink(&(mtx->listh));
@@ -56,8 +58,8 @@ static void mtx_unlock_prio_reset(void)
 
    if (task_current->prio_current != task_current->prio_base)
    {
-#ifdef OS_CONFIG_MUTEX_REV_UNLOCK_SEQ
-      /* since unlock sequence is guaranteed to be the same as locking sequence
+#ifdef OS_CONFIG_MUTEX_REV_UNLOCK_ORDER
+      /* since unlock order is guaranteed to be the reversed to locking order
        * we may simply postpone the priority reset to point where thread
        * releases the last lock. Before that point it should keep the priority
        * boost calculated in os_mutex_lock() (the highest priority of any
@@ -66,8 +68,8 @@ static void mtx_unlock_prio_reset(void)
 	      task_current->prio_current = task_current->prio_base;
       }
 #else
-      /* In case unlocking sequence is not guaranteed to be reversed locking
-       * sequence, calculation of new priority is quite complicated since we may
+      /* In case unlocking order is not guaranteed to be reversed locking
+       * order, calculation of new priority is quite complicated since we may
        * have been boosted because
        * 1) some nested dependency
        * 2) different mtx that this thread owns

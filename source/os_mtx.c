@@ -52,13 +52,14 @@ static inline void os_mtx_clear_owner(os_mtx_t *mtx)
 static void os_mtx_lock_prio_boost(os_mtx_t *mtx)
 {
    /* check for priority inversion precondition */
-   if( mtx->owner->prio_current < task_current->prio_current )
+   if (mtx->owner->prio_current < task_current->prio_current)
    {
       /* perform priority inheritance, why we use loop here ? see comment 2 */
       os_task_t *task;
 
       task = mtx->owner;
-      while(1) {
+      while (1)
+      {
          uint_fast8_t prio_new;
 
          /* boost the prio of task which hold mtx */
@@ -67,11 +68,11 @@ static void os_mtx_lock_prio_boost(os_mtx_t *mtx)
 
          /* in case such task is also blocked on mtx, go down into the
           * blocking chain boost the prio of their blockers */
-         if( (TASKSTATE_WAIT == task->state) &&
-             (OS_TASKBLOCK_MTX == task->block_type) )
+         if ((TASKSTATE_WAIT == task->state) &&
+             (OS_TASKBLOCK_MTX == task->block_type))
          {
             /* because (OS_TASKBLOCK_MTX == task->block_type), task->task_queue
-     	* points into os_mtx_t->task_queue */
+             * points into os_mtx_t->task_queue */
             task = os_container_of(
                task->task_queue, os_mtx_t, task_queue)->owner;
             continue;
@@ -104,21 +105,21 @@ static void os_mtx_unlock_prio_reset(void)
 
       /* iterate owner mtx list which this task owns */
       itr = list_itr_begin(&(task_current->mtx_list));
-      while( false == list_itr_end(&(task_current->mtx_list), itr) )
+      while (false == list_itr_end(&(task_current->mtx_list), itr))
       {
          itr_mtx = os_container_of(itr, os_mtx_t, listh);
-	 /* peek (not dequeue) top prio task that waits for this mtx */
-	 task = os_task_peekqueue(&(itr_mtx->task_queue));
-	 if (task) {
-		 /* os_max() means take bigger from two. It is important that we use
-		  * task->prio_current not task->prio_base since we would like to
-		  * include nested lock dependency. Therefore if some task has inherited
-		  * priority due lock dependency and waits for mtx which we still own,
-		  * we would like to also inherit this priority (not only inherit the
-		  * base priority of this task) */
-		 prio_new = os_max(prio_new, task->prio_current);
-	 }
-	 itr = itr->next; /* advance to next mtx on list */
+         /* peek (not dequeue) top prio task that waits for this mtx */
+         task = os_task_peekqueue(&(itr_mtx->task_queue));
+         if (task) {
+            /* os_max() means take bigger from two. It is important that we use
+             * task->prio_current not task->prio_base since we would like to
+             * include nested lock dependency. Therefore if some task has inherited
+             * priority due lock dependency and waits for mtx which we still own,
+             * we would like to also inherit this priority (not only inherit the
+             * base priority of this task) */
+            prio_new = os_max(prio_new, task->prio_current);
+         }
+         itr = itr->next; /* advance to next mtx on list */
       }
 
       /* apply newly calculated prio
@@ -162,7 +163,8 @@ void os_mtx_destroy(os_mtx_t* mtx)
 #endif
 
       /* wake up all tasks from mtx->task_queue */
-      while( NULL != (task = os_task_dequeue(&(mtx->task_queue))) ) {
+      while (NULL != (task = os_task_dequeue(&(mtx->task_queue))))
+      {
          task->block_code = OS_DESTROYED;
          os_task_makeready(task);
       }
@@ -185,18 +187,18 @@ os_retcode_t OS_WARN_UNUSEDRET os_mtx_lock(os_mtx_t* mtx)
    arch_critical_enter(cristate);
    do
    {
-      if( NULL == mtx->owner )
+      if (NULL == mtx->owner)
       {
-	 /* mutex unlocked, lock and take ownership */
+    /* mutex unlocked, lock and take ownership */
          os_mtx_set_owner(mtx, task_current);
          ret = OS_OK;
          break;
       }
 
       /* mutex is locked, check if locked by current task */
-      if( mtx->owner == task_current )
+      if (mtx->owner == task_current)
       {
-	 /* current task is the owner, just increase the recursion level */
+    /* current task is the owner, just increase the recursion level */
          ++(mtx->recur);
          ret = OS_OK;
          break;
@@ -217,7 +219,7 @@ os_retcode_t OS_WARN_UNUSEDRET os_mtx_lock(os_mtx_t* mtx)
        * os_mtx_unlock() by other task */
       ret = task_current->block_code;
 
-   }while(0);
+   } while (0);
    arch_critical_exit(cristate);
 
    return ret;
@@ -236,7 +238,7 @@ void os_mtx_unlock(os_mtx_t* mtx)
    {
       /* for recursive lock decrease the recursion level
        * break if still in recursion */
-      if( (--(mtx->recur)) > 0 )
+      if ((--(mtx->recur)) > 0)
          break;
 
       /* mtx not locked anymore, set the mtx state as unlocked (remove ownership) */
@@ -251,14 +253,14 @@ void os_mtx_unlock(os_mtx_t* mtx)
       /* since we unlocking the mtx we need to transfer the ownership to top
        * prio task which sleeps on this mtx. See comment 1 */
       task = os_task_dequeue(&(mtx->task_queue));
-      if( NULL != task )
+      if (NULL != task)
       {
          os_mtx_set_owner(mtx, task); /* lock and set ownership */
          task->block_code = OS_OK; /* set the block code to NORMAL WAKEUP */
          os_task_makeready(task);
          os_schedule(1); /* switch to ready task only when it has higher prio (1 as param) */
       }
-   }while(0);
+   } while (0);
    arch_critical_exit(cristate);
 }
 

@@ -39,13 +39,13 @@
  * Some ideas coming from Linux's source code.
  */
 typedef struct _list_t {
-	struct _list_t *next;
-	struct _list_t *prev;
+   struct _list_t *next;
+   struct _list_t *prev;
 } list_t;
 
 typedef struct _listprio_t {
-	list_t list;
-	unsigned short prio;
+   list_t list;
+   unsigned short prio;
 } listprio_t;
 
 /* --- private functions --- */
@@ -55,12 +55,12 @@ typedef struct _listprio_t {
  * Internal function.
  */
 static inline void __list_put_in_between (
-	list_t *elem, list_t *left, list_t *right)
+   list_t *elem, list_t *left, list_t *right)
 {
-	right->prev = elem;
-	elem->next = right;
-	elem->prev = left;
-	left->next = elem;
+   right->prev = elem;
+   elem->next = right;
+   elem->prev = left;
+   left->next = elem;
 }
 
 /*
@@ -69,8 +69,8 @@ static inline void __list_put_in_between (
  */
 static inline void __list_connect_together (list_t *left, list_t *right)
 {
-	right->prev = left;
-	left->next = right;
+   right->prev = left;
+   left->next = right;
 }
 
 /* --- public functions --- */
@@ -81,8 +81,8 @@ static inline void __list_connect_together (list_t *left, list_t *right)
  */
 static inline void list_init (list_t *l)
 {
-	l->next = l;
-	l->prev = l;
+   l->next = l;
+   l->prev = l;
 }
 
 /*
@@ -90,7 +90,7 @@ static inline void list_init (list_t *l)
  */
 static inline void list_prepend (list_t *l, list_t *elem)
 {
-	__list_put_in_between (elem, l, l->next);
+   __list_put_in_between (elem, l, l->next);
 }
 
 /*
@@ -98,7 +98,7 @@ static inline void list_prepend (list_t *l, list_t *elem)
  */
 static inline void list_append (list_t *l, list_t *elem)
 {
-	__list_put_in_between (elem, l->prev, l);
+   __list_put_in_between (elem, l->prev, l);
 }
 
 static inline void list_put_after(list_t *itr, list_t *ele)
@@ -116,8 +116,8 @@ static inline void list_put_before(list_t *itr, list_t *ele)
  */
 static inline void list_unlink (list_t *elem)
 {
-	__list_connect_together (elem->prev, elem->next);
-	list_init (elem);
+   __list_connect_together (elem->prev, elem->next);
+   list_init (elem);
 }
 
 /*
@@ -125,7 +125,7 @@ static inline void list_unlink (list_t *elem)
  */
 static inline bool list_is_empty(const list_t *l)
 {
-	return (l->next == l) ? true : false;
+   return (l->next == l) ? true : false;
 }
 
 
@@ -153,7 +153,7 @@ static inline list_t *list_peekfirst (const list_t *l)
    if( l->next == l ) {
       return NULL;
    } else {
-	return l->next;
+   return l->next;
    }
 }
 
@@ -179,7 +179,7 @@ static inline list_t *list_peeklast (const list_t *l)
    if( l->prev == l ) {
       return NULL;
    } else {
-	return l->prev;
+   return l->prev;
    }
 }
 

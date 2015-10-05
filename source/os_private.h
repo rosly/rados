@@ -29,10 +29,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* This file  contains all definitions used by various kernel modules which
-   cannot be exposed for user view (in other words they are shared between kernel
-   modules). Those definitions can be used only by the internal kernel code
-   (similarity to private class clause in C++)*/
+/* This file contains all definitions used by various kernel modules which
+ * cannot be exposed for user view */
 
 #ifndef __OS_PRIVATE_
 #define __OS_PRIVATE_
@@ -42,6 +40,7 @@
 /* --- OS macro definitions --- */
 
 #ifdef OS_CONFIG_APICHECK
+/** Macro checks for cases which may be exploited by invalid API parameters */
 #define OS_ASSERT(_cond) \
    do \
    { \
@@ -54,6 +53,8 @@
 #endif
 
 #ifdef OS_CONFIG_SELFCHECKING
+/** Macro verify internal OS state which is not directly dependent on API
+ * parameters */
 #define OS_SELFCHECK_ASSERT(_cond) \
    do \
    { \
@@ -66,35 +67,33 @@
 #endif
 
 /**
-* Common macro that allows to calculate pointer to parent,
-* from pointer to member, name of the member inside parent and parent object type
-* Using of temporary pointer _mptr is necessary to prevent macro side effects for
-* operands like pointer++
-*
-* @param _prt Pointer to member
-* @param _type Parent object type
-* @param _member Name of the member inside parent object
-*
-* @return Pointer to parent
-*/
+ * Common macro that allows to calculate pointer to parent,
+ * from pointer to member, name of the member inside parent and parent object
+ * type. Macro is protected from parameter side effects (like _member++)
+ *
+ * @param _prt Pointer to member
+ * @param _type Parent object type
+ * @param _member Name of the member inside parent object
+ *
+ * @return Pointer to parent
+ */
 #define os_container_of(_ptr, _type, _member) ({ \
    const typeof( ((_type *)0)->_member ) *_mptr = (_ptr); \
    (_type *)( (char *)_mptr - offsetof(_type,_member) );})
 
 /*
-* Common min macro with strict type-checking,
-* returns the smaller value from two operands
-*
-* Strict type checking in important aspect of secure code,
-* (sign type mixed checking is common source of exploitable bugs).
-* Using of temporary values is necessary to prevent macro side effects for
-* operands like variable++
-*
-* @param _x First value
-* @param _y Second value
-*
-* @return Smaller of two passed values
-*/
+ * Common min macro with strict type-checking,
+ * returns the smaller value from two operands
+ *
+ * Strict type checking in important aspect of secure code,
+ * (signed-unsigned type comparisons is common source of exploitable bugs).
+ * Macro is protected from parameter side effects (like _x++)
+ *
+ * @param _x First value
+ * @param _y Second value
+ *
+ * @return Smaller of two passed values
+ */
 #define os_min(_x, _y) ({ \
    typeof(_x) _min1 = (_x); \
    typeof(_y) _min2 = (_y); \
@@ -102,19 +101,18 @@
    _min1 < _min2 ? _min1 : _min2; })
 
 /*
-* Common max macro with strict type-checking,
-* returns the greater value from two operands
-*
-* Strict type checking in important aspect of secure code,
-* (sign type mixed checking is common source of exploitable bugs).
-* Using of temporary values is necessary to prevent macro side effects for
-* operands like variable++
-*
-* @param _x First value
-* @param _y Second value
-*
-* @return Greater of two passed values
-*/
+ * Common max macro with strict type-checking,
+ * returns the greater value from two operands
+ *
+ * Strict type checking in important aspect of secure code,
+ * (signed-unsigned type comparisons is common source of exploitable bugs).
+ * Macro is protected from parameter side effects (like _x++)
+ *
+ * @param _x First value
+ * @param _y Second value
+ *
+ * @return Greater of two passed values
+ */
 
 #define os_max(_x, _y) ({ \
    typeof(_x) _max1 = (_x); \
@@ -123,17 +121,18 @@
    _max1 > _max2 ? _max1 : _max2; })
 
 /**
-* Macro returns number of table elements
-*
-* @param _table Table pinter
-* @return Number of table elements, the return type is size_t
-*/
+ * Macro returns number of C array elements
+ *
+ * @param _table Array variable
+ * @return Number of table elements, the return type is size_t
+ */
 #define os_element_cnt(_table) (sizeof((_table)) / sizeof((_table)[0]))
 
 /* --- Scheduler section --- */
 
-os_taskqueue_t ready_queue; /* visiable only for os files, not for user */
-volatile os_atomic_t sched_lock; /* visiable only for os files, not for user */
+/* Variables visible only for OS files, not for user */
+os_taskqueue_t ready_queue;
+volatile os_atomic_t sched_lock;
 
 void OS_HOT os_task_enqueue(os_taskqueue_t* task_queue, os_task_t* task);
 void OS_HOT os_task_unlink(os_task_t* OS_RESTRICT task);
@@ -148,56 +147,58 @@ void OS_HOT os_block_andswitch(
    os_taskblock_t block_type);
 void os_task_exit(int retv);
 
-/* functions provided by arch port */
+/* --- Arch dependent functions prototypes --- */
 
 /** Architecture and platform dependent low level initialization
-  *
-  * This function is called from the inside of os_start() after idle task
-  * creation, but before it is started. This function should initialize remain
-  * resources which are needed for OS to run the idle task. In contrast to all
-  * platform dependent actions done in main (before calling os_start()), this
-  * function may interact with kernel internals (but not external API), since
-  * basic structures are initialized. Keep in mind that things like timer for
-  * ticks setup should be leaved up to app (user) so it will have more freedom
-  * while assigning HW resources for his app. Also this function cannot create
-  * tasks, mutexet ect, since this should be done in app_init()
-  * In general this function will be emply for most platforms, since all
-  * necessary preparations are usualy done in main, before calling os_start()
-  */
+ *
+ * This function is called from the inside of os_start() after idle task
+ * creation, but before it is started. This function should initialize remain
+ * resources which are needed for OS to run the idle task. In contrast to all
+ * platform dependent actions done in main (before calling os_start()), this
+ * function may interact with kernel internals (but not external API), since
+ * basic structures are initialized. Keep in mind that things like timer for
+ * ticks setup should be leaved up to app (user) so it will have more freedom
+ * while assigning HW resources for his app. Also this function cannot create
+ * tasks, mutexes ect, since this should be done in app_init()
+ * In general this function will be empty for most platforms, since all
+ * necessary preparations are usually done in main, before calling os_start()
+ */
 void arch_os_start(void);
 
-/* \note we dont mark arch_context_switch as OS_NAKED since not all arch use that */
+/* \note we don't mark arch_context_switch() as OS_NAKED since not all arch use that */
 void /* OS_NAKED */ OS_HOT arch_context_switch(os_task_t *new_task);
 void OS_NORETURN OS_COLD arch_halt(void);
 void arch_task_init(os_task_t *tcb, void* stack, size_t stack_size, os_taskproc_t proc, void* param);
 void arch_idle(void);
 
-/* this function blocks the preemptive scheduling
-   Take into account that interrupts are still enabled, while only the task switch will not be performed
-   Make sure that implementation changes the isr_nesting in atomic maner (same apply to arch_contextstore_i)
+/* --- OS private inline functions --- */
 
-   /note disabling the scheduler betwen two interrupts is save (atomic), because os_schedule is called in critical section, so if we are in interupt then we didnt break the execution of code protected by critical section */
+/**
+ * Blocks the preemptive scheduling
+ * Take into account that interrupts are still enabled, while only the task
+ * switch will not be performed.
+ *
+ * /note disabling the scheduler from interrupts is safe (atomic), because
+ * os_schedule() is called in critical section, so calling os_scheduler_lock()
+ * from interrupt will not interfere with code protected by critical section */
 static inline void os_scheduler_lock(void) {
    os_atomic_inc(sched_lock);
 }
 
 static inline void os_scheduler_unlock(void) {
    os_atomic_dec(sched_lock);
-   /* \TODO we should call os_schedule() external API here since we may be not
-    * in attomic section while it may be that we need to schedule task right
-    * away. The reason for that is that usualy os_scheduler_lock() was called
-    * for temporary locking in some critical section of user code, and that
-    * after unlock() we usualy should schedule(). This situation is for instance
-    * in os_start() where after creating idle task and unlocking the scheduler,
-    * any user task should be scheduled right away() (those created in
-    * app_init() */
+   /* TODO verify if we should not reschedule right after that. Usually locking
+    * scheduler is used to protect some user space critical section, so after
+    * exiting we might need reschedule(), or we should expose os_schedule() to
+    * user (if not yet done) */
 }
 
 static inline void os_task_makeready(os_task_t *task)
 {
    task->state = TASKSTATE_READY; /* set the task state */
-   if(NULL != task->wait_queue) {
-       /* in case task has assosiated wait_queue, add task to task_queue of
+   if (NULL != task->wait_queue)
+   {
+       /* in case task has associated wait_queue, add task to task_queue of
         * wait_queue assigned to this task */
       os_task_enqueue(&(task->wait_queue->task_queue), task);
    } else {
@@ -229,10 +230,11 @@ static inline void os_blocktimer_create(
 
 static inline void os_blocktimer_destroy(os_task_t *task)
 {
-   /* check if there is a timeout assosiated with task */
-   if( NULL != task->timer ) {
-     os_timer_destroy(task->timer);
-     task->timer = NULL;
+   /* check if there is a timeout associated with task */
+   if (NULL != task->timer)
+   {
+      os_timer_destroy(task->timer);
+      task->timer = NULL;
    }
 }
 

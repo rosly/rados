@@ -29,10 +29,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* This file contains all definitions used by various kernel modules which
-   has to be exposed for user view (from some reason). However those definitions
-   should be used only by the internal kernel code (similarity to procected
-   class clausule in C++) */
+/* This file contains all definitions used by various kernel modules which has
+ * to be exposed for user view (from some reason). Even if they are axposed for
+ * user those definitions are intended to be used only in internal OS code.
+ * They are exposed mainly because of OS API use them. */
 
 #ifndef __OS_PROTECTED_
 #define __OS_PROTECTED_
@@ -50,12 +50,12 @@
   enum { OS_CONCAT(static_assert_, __LINE__) = 1/(!!(_e)) }
 //char OS_CONCAT(static_assert_, __LINE__)[0 - 1*!(_e)];
 
-/** definition of system atomic value, it need to at least 8bits wide, unsigned */
+/** Definition of system atomic value, it need to at least 8bits wide, unsigned */
 typedef volatile arch_atomic_t os_atomic_t;
 OS_STATIC_ASSERT(ARCH_ATOMIC_MAX >= (UINT8_MAX - 1));
 #define OS_ATOMIC_MAX ARCH_ATOMIC_MAX
 
-/** definition of system tick, it is defined by arch but never can be smaller
+/** Definition of system tick, it is defined by arch but never can be smaller
  * than uint16_t */
 typedef arch_ticks_t os_ticks_t;
 OS_STATIC_ASSERT(sizeof(os_ticks_t) >= sizeof(uint16_t));

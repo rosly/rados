@@ -503,7 +503,22 @@ int test_scen4_workerL(void* OS_UNUSED(param))
    return 0;
 }
 
-#ifndef OS_CONFIG_MUTEX_REV_UNLOCK_ORDER
+/**
+ * Test scenario:
+ * This is regression test. Typical scenario of priority inversion with single
+ * mutex but L holds two of them (while only one is used for locking scheme).
+ * BUG root cause was that part of implementation assumed that L could hold the
+ * boosted prio until last mtx was unlocked. This in fact created priority
+ * inversion if only one mtx preventing H from going forward.  Here we try to
+ * lock H task on mtx owned by L which also owns other mtxs, then L unlocks the
+ * mtx and H should preempt.
+ *
+ * L locks mtx0 and mtx1
+ * H locks mtx1
+ * L unlock mtx1 (critical moment)
+ * We should see context switch to H even if L holds some other mtx
+ * additional check is that M should not be scheduled until H exits
+ */
 int test_scen5_workerH(void* OS_UNUSED(param))
 {
    int ret;
@@ -516,7 +531,7 @@ int test_scen5_workerH(void* OS_UNUSED(param))
    test_atomic[0] = 4;
 
    /* try to lock mtx0, we should switch to L */
-   ret = os_mtx_lock(&test_mtx[0]);
+   ret = os_mtx_lock(&test_mtx[1]);
    test_assert(0 == ret);
 
    /* we should now get mtx0 locked in L and we have mtx1 */
@@ -524,7 +539,7 @@ int test_scen5_workerH(void* OS_UNUSED(param))
    test_atomic[0] = 6;
 
    /* finish test we should switch to M */
-   os_mtx_unlock(&test_mtx[0]);
+   os_mtx_unlock(&test_mtx[1]);
    test_assert(6 == test_atomic[0]); /* verify the valid progress of test state */
    test_atomic[0] = 7;
 
@@ -575,9 +590,110 @@ int test_scen5_workerL(void* OS_UNUSED(param))
    test_assert(4 == test_atomic[0]); /* verify the valid progress of test state */
    test_atomic[0] = 5;
 
-   /* unlock mtx1 which will create situation when we release mtx in the same
-    * order as we lock them, in properly implemented priority inversion this
-    * should wake up the thread H */
+   /* unlock mtx1. In properly implemented priority inversion this should wake
+    * up the thread H since nothing more block it from running */
+   os_mtx_unlock(&test_mtx[1]);
+
+   test_assert(8 == test_atomic[0]); /* verify the valid progress of test state */
+   test_atomic[0] = 9;
+
+   /* finish test */
+   os_mtx_unlock(&test_mtx[0]);
+   test_assert(9 == test_atomic[0]); /* verify the valid progress of test state */
+   test_atomic[0] = 10;
+
+   return 0;
+}
+
+/**
+ * Test scenario:
+ * This is the same scenario as in scen5 but here we use mtx1 instead of mtx0.
+ * This makes situation where mutexes are unlocked in the same order as locking
+ * order, which additionally checks is if OS does not force the unlock sequence.
+ *
+ * L locks mtx0 and mtx1
+ * H locks mtx1
+ * L unlock mtx0 (critical moment)
+ * We should see context switch to H even if L holds some other mtx
+ * IMPORTANT: unlocking mtx0 before mtx1 creates same unlock order as locking
+ * order. Additional check is that M should not be scheduled until H exits
+ */
+int test_scen6_workerH(void* OS_UNUSED(param))
+{
+   int ret;
+
+   /* block on sem, allow L to progress */
+   ret = os_sem_down(&test_sem[1], OS_TIMEOUT_INFINITE);
+   test_assert(0 == ret);
+
+   test_assert(3 == test_atomic[0]); /* verify the valid progress of test state */
+   test_atomic[0] = 4;
+
+   /* try to lock mtx0, we should switch to L */
+   ret = os_mtx_lock(&test_mtx[0]);
+   test_assert(0 == ret);
+
+   /* we should now get mtx0 locked in L and we have mtx1 */
+   test_assert(5 == test_atomic[0]); /* verify the valid progress of test state */
+   test_atomic[0] = 6;
+
+   /* finish test we should switch to M */
+   os_mtx_unlock(&test_mtx[0]);
+   test_assert(6 == test_atomic[0]); /* verify the valid progress of test state */
+   test_atomic[0] = 7;
+
+   return 0;
+}
+
+int test_scen6_workerM(void* OS_UNUSED(param))
+{
+   int ret;
+
+   /* block on sem, allow L to progress */
+   ret = os_sem_down(&test_sem[0], OS_TIMEOUT_INFINITE);
+   test_assert(0 == ret);
+
+   test_assert(2 == test_atomic[0]); /* verify the valid progress of test state */
+   test_atomic[0] = 3;
+
+   /* switch context to H */
+   os_sem_up(&test_sem[1]);
+
+   /* finish test */
+   test_assert(7 == test_atomic[0]); /* verify the valid progress of test state */
+   test_atomic[0] = 8;
+
+   return 0;
+}
+
+int test_scen6_workerL(void* OS_UNUSED(param))
+{
+   int ret;
+
+   test_assert(0 == test_atomic[0]); /* verify the valid progress of test state */
+   test_atomic[0] = 1;
+
+   /* lock mtx0 and mtx1 */
+   ret = os_mtx_lock(&test_mtx[0]);
+   test_assert(0 == ret);
+   ret = os_mtx_lock(&test_mtx[1]);
+   test_assert(0 == ret);
+
+   test_assert(1 == test_atomic[0]); /* verify the valid progress of test state */
+   test_atomic[0] = 2;
+
+   /* switch context to M */
+   os_sem_up(&test_sem[0]);
+
+   /* we will return from H */
+   test_assert(4 == test_atomic[0]); /* verify the valid progress of test state */
+   test_atomic[0] = 5;
+
+   /* unlock mtx0 we want to release mtx in the same order as we lock them (not
+    * reverse order), in properly implemented priority inversion this should
+    * wake up the thread H since nothing more block it from running This is
+    * allowed since mutex does not enforce any locking sequence. User should
+    * prevent from making deadlock possible */
    os_mtx_unlock(&test_mtx[0]);
 
    test_assert(8 == test_atomic[0]); /* verify the valid progress of test state */
@@ -590,7 +706,6 @@ int test_scen5_workerL(void* OS_UNUSED(param))
 
    return 0;
 }
-#endif
 
 /**
  * Test coordinator, runs all test in unit
@@ -692,7 +807,6 @@ int test_coordinator(void* OS_UNUSED(param))
    }
    test_assert(18 == test_atomic[0]);
 
-#ifndef OS_CONFIG_MUTEX_REV_UNLOCK_ORDER
 /* scenario 5 */
    os_taskproc_t scen5_worker_proc[] = {
 	   test_scen5_workerH,
@@ -718,7 +832,32 @@ int test_coordinator(void* OS_UNUSED(param))
       os_task_join(&task_worker[i]);
    }
    test_assert(10 == test_atomic[0]);
-#endif
+
+/* scenario 6 */
+   os_taskproc_t scen6_worker_proc[] = {
+	   test_scen6_workerH,
+	   test_scen6_workerM,
+	   test_scen6_workerL
+   };
+   os_sem_create(&test_sem[0], 0);
+   os_sem_create(&test_sem[1], 0);
+   os_mtx_create(&test_mtx[0]);
+   os_mtx_create(&test_mtx[1]);
+   test_atomic[0] = 0;
+   for(i = 0; i < 3; i++)
+   {
+      /* created task will be not scheduled because current task has the highest available priority */
+      os_task_create(
+         &task_worker[i], OS_CONFIG_PRIOCNT - 1 - i,
+         task_stack[i], sizeof(task_stack[i]),
+         scen6_worker_proc[i], (void*)(long)i);
+   }
+   /* scheduler will kick in after following call */
+   for(i = 0; i < 3; i++)
+   {
+      os_task_join(&task_worker[i]);
+   }
+   test_assert(10 == test_atomic[0]);
 
    test_result(0);
    return 0;

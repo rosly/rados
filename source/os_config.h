@@ -83,17 +83,6 @@
 /** Define to enable priority inheritance for mutex */
 #define OS_CONFIG_MUTEX_PRIO_INHERITANCE
 
-/** Define to enable optimization of priority inheritance code during
- * os_mtx_unlock(). This define is effective only when priority inheritance was
- * enabled by OS_CONFIG_MUTEX_PRIO_INHERITANCE. If defined than thread will keep
- * boosted priority until last mtx held by this thread would be unlocked. It
- * will also enable the assertion for checking if the unlock order is really
- * a reverse locking order (asserts can still be disabled by un-defining
- * OS_CONFIG_API_CHECK). If not defined than os_mtx_unlock() will recalculate
- * the dynamic priority of the thread with usage of recursive algorithm which
- * worst complexity is O(n) where n is number of mutexes in the system */
-//#define OS_CONFIG_MUTEX_REV_UNLOCK_ORDER
-
 /** Define to enable timers. Keep in mind that timers are used for time guard's
  * for blocking primitives such semaphores. This may change the behaviour of
  * application even if it doesn't use timers explicitly (eg not calling the

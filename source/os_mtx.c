@@ -33,6 +33,11 @@
 
 /* --- private functions --- */
 
+/**
+ * Assign mutex ownership to given task
+ * This is equivalent to locking the mutex. Initial recursive lock value is set
+ * to 1.
+ */
 static inline void os_mtx_set_owner(os_mtx_t *mtx, os_task_t *task)
 {
    mtx->owner = task;
@@ -42,6 +47,11 @@ static inline void os_mtx_set_owner(os_mtx_t *mtx, os_task_t *task)
    mtx->recur = 1; /* initial recursion lvl (>1 means locked, 0 means unlocked) */
 }
 
+/**
+ * Clear ownership of mutex.
+ * This is equivalent to unlocking the mutex. Note that recursive lock is not
+ * modified here, this need to be done earlier and only if this value is 0
+ * os_mtx_clear_owner() may be called */
 static inline void os_mtx_clear_owner(os_mtx_t *mtx)
 {
    mtx->owner = NULL;
@@ -49,6 +59,10 @@ static inline void os_mtx_clear_owner(os_mtx_t *mtx)
 }
 
 #ifdef OS_CONFIG_MUTEX_PRIO_INHERITANCE
+/**
+ * Task priority inheritance function for mutex locking.
+ * This function evaluates the recursive lock dependency between tasks.
+ */
 static void os_mtx_lock_prio_boost(os_mtx_t *mtx)
 {
    /* check for priority inversion precondition */
@@ -82,6 +96,12 @@ static void os_mtx_lock_prio_boost(os_mtx_t *mtx)
    }
 }
 
+/**
+ * Task priority inheritance function for mutex unlocking.
+ * This function reset the priority of task_current to proper level according to
+ * priority inheritance rules. This prevents priority inversion to happen
+ * even when indirect recursive lock dependency is still present
+ */
 static void os_mtx_unlock_prio_reset(void)
 {
    if (task_current->prio_current != task_current->prio_base)
@@ -131,6 +151,7 @@ static void os_mtx_unlock_prio_reset(void)
 #endif
 
 /* --- public functions --- */
+/* all public functions are documented in os_mtx.h file */
 
 void os_mtx_create(os_mtx_t* mtx)
 {
@@ -188,9 +209,13 @@ os_retcode_t OS_WARN_UNUSEDRET os_mtx_lock(os_mtx_t* mtx)
    arch_critical_enter(cristate);
    do
    {
+      /** \TODO there is a race condition of using mute after destroy
+        * maybe we should check fo mutex initialization status here and return
+        * proper code in this case */
+
       if (NULL == mtx->owner)
       {
-    /* mutex unlocked, lock and take ownership */
+         /* mutex unlocked, lock and take ownership */
          os_mtx_set_owner(mtx, task_current);
          ret = OS_OK;
          break;

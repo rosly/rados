@@ -57,6 +57,7 @@
  *   requirement's and limitation of CPU and OS should be known prior coding).
  */
 
+/** Definition of mutex structure */
 typedef struct {
    /** list header that allows to place this mtx on various lists */
    list_t listh;
@@ -67,18 +68,72 @@ typedef struct {
    /** Queue of threads suspended on this mutex */
    os_taskqueue_t task_queue;
 
-   /** Recursive locks count for owner
+   /** Recursive lock count
     * (it does not need to be sig_atomic_t since only the owner task can change
     * this value and using of mtx form ISR is forbidden */
    uint_fast8_t recur;
 
 } os_mtx_t;
 
+/**
+ * Function initializes the mutex structure given by @param mtx
+ *
+ * @param pointer to mutex
+ */
 void os_mtx_create(os_mtx_t* mtx);
+
+/**
+ * Function destroys the mutex given by @param mtx
+ *
+ * @param pointer to mutex
+ *
+ * @pre mutex must be initialized prior call of this function
+ * @pre only owner of the mutex should call this function. This also means that
+ *      if given mutex is not locked, user code must prevent any race conditions
+ *      between os_mtx_lock() and os_mtx_destroy(). Because of this well written
+ *      code should lock the mutex before destroying it (even if
+ *      os_mtx_destroy() function accept unlocked mutex)
+ * @pre this function cannot be used from ISR
+ *
+ * @post mutex will be uninitialized after this call. Such mutex cannot be used
+ *       by any other function until it will be initialized again. It means that
+ *       user code has to prevent race conditions of accessing such mutex after
+ *       return from os_mtx_destroy(). Threads which had waited for mutex before
+ *       os_mtx_destroy() will be released with OS_DESTROYED return code from
+ *       os_mtx_lock(). But calls of os_mtx_lock() after os_mtx_destroy() have
+ *       returned are forbidden.
+ *
+ * @post this function also reset the prio of calling thread in case it was
+ *       boosted by priority inheritance
+ */
 void os_mtx_destroy(os_mtx_t* mtx);
-/** Following function return value should always be checked. The reason for this
- * is mutex removal from other thread */
+
+/**
+ * Function locks the mutex. If the mutex is already locked the calling thread
+ * will sleep until owner thread will call os_mtx_unlock(). Only single thread
+ * can own the mutex at given time.
+ *
+ * @param pointer to mutex
+ *
+ * @pre mutex must be initialized prior call of this function (please look at to
+ *      description of possible race conditions with os_mtx_destroy()
+ * @pre this function cannot be used from ISR
+ *
+ * @return OS_OK in case mutex was successfully locked by calling thread
+ *         OS_DESTROYED in case mutex was destroyed while calling thread waits
+ *         for acquiring of the lock
+ * @note user code should always check the return code of os_mtx_lock()
+ */
 os_retcode_t OS_WARN_UNUSEDRET os_mtx_lock(os_mtx_t* mtx);
+
+/**
+ * Function unlock the mutex. Only owner thread can call this function.
+ *
+ * @param pointer to mutex
+ *
+ * @pre mutex must be locked (owned) by thread that calls this function
+ * @pre this function cannot be used from ISR
+ */
 void os_mtx_unlock(os_mtx_t* mtx);
 
 #endif

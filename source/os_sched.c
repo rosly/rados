@@ -91,6 +91,7 @@ static void os_task_check_init(os_task_t *task, void* stack, size_t stack_size);
 static void os_task_init(os_task_t* task, uint_fast8_t prio);
 
 /* --- public function implementation --- */
+/* all public functions are documented in os_sched.h file */
 
 void os_start(
    os_initproc_t app_init,

@@ -44,8 +44,9 @@
 #define OS_ASSERT(_cond) \
    do \
    { \
-      if( OS_UNLIKELY(!(_cond)) ) { \
-         arch_halt(); \
+      if( OS_UNLIKELY(!(_cond)) ) \
+      { \
+         os_halt(); \
       } \
    }while(0)
 #else
@@ -58,8 +59,9 @@
 #define OS_SELFCHECK_ASSERT(_cond) \
    do \
    { \
-      if( OS_UNLIKELY(!(_cond)) ) { \
-         arch_halt(); \
+      if( OS_UNLIKELY(!(_cond)) ) \
+      { \
+         os_halt(); \
       } \
    }while(0)
 #else
@@ -131,8 +133,7 @@
 /* --- Scheduler section --- */
 
 /* Variables visible only for OS files, not for user */
-os_taskqueue_t ready_queue;
-volatile os_atomic_t sched_lock;
+extern os_taskqueue_t ready_queue;
 
 void OS_HOT os_task_enqueue(os_taskqueue_t* task_queue, os_task_t* task);
 void OS_HOT os_task_unlink(os_task_t* OS_RESTRICT task);
@@ -145,7 +146,7 @@ void OS_HOT os_schedule(uint_fast8_t higher_prio);
 void OS_HOT os_block_andswitch(
    os_taskqueue_t* OS_RESTRICT task_queue,
    os_taskblock_t block_type);
-void os_task_exit(int retv);
+void OS_NORETURN OS_COLD os_task_exit(int retv);
 
 /* --- Arch dependent functions prototypes --- */
 
@@ -172,26 +173,6 @@ void arch_task_init(os_task_t *tcb, void* stack, size_t stack_size, os_taskproc_
 void arch_idle(void);
 
 /* --- OS private inline functions --- */
-
-/**
- * Blocks the preemptive scheduling
- * Take into account that interrupts are still enabled, while only the task
- * switch will not be performed.
- *
- * /note disabling the scheduler from interrupts is safe (atomic), because
- * os_schedule() is called in critical section, so calling os_scheduler_lock()
- * from interrupt will not interfere with code protected by critical section */
-static inline void os_scheduler_lock(void) {
-   os_atomic_inc(sched_lock);
-}
-
-static inline void os_scheduler_unlock(void) {
-   os_atomic_dec(sched_lock);
-   /* TODO verify if we should not reschedule right after that. Usually locking
-    * scheduler is used to protect some user space critical section, so after
-    * exiting we might need reschedule(), or we should expose os_schedule() to
-    * user (if not yet done) */
-}
 
 static inline void os_task_makeready(os_task_t *task)
 {

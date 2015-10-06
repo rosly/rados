@@ -138,7 +138,6 @@ void os_task_create(
 int os_task_join(os_task_t *task)
 {
    arch_criticalstate_t cristate;
-   os_sem_t join_sem;
    int ret;
 
    OS_ASSERT(0 == isr_nesting); /* this function may be called only form user code */
@@ -151,6 +150,8 @@ int os_task_join(os_task_t *task)
    /* check if task ended up in os_task_exit() */
    if( task->state < TASKSTATE_DESTROYED )
    {
+      os_sem_t join_sem;
+
       /* it seems not, so we have to wait until it will finish
        * we will wait for it by blocking on semaphore */
       os_sem_create(&join_sem, 0);
@@ -160,13 +161,14 @@ int os_task_join(os_task_t *task)
       os_sem_destroy(&join_sem);
    }
 
-   OS_ASSERT(TASKSTATE_DESTROYED == task->state);
+   OS_SELFCHECK_ASSERT(TASKSTATE_DESTROYED == task->state); /* double check */
    /* here we know for sure that task ended up in os_task_exit() */
    task->state = TASKSTATE_INVALID; /* mark that task was joined */
    task->join_sem = NULL;
+   ret = task->ret_value;
    arch_critical_exit(cristate);
 
-   return task->ret_value;
+   return ret;
 }
 
 void os_task_check(os_task_t *task)
@@ -174,7 +176,7 @@ void os_task_check(os_task_t *task)
 #ifdef OS_CONFIG_CHECKSTACK
    if(OS_UNLIKELY(OS_STACK_FILLPATERN != *((uint8_t*)task->stack_end)))
    {
-      arch_halt();
+      os_halt();
    }
 #endif
 }
@@ -191,7 +193,9 @@ void OS_HOT os_tick(void)
 
 void OS_COLD os_halt(void)
 {
-  arch_halt();
+   os_scheduler_lock();
+   arch_dint();
+   arch_halt();
 }
 
 /* --- private functions --- */
@@ -404,7 +408,7 @@ void OS_HOT os_block_andswitch(
   task_current->state = TASKSTATE_RUNNING;
 }
 
-void os_task_exit(int retv)
+void OS_NORETURN OS_COLD os_task_exit(int retv)
 {
    arch_criticalstate_t cristate;
 

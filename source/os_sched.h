@@ -37,7 +37,7 @@ typedef enum {
    TASKSTATE_READY,
    TASKSTATE_WAIT,
    TASKSTATE_DESTROYED,
-   TASKSTATE_INVALID /* used after join() to prevent from double join */
+   TASKSTATE_INVALID /**< used after join() to prevent from double join */
 } os_taskstate_t;
 
 typedef enum {
@@ -60,44 +60,42 @@ struct os_sem_tag; /* forward declaration */
 struct os_waitqueue_tag; /* forward declaration */
 
 typedef struct {
-  /** need to be the first field, because then it is easier to save the context,
-   * for more info about the context store see arch_context_t */
+  /** need to be the first field, because then it is easier to save the context
+   * from ASM code, for more info about the context store see arch_context_t */
   arch_context_t ctx;
 
   /** list link, allows to place the task on various lists */
   list_t list;
 
-  /** the base priority, constant for all task life cycle, decided to
-   * use fast8 type since we ned at least uint8 while we dont whant to have some
-   * additional penelty because of alligment issues, form other side it is nt
-   * realy connection to fast operations on priorities */
+  /** the base priority, constant for whole life cycle of the task, decided to
+   * use fast8 type since we need at least uint8 while we dont whant to have
+   * some additional penelty because of CPU alligment issues */
   uint_fast8_t prio_base;
 
-  /** current priority of the task, it may be boosted or lowered, for instace by
-   * priority inversion code */
+  /** current priority of the task, namely the effective priority
+   * it may be changed for instace by priority inheritance code */
   uint_fast8_t prio_current;
 
-  /** state of task */
+  /** state of task - common meaning as in other RTOS'es */
   os_taskstate_t state;
 
-  /** data set while task is in TASKSTATE_WAIT or TASKSTATE_READY, in other
-   * words below variables will be used only when taks is blocked or ready to
-   * run but not currently executing */
+  /** following struct is used only when task is in TASKSTATE_WAIT or
+   * TASKSTATE_READY */
   struct {
-    /** taskqueue to which the task belongs, this pointer is required if durring
-     * task enqueue/dequeue we have to modify the taskqueue object (this is the
-     * case for current taskqueue algorithm) */
+    /** taskqueue to which the task belongs, this can be ready_queue or any tash
+     * queue of blocking object like sem or mtx. Pointer used durring
+     * task enqueue/dequeue since we have to modify the also taskqueue itself */
     struct os_taskqueue_tag *task_queue;
 
-    /** pointer to object which blocks the task *, valid only when task state ==
-     * TASKSTATE_WAIT */
+    /** \TODO not currently used, pointer to object which blocks the task, valid
+     * only when task state == TASKSTATE_WAIT */
     //void *block_obj;
 
-    /** defines on which object the task is blocked, valid only when
-     * task state == TASKSTATE_WAIT */
+    /** defines on which object type the task is blocked, valid only when task
+     * state == TASKSTATE_WAIT */
     os_taskblock_t block_type;
 
-    /** assosiated pointer while waiting with timeout guard valid only if task
+    /** assosiated timer while waiting with timeout guard, valid only if task
      * state = TASKSTATE_WAIT */
     os_timer_t *timer;
 
@@ -201,7 +199,21 @@ int os_task_join(os_task_t *task);
 
 void os_task_check(os_task_t *task);
 
+/** System tick function
+ *
+ * This function need to be called from ISR. It kicks the timer subsystem and
+ * also trigers the preemption mechanism
+ *
+ * @pre can be called only from ISR
+ */
 void OS_HOT os_tick(void);
+
+/** Function halt the system
+ *
+ * The main purpose of this function is to lock the execution in case of
+ * critical error. This function can be used as final stage of user assert
+ * failure code.
+ */
 
 void OS_COLD os_halt(void);
 

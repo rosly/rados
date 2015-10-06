@@ -110,7 +110,8 @@ static void os_mtx_unlock_prio_reset(void)
          itr_mtx = os_container_of(itr, os_mtx_t, listh);
          /* peek (not dequeue) top prio task that waits for this mtx */
          task = os_task_peekqueue(&(itr_mtx->task_queue));
-         if (task) {
+         if (task)
+         {
             /* os_max() means take bigger from two. It is important that we use
              * task->prio_current not task->prio_base since we would like to
              * include nested lock dependency. Therefore if some task has inherited
@@ -149,9 +150,9 @@ void os_mtx_destroy(os_mtx_t* mtx)
    arch_critical_enter(cristate);
 
    /* check if mtx is locked */
-   if (NULL != mtx->owner) {
-
-      /* in case mutex was locked only owner can destroy it */
+   if (NULL != mtx->owner)
+   {
+      /* in case mutex was locked, than only owner can destroy it */
       OS_ASSERT(mtx->owner == task_current);
 
       /* set the mtx state as unlocked (remove ownership) */

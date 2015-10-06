@@ -34,75 +34,115 @@
 /* will be truncanced to register size */
 #define OS_STACK_FILLPATERN ((uint8_t)0xAB)
 
-/** not need to be volatile since we whant to optimize the access to it, while
- * it only may change after os_schedule call, compiler asumes that after
- * function call all data under the pointer may be changed (also ISR will not
- * change it since interrupts are blocked by critical sections) */
-/* intentionaly not volatile */
+/* --- variables definitions used by scheduler --- */
+
+/** Pointer to currently running task structure
+ * /note intentionally not volatile, not need to be volatile since we use it only
+ * under critical section of scheduler and it is modified only by os_schedule()
+ * call. Compiler asumes that after any function call all data under the pointer
+ * may be changed (synchronization point). Also ISR will not change it out of
+ * scheduler control since interrupts are blocked by critical sections */
 os_task_t* task_current = NULL;
+
+/** Task queue for READY tasks
+ * The main structure used by scheduler during os_schedule() call. From this
+ * task queue we pick task which will be running as current one */
 os_taskqueue_t ready_queue;
+
+/** Counter to mark ISR nesting
+ * Allows to track the nesting level of ISR and control the task state
+ * dump/restore on ISR enter/exit. Also used for locking the preemption Can be
+ * also used to check if OS function was called by user or ISR since
+ * isr_nesting > 0 means that we were called from ISR */
 volatile os_atomic_t isr_nesting = 0;
+
+/** Preemption lock bitflag
+ * Used to explicitly lock the scheduler for any reason */
 volatile os_atomic_t sched_lock = 0;
+
+/** Task structure for idle task
+ * Since user programs does not explicitly create idle task, OS need to keep
+ * internal task structure for IDLE task */
 static os_task_t task_idle;
 
-/* private function forward declarations */
+/* --- private inline functions --- */
+
+/**
+ * Blocks the preemptive scheduling
+ * Take into account that interrupts are still enabled, while only the task
+ * switch will not be performed */
+static inline void os_scheduler_lock(void)
+{
+   os_atomic_inc(sched_lock);
+}
+
+static inline void os_scheduler_unlock(void)
+{
+   os_atomic_dec(sched_lock);
+   /* TODO verify if we should not reschedule right after that. Usually locking
+    * scheduler is used to protect some user space critical section, so after
+    * exiting we might need reschedule(), or we should expose os_schedule() to
+    * user (if not yet done) */
+}
+
+/* --- forward declaration of private functions --- */
+
 static void os_task_check_init(os_task_t *task, void* stack, size_t stack_size);
 static void os_task_init(os_task_t* task, uint_fast8_t prio);
 
-/* prior this function call, all interrupts must be disabled */
+/* --- public function implementation --- */
+
 void os_start(
    os_initproc_t app_init,
    os_initproc_t app_idle)
 {
-   /* disable the interrupts durrint the os initialization */
+   /* disable the interrupts, needed to make critical section */
    arch_dint();
 
-   /* initialize the remain os variables */
+   /* initialize OS subsystem and variables */
    os_taskqueue_init(&ready_queue);
    os_timers_init();
 
    /* create and switch to idle task, perform the remain app_init on idle_task */
    os_task_init(&task_idle, 0);
-   task_idle.state = TASKSTATE_RUNNING; /* because state = TASKSTATE_READY after init */
-   /* interrupt are not enabled, critical section not needed for following */
+   task_idle.state = TASKSTATE_RUNNING;
    task_current = &task_idle;
-   /* from this point we can switch the context because we have at least
+   /* from this point we can perform context switching because we have at least
     * task_idle in ready_queue, but for fast app_init we disable the scheduler
     * until we will be fully ready */
 
+   /* architecture dependent initialization */
    arch_os_start();
 
-   /* disable the scheduler for time of app_init() call, this is needed since we
-    * dont wont to switch tasks while we craete them in app_init() */
+   /* we need to lock the scheduler since must prevent context switch to tasks
+    * which will be created while app_init() */
    os_scheduler_lock();
-   /* here app should create the remaining threads and start the interrupts (not
-    * only the tick), we call app_init() user supplied function */
+   /* user supplied function, it should initialize interrupts (tick and others) */
    app_init();
    os_scheduler_unlock();
-   arch_eint(); /* we are ready for scheduler actions, enable the interrupts */
+   arch_eint(); /* we are ready for scheduling actions, enable the all interrupts */
 
-   /* after all initialization actions, force switch to other task than idle
-      \TODO instead of folowing nasty code we can just use os_schedule(0) */
+   /* after all initialization actions, force first schedule (context switch)
+    * \TODO instead of following nasty code we can just use os_schedule(0) */
    do
    {
       arch_criticalstate_t cristate;
 
+      /* enter critical section since we will schedule */
       arch_critical_enter(cristate);
-      os_task_makeready(task_current); /* task_current means task_idle here */
-      /* finaly we switch the context to first user task, (it will have the
-       * higher priority than idle) (need to be done under critical section) */
+      os_task_makeready(task_current); /* task_current == task_idle here */
+      /* finally we switch the context to user task, (any user task has higher
+       * prio than idle_task) */
       arch_context_switch(os_task_dequeue(&ready_queue));
-      task_current->state = TASKSTATE_RUNNING; /* we are back again in idle task, it is running now */
+      task_current->state = TASKSTATE_RUNNING; /* we are back again in idle task */
       arch_critical_exit(cristate);
-   }while(0);
+   } while (0);
 
-   /* idle task will spin in idle loop */
-   while(1)
+   /* idle task will spin in following idle loop */
+   while (1)
    {
-      /* user supplied idle function */
-      app_idle();
-      /* if exit then arch defined relax function */
-      arch_idle();
+      app_idle(); /* user supplied idle function */
+      arch_idle(); /* arch dependent relax function */
    }
 }
 
@@ -116,11 +156,11 @@ void os_task_create(
 {
    arch_criticalstate_t cristate;
 
-   OS_ASSERT(0 == isr_nesting); /* this function may be called only form user code */
-   OS_ASSERT(prio < OS_CONFIG_PRIOCNT);
+   OS_ASSERT(0 == isr_nesting); /* cannot create task from ISR */
+   OS_ASSERT(prio < OS_CONFIG_PRIOCNT); /* prio must be less than prio config limit */
    OS_ASSERT(prio > 0); /* only idle task may have the prio 0 */
-   OS_ASSERT(NULL != stack);
-   OS_ASSERT(stack_size >= OS_STACK_MINSIZE);
+   OS_ASSERT(NULL != stack); /* stack must be given */
+   OS_ASSERT(stack_size >= OS_STACK_MINSIZE); /* minimal size for stack */
 
    os_task_init(task, prio);
 
@@ -131,7 +171,7 @@ void os_task_create(
    os_task_enqueue(&ready_queue, task);
    arch_critical_exit(cristate);
 
-   os_schedule(1); /* 1 as a param will cause a task-switch only if created task
+   os_schedule(1); /* 1 as a param allows context switch only if created task
                       has higher priority than task_curernt */
 }
 
@@ -140,15 +180,15 @@ int os_task_join(os_task_t *task)
    arch_criticalstate_t cristate;
    int ret;
 
-   OS_ASSERT(0 == isr_nesting); /* this function may be called only form user code */
+   OS_ASSERT(0 == isr_nesting); /* cannot join tasks from ISR */
    /* idle task cannot call blocking functions (will crash OS) */
    OS_ASSERT(task_current->prio_current > 0);
 
    arch_critical_enter(cristate);
-   OS_ASSERT(NULL == task->join_sem); /* only single task can wait for another task */
+   OS_ASSERT(NULL == task->join_sem); /* only one task is allowed to wait for particular task */
    OS_ASSERT(TASKSTATE_INVALID != task->state); /* task can be joined only once */
-   /* check if task ended up in os_task_exit() */
-   if( task->state < TASKSTATE_DESTROYED )
+   /* check if task have finished (does it called os_task_exit()) ? */
+   if (task->state < TASKSTATE_DESTROYED)
    {
       os_sem_t join_sem;
 
@@ -174,7 +214,7 @@ int os_task_join(os_task_t *task)
 void os_task_check(os_task_t *task)
 {
 #ifdef OS_CONFIG_CHECKSTACK
-   if(OS_UNLIKELY(OS_STACK_FILLPATERN != *((uint8_t*)task->stack_end)))
+   if (OS_UNLIKELY(OS_STACK_FILLPATERN != *((uint8_t*)task->stack_end)))
    {
       os_halt();
    }
@@ -187,7 +227,7 @@ void OS_HOT os_tick(void)
 
    os_timer_tick(); /* call the timer module mechanism */
    /* switch to other READY task which has the same or greater priority (0 as
-    * param means just that) */
+    * param of os_schedule() means just that) */
    os_schedule(0);
 }
 
@@ -200,34 +240,40 @@ void OS_COLD os_halt(void)
 
 /* --- private functions --- */
 
+/**
+ * Function adds task to task_queue
+ * Should be called each time we add task to task_queue since it updates
+ * task_queue internals. It also links task with task_queue but does not update
+ * the task state! This must be done before call of this function */
 void OS_HOT os_task_enqueue(
    os_taskqueue_t* OS_RESTRICT task_queue,
    os_task_t* OS_RESTRICT task)
 {
    list_append(&(task_queue->tasks[task->prio_current]), &(task->list));
    task->task_queue = task_queue;
-   if( task_queue->priomax < task->prio_current ) {
+   if (task_queue->priomax < task->prio_current)
+   {
      task_queue->priomax = task->prio_current;
    }
 }
 
 /**
- *  Function recalculates the priomax inside task_queue after task unlink
- *  operation.Function does not unlink the task! this must be done before
- *  calling this function
+ * Function recalculates the priomax inside task_queue after task unlink
+ * operation. Function does not unlink the task! this must be done before
+ * calling this function
  */
 void OS_HOT os_taskqueue_remax(os_taskqueue_t* OS_RESTRICT task_queue)
 {
-   while( (0 != (task_queue->priomax)) &&
-          list_is_empty(&(task_queue->tasks[task_queue->priomax]))) {
+   while ((0 != (task_queue->priomax)) &&
+          list_is_empty(&(task_queue->tasks[task_queue->priomax])))
+   {
      --(task_queue->priomax);
    }
 }
 
 /**
- *  Function unlink the task from task_queue
- *  This is desierd function which should be called when we need to switch to
- *  explicitly pointed task from task_queues
+ * Function unlink the task from task_queue
+ * Need to be called each time OS wants to dequeue specific task from task_queue
  */
 void OS_HOT os_task_unlink(os_task_t* OS_RESTRICT task)
 {
@@ -236,6 +282,10 @@ void OS_HOT os_task_unlink(os_task_t* OS_RESTRICT task)
    task->task_queue = NULL;
 }
 
+/**
+ * Function changes the effective (prio_current) priority of task
+ * The pointed task may be either in WAIT or READY state
+ */
 void OS_HOT os_task_reprio(
    os_task_t* task,
    uint_fast8_t new_prio)
@@ -249,10 +299,12 @@ void OS_HOT os_task_reprio(
 
    /* check if we really change the prio so we do not unnecessarily change the
     * order of waiting tasks */
-   if (task->prio_current != new_prio) {
+   if (task->prio_current != new_prio)
+   {
       task_queue = task->task_queue;
       task->prio_current = new_prio;
-      if (task_queue) {
+      if (task_queue)
+      {
          os_task_unlink(task);
          os_task_enqueue(task_queue, task);
       }
@@ -260,14 +312,15 @@ void OS_HOT os_task_reprio(
 }
 
 /**
- *  Function dequeues the most urgent task from the task_queue.  This is desierd
- *  function which should be called when we need to peek (switch to) most
- *  prioritized task
+ * Function dequeues the most urgent task from the task_queue.
+ * Function need to be called when OS need to obtain most prioritized task in
+ * task_queue
  */
 os_task_t* OS_HOT os_task_dequeue(os_taskqueue_t* OS_RESTRICT task_queue)
 {
    list_t *list = list_detachfirst(&(task_queue->tasks[task_queue->priomax]));
-   if( NULL == list ) {
+   if (NULL == list)
+   {
       return NULL;
    }
    os_task_t *task = os_container_of(list, os_task_t, list);
@@ -277,68 +330,77 @@ os_task_t* OS_HOT os_task_dequeue(os_taskqueue_t* OS_RESTRICT task_queue)
 }
 
 /**
- *  Similar to os_task_dequeue() but taks is dequeued only if its prio is higher
- *  than prio passed by param
+ * Similar to os_task_dequeue() but task is dequeued only if most top prio task
+ * in task queue has prio higher than this passed by @param prio
  */
 os_task_t* OS_HOT os_task_dequeue_prio(
    os_taskqueue_t* OS_RESTRICT task_queue,
    uint_fast8_t prio)
 {
-   if( task_queue->priomax >= prio ) {
+   if (task_queue->priomax >= prio)
+   {
       return os_task_dequeue(task_queue);
    }
    return NULL;
 }
 
 /**
- *  Function returns the pointer to most urgent task on the task_queue
- *  This function does not modify the task_queue, it just returns the reference
- *  Use this function only when you are intrested about some property of most
- *  prioritized task on the queue but you dont whant to dqueue this task
+ *  Function returns the pointer to top prio task on the task_queue
+ *  This function does not dequeue the task from task_queue, it just returns
+ *  pointer to task which is still enqueued in task_queue.
+ *  Use this function only when you are interested about some property of most
+ *  prioritized task on the queue but you don't want to dequeue this task.
  */
 os_task_t* OS_HOT os_task_peekqueue(os_taskqueue_t* OS_RESTRICT task_queue)
 {
    list_t *list = list_peekfirst(&(task_queue->tasks[task_queue->priomax]));
-   if( NULL == list ) {
-      return NULL; /* this may happend on mutex, semaphore wait list, but not for ready_queue */
+   /* in case task_queue was empty (cannot happen for ready_queue's) */
+   if (NULL == list)
+   {
+      return NULL;
    }
    os_task_t *task = os_container_of(list, os_task_t, list);
    return task;
 }
 
+/**
+ * Function initializes task_queue
+ */
 void os_taskqueue_init(os_taskqueue_t *task_queue)
 {
    unsigned i;
 
-   for(i = 0; i < os_element_cnt(task_queue->tasks); i++) {
+   for(i = 0; i < os_element_cnt(task_queue->tasks); i++)
+   {
       list_init(&(task_queue->tasks[i]));
    }
    task_queue->priomax = 0;
 }
 
 /**
- * This function switches the current task to one of task from ready queue.
- * Typicaly the most prioritized task from ready queue is chosen, but it has to
- * have prio higher than task_current. Additionaly we can force to chose only
- * task with higher priority than task_curent by usin of \param higher_prio
- * param.
+ * This function switches the current task to another READY task.
+ * Context switch is done to the most prioritized task from ready queue.
+ * By @param higher_prio we may force that context switch will be done only to
+ * higher priority tasks than current_task->prio_current.
  *
  *  Function works in following schema
  *   - chose task from ready_queue, pick only task with priority equal to
  *     task_current or higher (depending on higher_prio param)
- *   - in case of user code it will switch the context to new task
- *   - in case of interrupt (nesting level == 1) it will not swich the context
- *     but only change the task_current pointer (so context switch can be done at
- *     the end of ISR)
- *   - in case of interrupt (nesting level > 1) do nothing at all (not even
- *     saerch for READY task), this is because only most bottom ISR at the nesting
- *     scenario can switch the tasks (otherwise we will get into trouble)
+ *   - in case function is called from user code it will switch the context to
+ *     new task
+ *   - in case function is called from interrupt at nesting level == 1 it will
+ *     not switch the context immediately but only change the task_current
+ *     pointer (the context switch will be postponed until end of ISR)
+ *   - in case function is called from interrupt at nesting level > 1 do nothing
+ *     at all (not even search for READY task), this is because only most extern
+ *     ISR at the nesting scenario can switch the tasks (otherwise we will get
+ *     into trouble)
  *
- *  This function can not perform the task switching at all, if all of the READY
- *  tasks will be less prioritized then the task_current.  So if you want to
- *  unconditionally switch the task use the os_switch() instead. This can be
- *  required if you cannot continiue with execution of current task, for
- *  instance after kind of block (look at os_sem.c code)
+ *  This function will perform the task switching only to task with prio equal
+ *  or higher than task_current->prio_current. If the intention is to
+ *  unconditionally switch of the task use the os_switch() instead. This can be
+ *  required for instance when execution of current task is no longer possible,
+ *  like in case of blocking code (look at os_sem.c code)
  *
  *  /note this function can be called only from critical section
  */
@@ -347,28 +409,28 @@ void OS_HOT os_schedule(uint_fast8_t higher_prio)
    os_task_t *new_task;
 
    /* Check the nesting level or if scheduler is locked.
-    * We dont whant to switch the task if we are in nested ISR and in case we
-    * explicitly locked the scheduler from some reason  */
-   if( OS_LIKELY((isr_nesting <= 1) && (0 == sched_lock)) )
+    * Do not switch tasks in case of nested ISR or in case we explicitly locked
+    * the scheduler for whatever reason */
+   if (OS_LIKELY((isr_nesting <= 1) && (0 == sched_lock)))
    {
-      /* pick some READY task for ready_queue which has priority equal or
-       * greater than task_current (see condition inside os_task_dequue_prio) */
+      /* dequeue another READY task which has priority equal or greater than
+       * task_current (see condition inside os_task_dequeue_prio) */
       new_task = os_task_dequeue_prio(
-                   &ready_queue, task_current->prio_current + higher_prio);
+         &ready_queue, task_current->prio_current + higher_prio);
 
-      /* in case all READY tasks have lower priority, we will get NULL and no
-       * task switch will be done */
-      if( NULL != new_task ) {
+      /* we will get NULL in case all READY tasks have lower priority */
+      if (NULL != new_task)
+      {
          /* since we have new task, task_current need to be pushed to
           * ready-queue */
          os_task_makeready(task_current);
-         /* check if we are in ISR */
-         if( 0 == isr_nesting ) {
-            /* switch the context only if not in ISR */
-            arch_context_switch(new_task);
+         /* check if we were called from ISR */
+         if (0 == isr_nesting)
+         {
+            arch_context_switch(new_task); /* not in ISR, switch context */
          } else {
             /* in case of ISR, only switch the task_current pointer, context
-             * switching itself must be perfomed at the end of ISR (see
+             * switching itself must be performed at the end of ISR (see
              * arch_contextrestore_i) */
             task_current = new_task;
          }
@@ -379,35 +441,40 @@ void OS_HOT os_schedule(uint_fast8_t higher_prio)
 }
 
 /**
- * Function is simmilar to os_schedule in scope that it switches the context,
+ * Function is similar to os_schedule in scope that it switches the context,
  * but it does it always (os_schedule() may not change the task if there is no
  * READY task with higher prio).
  * This function is intended to call while task_current cannot progress any
  * further and must be blocked.
  *
- * \param task_queue task_queue on wich task_current will be blocked
- * \param block_type a couse of block
+ * @param task_queue task_queue on which task_current will be blocked
+ * @param block_type blocking root cause code
  *
- * \warning This function cannot be called from ISR!!
+ * @warning This function cannot be called from ISR!!
  */
 void OS_HOT os_block_andswitch(
    os_taskqueue_t* OS_RESTRICT task_queue,
    os_taskblock_t block_type)
 {
-  /* block current task on pointed queue */
+  /* block current task on pointed task queue */
   os_task_makewait(task_queue, block_type);
 
-  /* Chose any READY task and switch to it - at least idle task is in READY
-   * state (ready_queue) so we will never get the NULL there */
+  /* chose any READY task and switch to it - at least idle task is READY
+   * so we will never get the NULL from os_task_dequeue() */
   arch_context_switch(os_task_dequeue(&ready_queue));
 
-  /* return from arch_context_switch call will be in some of next os_schedule()
-   * call. After return task state should be again set to TASKSTATE_RUNING, also
-   * iterrupts are again disabled here (even it they where enabled for execution
-   * of previous task) */
+  /* we will return to this point after future context switch.
+   * After return task state should be again set to TASKSTATE_RUNING, also
+   * interrupts are again disabled here (since we were in OS critical section
+   * before arch_context_switch() even it they where enabled for execution of
+   * previous task) */
   task_current->state = TASKSTATE_RUNNING;
 }
 
+/**
+ * Function finalizes task execution
+ * This is the last function which should be called by OS to kill the task
+ */
 void OS_NORETURN OS_COLD os_task_exit(int retv)
 {
    arch_criticalstate_t cristate;
@@ -420,40 +487,45 @@ void OS_NORETURN OS_COLD os_task_exit(int retv)
    task_current->ret_value = retv; /* store the return value of task for future join */
    task_current->state = TASKSTATE_DESTROYED;
 
-   /* if some task is waiting for this task, we signalize the join semaphore on
-    * which some other thread is waiting in os_task_join */
-   if( NULL != task_current->join_sem ) {
-
-      /* \TODO after adding os_sem_up_sync() blocking of scheduler seems to be
-       * unnecessary, we will not call schedule() anyway .. rething it again and
-       * if really unnecessary remove sheduler locking from below */
+   /* if some task is waiting for this task, we signalize the join semaphore.
+    * This will wake up the waiting task in os_task_join() */
+   if (NULL != task_current->join_sem)
+   {
 
       /* since after join, master thread will probably remove the current task
-       * stack and task struct, we cannot switch to it while we call os_sem_up.
+       * stack and task structure, we cannot use os_sem_up().
        * We simply avoiding this by locking the scheduler. (keep in mind that
-       * critical section is different think, here we lock additionaly
-       * scheduler) */
+       * critical section is different thing than scheduler lock)
+       *
+       * \TODO after adding os_sem_up_sync() implementation blocking of
+       * scheduler seems to be unnecessary, since we do not call schedule().
+       * review this again and if really unnecessary remove scheduler locking
+       * in below code */
       os_scheduler_lock();
       os_sem_up_sync(task_current->join_sem, true);
-      os_scheduler_unlock(); /* reenable task switch by scheduler */
+      os_scheduler_unlock(); /* re-enable task switch by scheduler */
    }
 
   /* Chose any READY task and switch to it - at least idle task is in READY
    * state (ready_queue) so we will never get the NULL there
-   * Since we not saving current_task anywhere it will disapear from scheduling
-   * loop */
+   * Since we not pushing current_task anywhere it will disappear from scheduling
+   */
    arch_context_switch(os_task_dequeue(&ready_queue));
 
   /* we should never reach this point, there is no chance that scheduler picked
    * up this code again since we dropped the task */
   OS_ASSERT(0);
   arch_critical_exit(cristate); /* just to prevent warning about unused variable */
-  /* \TODO change arch_critical_enter call in this function into arch_dint() and
-   * check if this will work */
+  /* \TODO since by critical section we only whant to disable interrupts we
+   * might change arch_critical_enter call in this function into arch_dint().
+   * Review that. */
 }
 
-/* --- private functions --- */
+/* --- private function implementation --- */
 
+/**
+ * Initialize task checking mechanism
+ */
 static void os_task_check_init(os_task_t *task, void* stack, size_t stack_size)
 {
 #ifdef OS_CONFIG_CHECKSTACK
@@ -467,6 +539,9 @@ static void os_task_check_init(os_task_t *task, void* stack, size_t stack_size)
 #endif
 }
 
+/**
+ * Initialize task structure
+ */
 static void os_task_init(
    os_task_t* task,
    uint_fast8_t prio)

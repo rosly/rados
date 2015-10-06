@@ -150,7 +150,8 @@ static inline bool list_itr_end(const list_t *l, const list_t *itr)
  */
 static inline list_t *list_peekfirst (const list_t *l)
 {
-   if( l->next == l ) {
+   if( l->next == l )
+   {
       return NULL;
    } else {
    return l->next;
@@ -163,7 +164,8 @@ static inline list_t *list_peekfirst (const list_t *l)
 static inline list_t *list_detachfirst (const list_t *l)
 {
    list_t *elem = l->next;
-   if( elem == l ) {
+   if( elem == l )
+   {
       return NULL; /* means list is empty */
    }
    __list_connect_together(elem->prev, elem->next);
@@ -176,7 +178,8 @@ static inline list_t *list_detachfirst (const list_t *l)
  */
 static inline list_t *list_peeklast (const list_t *l)
 {
-   if( l->prev == l ) {
+   if( l->prev == l )
+   {
       return NULL;
    } else {
    return l->prev;
@@ -192,7 +195,8 @@ static inline void listprio_append(listprio_t *h, listprio_t *elem)
 {
     listprio_t *l = h;
     listprio_t *r = (listprio_t*)(l->list.next);
-    while((r != h) && (elem->prio <= r->prio)) {
+    while((r != h) && (elem->prio <= r->prio))
+    {
         l = r;
         r = (listprio_t*)(r->list.next);
     }
@@ -205,7 +209,8 @@ static inline void listprio_append(listprio_t *h, listprio_t *elem)
 static inline listprio_t *listprio_detachfirst(const listprio_t *l)
 {
    list_t *elem = l->list.next;
-   if( elem == (list_t*)l ) {
+   if( elem == (list_t*)l )
+   {
       return NULL; /* means list is empty */
    }
    __list_connect_together (elem->prev, elem->next);

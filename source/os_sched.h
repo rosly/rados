@@ -173,32 +173,58 @@ typedef struct os_taskqueue_tag {
 typedef void (*os_initproc_t)(void);
 typedef int (*os_taskproc_t)(void* param);
 
-/** Function initializes all internal OS structure.
+/** Function initializes OS internals.
  *
- * Function should be called form main() and never returns.
+ * Function should be called form user code main() function. It does not return.
  *
- * @param app_init Function callback which initializes architecture dependend HW
- *        and SW components from OS idle task context (for example creation of
- *        global  mutexts or semaphores, creation of other OS tasks, starting
- *        of tick timer and all SW components wchich can issue further OS
- *        function calls).
- * @param app_idle Function callback which is called by OS on every cycle of
- *        idle task. If user part of SW should perform any action while idle task
- *        is scheduled, this is the right place for this. But keep in mind that
- *        from this function, you cannot call any os OS blocking functions.
+ * @param app_init Function callback which initializes architecture dependent HW
+ *        and SW components from context of OS idle task (for example creation
+ *        of global  mutexes or semaphores, creation of other OS tasks, starting
+ *        of tick timer and all SW components which would need to call OS
+ *        functions
+ * @param app_idle Function callback which is called by OS in each turn of idle
+ *        task. This callback can be used to perform user actions from context
+ *        of idle task, but keep in mind that it cannot call any OS blocking
+ *        functions.
  *
- * @pre prior this function call, all architecture depended HW setup must be
- *      done to level which allows stable and uninterrupted C enviroment execution
- *      (this includes .bss and .data sections initialization, stack and frame
- *      pointer initialization, watchdog and interrupts disabling etc)
- * @pre It is important that prior this function call, interrupts must be disabled
+ * @pre prior this function call, all architecture depended HW and SW setup must
+ *      be finished. This includes .bss and .data sections initialization, stack
+ *      and frame pointer initialization, watchdog and interrupts disabling etc)
+ * @pre It is important that prior this function call, interrupts must be
+ *      disabled
  *
- * @note It is guarantieed that app_init will be called before app_idle
+ * @note It is guarantied that app_init will be called before app_idle
  */
 void os_start(
    os_initproc_t app_init,
    os_initproc_t app_idle);
 
+/**
+ * Function creates user tasks
+ *
+ * There is no limit for number of user tasks.
+ *
+ * @param task pointer to task structure TCB
+ * @param prio priority of the task. Allowed priorities are 0 < prio <
+ *        OS_CONFIG_PRIOCNT. Many task may share the same priority. In case more
+ *        than one task would be in READY state, they are scheduled in round
+ *        robin manner.  Such task are also threated in FIFO manner for all
+ *        synchronization resources (mtx, sem etc)
+ * @param stack pointer to stack memory. Each task has to have at least minimal
+ *        stack size which will allow for execution of designed nested level of
+ *        interrupt without overflow of the stack. SW can verify if task stack
+ *        was not overflowed by calling os_task_check() (see OS_CONFIG_CHECKSTACK)
+ * @param stack_size size of the given stack
+ * @param entry point function of the task
+ * @param user defined parameter given to entry point function
+ *
+ * @pre OS must be initialized before any task may be created (call os_start)
+ * @pre this function cannot be called from ISR
+ *
+ * @post the created task would be scheduled immediately if it would have
+ *       priority bigger than the task that call os_task_create(). Therefore
+ *       caller may return after created task would block on resource.
+ */
 void os_task_create(
    os_task_t *task,
    uint_fast8_t prio,
@@ -207,26 +233,57 @@ void os_task_create(
    os_taskproc_t proc,
    void* param);
 
+/**
+ * By calling the function one task can wait until task given by parameter
+ * will exit from its own entry point function. Return value from task entry
+ * point function is returned to waiter.
+ *
+ * @param task pointer to task structure (TCB) on which caller would like
+ *        join/wait for exit
+ *
+ * @pre task can not be already finished/joined
+ * @pre function cannot be called from ISR
+ * @pre since this function would block it cannot be called from idle task
+ *
+ * @post stack and task structure (TCB) of the joined task may be safely removed
+ *       after return from os_task_join(). It can be also reused for another
+ *       task creation.
+ *
+ * @return return code from task entry point of joined task
+ */
 int os_task_join(os_task_t *task);
 
+/**
+ * Function verify if task stack was not overflowed
+ *
+ * @param task pointer to task structure which stack we would like to verify
+ *
+ * @pre task must be valid, initialized not finished
+ *
+ * @post in case function detects stack corruption it internally calls os_halt()
+ */
 void os_task_check(os_task_t *task);
 
-/** System tick function
+/**
+ * System tick function (system timer interrupt)
  *
  * This function need to be called from ISR. It kicks the timer subsystem and
- * also trigers the preemption mechanism
+ * also triggers the preemption mechanism. The frequency of os_tick() call is
+ * user defined and it defined a jiffy. All timeouts for time guarded OS
+ * blocking functions are measured in jiffies.
  *
  * @pre can be called only from ISR
  */
 void OS_HOT os_tick(void);
 
-/** Function halt the system
+/**
+ * Function halt the system
  *
  * The main purpose of this function is to lock the execution in case of
  * critical error. This function can be used as final stage of user assert
- * failure code.
+ * failure code. This function never returns and no other task will be
+ * scheduled. The system will be deadlocked in busy loop of os_halt() code.
  */
-
 void OS_COLD os_halt(void);
 
 #endif

@@ -71,7 +71,7 @@ struct os_taskqueue_tag;
 struct os_sem_tag;
 struct os_waitqueue_tag;
 
-/** Definition of Task Struct - Task Control Block - TCB */
+/** Definition of Task Structure - Task Control Block - TCB */
 typedef struct {
   /** need to be the first field for easy access to it from ASM ctx switch code
    * for more info about the context store see arch_context_t */

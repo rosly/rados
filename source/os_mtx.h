@@ -35,9 +35,9 @@
 /**
  * Mutex is synchronization primitive. Comparing to semaphores it has
  * following differences:
- * - mutex cannot be used from ISR
  * - mutex can have only two states: locked/unlocked (works as a flag),
  *   while semaphore can have multiple values (works as a counter)
+ * - mutex cannot be used from ISR
  * - mutex has concept of ownership. The locked mutex can be unlocked only by
  *   the owner (task which recently lock it up), unlocking from another task will
  *   result in assertion, this may be seen as error checking feature of the mutex
@@ -53,8 +53,9 @@
  *   the first reason of timeout for mutexes in RTOS is mitigating deadlocks
  *   BUGS. Using timeout as a solution for deadlock BUGS is really bad idea.
  *   Other reasons where timeout for mtx are needed are usually when application
- *   is not well designed and it cannot meet real-time constrains.  All
- *   requirement's and limitation of CPU and OS should be known prior coding).
+ *   is not well designed and it cannot meet real-time constrains. All
+ *   requirement's and limitation of CPU and OS should be known prior
+ *   application design).
  */
 
 /** Definition of mutex structure */
@@ -76,14 +77,21 @@ typedef struct {
 } os_mtx_t;
 
 /**
- * Function initializes the mutex structure given by @param mtx
+ * Function creates the mutex.
+ *
+ * Mutex structure can be allocated by from any memory. Function initializes
+ * mutex structure given by @param mtx (does not use dynamic memory of any
+ * kind).
  *
  * @param pointer to mutex
  */
 void os_mtx_create(os_mtx_t* mtx);
 
 /**
- * Function destroys the mutex given by @param mtx
+ * Function destroys the mutex
+ *
+ * Function does overwite mutex structure memory. As same as with
+ * os_mtx_create() it does not use any dynamic memory.
  *
  * @param pointer to mutex
  *
@@ -98,13 +106,15 @@ void os_mtx_create(os_mtx_t* mtx);
  * @post mutex will be uninitialized after this call. Such mutex cannot be used
  *       by any other function until it will be initialized again. It means that
  *       user code has to prevent race conditions of accessing such mutex after
- *       return from os_mtx_destroy(). Threads which had waited for mutex before
- *       os_mtx_destroy() will be released with OS_DESTROYED return code from
- *       os_mtx_lock(). But calls of os_mtx_lock() after os_mtx_destroy() have
- *       returned are forbidden.
- *
+ *       return from os_mtx_destroy(). Threads which was suspended on mutex
+ *       prior call of os_mtx_destroy() will be released with OS_DESTROYED
+ *       return code from os_mtx_lock(). But calls of os_mtx_lock() after
+ *       os_mtx_destroy() have returned are forbidden.
  * @post this function also reset the prio of calling thread in case it was
  *       boosted by priority inheritance
+ * @post this function may cause preemption since this function wakes up threads
+ *       suspended on mutex (possibly with higher priority than calling
+ *       thread)
  */
 void os_mtx_destroy(os_mtx_t* mtx);
 
@@ -117,11 +127,11 @@ void os_mtx_destroy(os_mtx_t* mtx);
  *
  * @pre mutex must be initialized prior call of this function (please look at to
  *      description of possible race conditions with os_mtx_destroy()
- * @pre this function cannot be used from ISR
+ * @pre this function cannot be used from ISR nor idle task
  *
  * @return OS_OK in case mutex was successfully locked by calling thread
- *         OS_DESTROYED in case mutex was destroyed while calling thread waits
- *         for acquiring of the lock
+ *         OS_DESTROYED in case mutex was destroyed while calling thread was
+ *         suspended on the lock operation
  * @note user code should always check the return code of os_mtx_lock()
  */
 os_retcode_t OS_WARN_UNUSEDRET os_mtx_lock(os_mtx_t* mtx);

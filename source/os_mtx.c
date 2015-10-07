@@ -128,16 +128,16 @@ static void os_mtx_unlock_prio_reset(void)
       while (false == list_itr_end(&(task_current->mtx_list), itr))
       {
          itr_mtx = os_container_of(itr, os_mtx_t, listh);
-         /* peek (not dequeue) top prio task that waits for this mtx */
+         /* peek (not dequeue) top prio task that is suspended on this mtx */
          task = os_task_peekqueue(&(itr_mtx->task_queue));
          if (task)
          {
             /* os_max() means take bigger from two. It is important that we use
              * task->prio_current not task->prio_base since we would like to
-             * include nested lock dependency. Therefore if some task has inherited
-             * priority due lock dependency and waits for mtx which we still own,
-             * we would like to also inherit this priority (not only inherit the
-             * base priority of this task) */
+             * include nested lock dependency. In other words if some task has
+             * inherited priority due its lock dependency and is still suspended
+             * on mtx which we own, we would like to also inherit this boosted
+             * priority (not only inherit the base priority of this task) */
             prio_new = os_max(prio_new, task->prio_current);
          }
          itr = itr->next; /* advance to next mtx on list */
@@ -284,7 +284,8 @@ void os_mtx_unlock(os_mtx_t* mtx)
          os_mtx_set_owner(mtx, task); /* lock and set ownership */
          task->block_code = OS_OK; /* set the block code to NORMAL WAKEUP */
          os_task_makeready(task);
-         os_schedule(1); /* switch to ready task only when it has higher prio (1 as param) */
+         os_schedule(1); /* switch to ready task only when it has higher prio (1
+                            as param of os_schedule(0 means just that) */
       }
    } while (0);
    arch_critical_exit(cristate);

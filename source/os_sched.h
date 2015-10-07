@@ -286,5 +286,21 @@ void OS_HOT os_tick(void);
  */
 void OS_COLD os_halt(void);
 
+/**
+ * Function finalizes task execution
+ *
+ * This is the last function which should be called by OS to kill the task.
+ * Usually it is called by arch dependent code after return from task entry
+ * point function. User also can call this function at will in case the task
+ * does not hold any resources like mutex, which can lead to deadlocking of the
+ * system. os_task_exit() accepts task return code as parameter. After calling
+ * os_task_exit() another task may reclaim the task return code as well as their
+ * stack and task structure (TCB) by calling os_task_join().
+ *
+ * @pre task may not hold resources which may lead to system deadlock
+ * @post this function does not return
+ */
+void OS_NORETURN OS_COLD os_task_exit(int retv);
+
 #endif
 

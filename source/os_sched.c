@@ -516,10 +516,11 @@ void OS_NORETURN OS_COLD os_task_exit(int retv)
   /* we should never reach this point, there is no chance that scheduler picked
    * up this code again since we dropped the task */
   OS_ASSERT(0);
-  arch_critical_exit(cristate); /* just to prevent warning about unused variable */
-  /* \TODO since by critical section we only whant to disable interrupts we
+  arch_critical_exit(cristate); /* just to silence warning about unused variable */
+  /* \TODO since by critical section we only want to disable interrupts we
    * might change arch_critical_enter call in this function into arch_dint().
    * Review that. */
+  while (1); /* just to silence warning about return from function */
 }
 
 /* --- private function implementation --- */

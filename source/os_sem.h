@@ -109,14 +109,14 @@ void os_sem_destroy(os_sem_t* sem);
  *
  * @param sem pointer to semaphore
  * @param timeout_ticks number of jiffies (os_tick() call count) before
- *        operation will time out. If user would like not to use timeout than
- *        OS_TIMEOUT_INFINITE should be used as
- *        parameter. If user would like to perform TRY operation (which will
- *        return without consuming signal in case thread would need to be
- *        blocked) than OS_TIMEOUT_TRY should be used as parameter. In that case
- *        function return code will be OS_WOULDBLOCK.
+ *        operation will time out. If user would like to not use of timeout, than
+ *        @param timeout should be OS_TIMEOUT_INFINITE.
+ *        If user would like to perform TRY operation (which will return instead
+ *        of suspending the thread) than @param timeout should be
+ *        OS_TIMEOUT_TRY. In this scenario function return code will be
+ *        OS_WOULDBLOCK.
  *
- * @pre semaphore must be initialized prior call of this function (please look at to
+ * @pre semaphore must be initialized prior call of this function (please look at
  *      description of possible race conditions with os_sem_destroy()
  * @pre this function cannot be used from ISR nor idle task
  *
@@ -125,7 +125,7 @@ void os_sem_destroy(os_sem_t* sem);
  *         suspended on semaphore
  *         OS_WOULDBLOCK in case semaphore did not contain any signals and
  *         @param timeout was OS_TIMEOUT_TRY
- *         OS_TIMEOUT in case operation had timeouted
+ *         OS_TIMEOUT in case operation timeout expired
  * @note user code should always check the return code of os_sem_down()
  */
 os_retcode_t OS_WARN_UNUSEDRET os_sem_down(

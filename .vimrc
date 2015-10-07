@@ -32,8 +32,8 @@ endif
 
 function! GnuIndent()
   setlocal cinoptions=>4,n-2,{2,^-2,:2,=2,g0,h2,p5,t0,+2,(0,u0,w1,m1
-  setlocal shiftwidth=2
-  setlocal tabstop=8
+  setlocal shiftwidth=3
+  setlocal tabstop=3
   highlight default link LinuxError ErrorMsg
   syn match LinuxError / \+\ze\t/     " spaces before tab
   syn match LinuxError /\s\+$/        " trailing whitespaces

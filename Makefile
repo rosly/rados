@@ -1,5 +1,5 @@
 # This file is a part of RadOs project
-# Copyright (c) 2013, Radoslaw Biernaki <radoslaw.biernacki@gmail.com>
+# Copyright (c) 2013, Radoslaw Biernacki <radoslaw.biernacki@gmail.com>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without

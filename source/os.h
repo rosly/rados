@@ -42,15 +42,6 @@
 #include "os_mtx.h"
 #include "os_waitqueue.h"
 
-#define ASSERT(_cond) \
-   do \
-   { \
-      if (OS_UNLIKELY(!(_cond))) \
-      { \
-         os_halt(); \
-      } \
-   }while(0)
-
 /* need to be visiable for user because of arch_contextstore_i macros */
 extern os_task_t* task_current;
 

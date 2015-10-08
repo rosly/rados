@@ -16,7 +16,7 @@ RM       = rm -f
 MV       = mv
 
 ifeq ($(DEBUG),)
-CFLAGS   = -O3 -flto
+CFLAGS   = -O3
 else
 #for debug buld we use -O0 do not obstruct the generated code
 CFLAGS   = -O0

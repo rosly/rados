@@ -62,8 +62,8 @@ void os_sem_destroy(os_sem_t* sem)
       task->block_code = OS_DESTROYED;
       os_task_makeready(task);
    }
-   /* finally we destroy all semaphore data, this can create problems if
-    * semaphore is used in interrupt context (feel warned) */
+   /* destroy all semaphore data, this can create problems if semaphore is used
+    * in interrupt context (feel warned) */
    memset(sem, 0, sizeof(os_sem_t));
 
    /* schedule to make context switch in case os_sem_destroy() was called by
@@ -164,9 +164,10 @@ void os_sem_up_sync(os_sem_t* sem, bool sync)
       task->block_code = OS_OK; /* set the block code to NORMAL WAKEUP */
       os_task_makeready(task);
 
-      /* do not call schedule() if user does not request that
-       * user code may call some other OS function right away to trigger the
-       * scheduler(). Parameter 'sync' is used for such optimization request */
+      /* do not call schedule() if user have some plans to do so.
+       * User code may call some other OS function right away which will trigger
+       * the os_schedule(). Parameter 'sync' is used for such optimization
+       * request */
       if (!sync)
       {
          /* switch to more prioritized READY task, if there is such (1 as param
@@ -180,8 +181,8 @@ void os_sem_up_sync(os_sem_t* sem, bool sync)
 /* --- private functions --- */
 
 /**
- * Function called by timers module. Used for timeout of os_sem_down()
- * operations. Callback to this function are done from os_timer_tick() context
+ * Function called by timers module. Used for timeout of os_sem_down().
+ * Callback to this function are done from contxt of os_timer_tick().
  */
 static void os_sem_timerclbck(void* param)
 {
@@ -190,7 +191,9 @@ static void os_sem_timerclbck(void* param)
 
    OS_SELFCHECK_ASSERT(TASKSTATE_WAIT == task->state);
 
-   os_task_unlink(task); /* remove task from semaphore task queue */
+   /* remove task from semaphore task queue (in os_sem_up() the
+    * os_task_dequeue() does that */
+   os_task_unlink(task);
    task->block_code = OS_TIMEOUT;
    os_task_makeready(task);
    /* we do not call the os_schedule() here, because this will be done at the

@@ -192,7 +192,8 @@ static inline void os_task_makewait(
    os_taskqueue_t *task_queue,
    os_taskblock_t block_type)
 {
-   //task_current->block_code = OS_INVALID;
+   /* task_current->block_code = OS_INVALID; should no be needed if correctly
+    * set during all wakeups */
    task_current->state = TASKSTATE_WAIT;
    task_current->block_type = block_type;
    os_task_enqueue(task_queue, task_current);

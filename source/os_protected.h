@@ -62,5 +62,15 @@ OS_STATIC_ASSERT(sizeof(os_ticks_t) >= sizeof(uint16_t));
 OS_STATIC_ASSERT(ARCH_TICKS_MAX >= (UINT16_MAX - 1));
 #define OS_TICKS_MAX ARCH_TICKS_MAX
 
+/** Return codes for OS API functions */
+typedef enum {
+   OS_OK = 0,     /**< Operation successful */
+   OS_WOULDBLOCK, /**< Operation would block */
+   OS_TIMEOUT,    /**< operation timeouted */
+   OS_DESTROYED,  /**< Operation failed due resource was destroyed in flight */
+   OS_OVERFLOW,   /**< Operation overflowed */
+   OS_INVALID     /**< Invalid operation */
+} os_retcode_t;
+
 #endif
 

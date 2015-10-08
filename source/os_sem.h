@@ -53,6 +53,11 @@
  *   code from os_sem_down() will be OS_TIMEOUTED
  */
 
+/**
+ * Definition of no limit for os_sem_create() limit parameter
+ */
+#define OS_SEM_NOLIMIT OS_ATOMIC_MAX
+
 /** Definition of semaphore structure */
 typedef struct os_sem_tag {
    /** queue of threads suspended on this semaphore */
@@ -60,6 +65,9 @@ typedef struct os_sem_tag {
 
    /* Semaphore value, os_atomit_c since semaphores can be incremented from ISR */
    os_atomic_t value;
+
+   /* Semaphore limit */
+   os_atomic_t limit;
 
 } os_sem_t;
 
@@ -72,8 +80,14 @@ typedef struct os_sem_tag {
  *
  * @param sem pointer to semaphore
  * @param init_value initial value of semaphore, must be >= 0 and < * OS_ATOMIC_MAX
+ * @param limit maximal value of semaphore, the value of semaphore will be
+ *              clamped to given limit. OS_SEM_NOLIMIT can be used to create
+ *              unlimited semaphore. limit must be > 1
  */
-void os_sem_create(os_sem_t* sem, os_atomic_t init_value);
+void os_sem_create(
+   os_sem_t* sem,
+   os_atomic_t init_value,
+   os_atomic_t limit);
 
 /**
  * Function destroys the semaphore
@@ -146,10 +160,15 @@ os_retcode_t OS_WARN_UNUSEDRET os_sem_down(
  *        helps to save CPU cycles by preventing from unnecessary context
  *        switches.
  *
- * @pre this function CAN be called from ISR. This is one of basic use cases for
- *      semaphore.
+ * @pre this function CAN be called from ISR.
+ *
+ * @return OS_OK in case of nonlimited semaphore (alvays)
+ *         OS_OVERFLOW on case of limited semaphore which would overflow the
+ *                     limit
  */
-void os_sem_up_sync(os_sem_t* sem, bool sync);
+os_retcode_t OS_WARN_UNUSEDRET os_sem_up_sync(
+   os_sem_t* sem,
+   bool sync);
 
 /**
  * Function signalizes the semaphore

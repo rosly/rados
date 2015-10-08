@@ -37,13 +37,18 @@ static void os_sem_timerclbck(void* param);
 /* --- public functions --- */
 /* all public functions are documented in os_sem.h file */
 
-void os_sem_create(os_sem_t* sem, os_atomic_t init_value)
+void os_sem_create(
+   os_sem_t* sem,
+   os_atomic_t init_value,
+   os_atomic_t limit)
 {
    OS_ASSERT(init_value < OS_ATOMIC_MAX);
+   OS_ASSERT(limit > 1);
 
    memset(sem, 0, sizeof(os_sem_t));
    os_taskqueue_init(&(sem->task_queue));
    sem->value = init_value;
+   sem->limit = limit;
 }
 
 void os_sem_destroy(os_sem_t* sem)
@@ -133,10 +138,11 @@ os_retcode_t OS_WARN_UNUSEDRET os_sem_down(
    return ret;
 }
 
-void os_sem_up_sync(os_sem_t* sem, bool sync)
+os_retcode_t OS_WARN_UNUSEDRET os_sem_up_sync(os_sem_t* sem, bool sync)
 {
-   arch_criticalstate_t cristate;
+   os_retcode_t ret = OS_OK;
    os_task_t *task;
+   arch_criticalstate_t cristate;
 
    /* \TODO implement nbr in function param so we can increase the semaphore
     * number more than once. To make it work in this way we have also to wake
@@ -145,36 +151,46 @@ void os_sem_up_sync(os_sem_t* sem, bool sync)
     * waitqueue_wakeup() */
 
    arch_critical_enter(cristate);
-
-   /* check if semaphore value would overflow */
-   OS_ASSERT(sem->value < (OS_ATOMIC_MAX - 1));
-
-   /* check if there are some suspended tasks on this sem */
-   task = os_task_dequeue(&(sem->task_queue));
-   if (NULL == task)
+   do
    {
-      /* there was no suspended tasks, in this case just increment the sem value */
-      ++(sem->value);
-   } else {
-      /* there is suspended task, we need to wake it up
-       * we need to destroy the guard timer of this task, because otherwise it
-       * may fire right after we leave the critical section */
-      os_blocktimer_destroy(task);
-
-      task->block_code = OS_OK; /* set the block code to NORMAL WAKEUP */
-      os_task_makeready(task);
-
-      /* do not call schedule() if user does not request that
-       * user code may call some other OS function right away to trigger the
-       * scheduler(). Parameter 'sync' is used for such optimization request */
-      if (!sync)
+      /* check if there are some suspended tasks on this sem */
+      task = os_task_dequeue(&(sem->task_queue));
+      if (!task)
       {
-         /* switch to more prioritized READY task, if there is such (1 as param
-          * in os_schedule() means just that */
-         os_schedule(1);
+         /* there was no suspended tasks, in this case just increment the sem
+          * value while checking if semaphore value would overflow (in case
+          * sem->limit would be OS_SEM_NOLIMIT = OS_ATOMIC_MAX we must have
+          * decrement sem->limit by one to avoid overflow in the compare itself) */
+         if (sem->value > (sem->limit - 1))
+         {
+            ret = OS_OVERFLOW;
+            break;
+         }
+         ++(sem->value);
+
+      } else {
+         /* there was suspended task, we need to wake it up
+          * we need to destroy the guard timer of this task, because otherwise it
+          * may fire right after we leave the critical section */
+         os_blocktimer_destroy(task);
+
+         task->block_code = OS_OK; /* set the block code to NORMAL WAKEUP */
+         os_task_makeready(task);
+
+         /* do not call schedule() if user does not request that
+          * user code may call some other OS function right away to trigger the
+          * scheduler(). Parameter 'sync' is used for such optimization request */
+         if (!sync)
+         {
+            /* switch to more prioritized READY task, if there is such (1 as param
+             * in os_schedule() means just that */
+            os_schedule(1);
+         }
       }
-   }
+   } while (0);
    arch_critical_exit(cristate);
+
+   return ret;
 }
 
 /* --- private functions --- */

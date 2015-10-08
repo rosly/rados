@@ -57,15 +57,6 @@ typedef enum {
    OS_TASKBLOCK_WAITQUEUE    /**< Task blocked on wait_queue */
 } os_taskblock_t;
 
-/** Return codes for OS API functions */
-typedef enum {
-   OS_OK = 0,     /**< Operation successful */
-   OS_WOULDBLOCK, /**< Operation would block */
-   OS_TIMEOUT,    /**< operation timeouted */
-   OS_DESTROYED,  /**< Operation failed due resource was destroyed in flight */
-   OS_INVALID     /**< Invalid operation */
-} os_retcode_t;
-
 /* --- forward declarations --- */
 struct os_taskqueue_tag;
 struct os_sem_tag;

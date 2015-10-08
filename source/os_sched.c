@@ -195,7 +195,7 @@ int os_task_join(os_task_t *task)
 
       /* it seems not, so we have to wait until it will finish
        * we will wait for it by blocking on semaphore */
-      os_sem_create(&join_sem, 0);
+      os_sem_create(&join_sem, 0, OS_SEM_NOLIMIT);
       task->join_sem = &join_sem;
       ret = os_sem_down(&join_sem, OS_TIMEOUT_INFINITE);
       OS_ASSERT(OS_OK == ret);
@@ -503,7 +503,8 @@ void OS_NORETURN OS_COLD os_task_exit(int retv)
        * review this again and if really unnecessary remove scheduler locking
        * in below code */
       os_scheduler_lock();
-      os_sem_up_sync(task_current->join_sem, true);
+      os_retcode_t ret = os_sem_up_sync(task_current->join_sem, true);
+      ret = ret; /* non limited sem, ignore the return value */
       os_scheduler_unlock(); /* re-enable task switch by scheduler */
    }
 

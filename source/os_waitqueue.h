@@ -33,98 +33,131 @@
 #define __OS_WAITQUEUE_
 
 /**
- * Wait_queue is synchronization primitive simmilar to concept used in Linux kernel
+ * Wait_queue is synchronization primitive used for all variety of
+ * notifier-receiver scenarios including those that involve data exchange like
+ * producer-consumer
  *
- * The idea behind wait_queue is to allow programer to synchronize os task, with
- * asynchronius events without need of pooling. In this case we usualy need to
- * chek kind of condition and if it is not meet we need to sleep the task. The
- * problem is that betwen condition check and some sort of sleep call, the
- * asynchronius event may hit, and receiver code will not have oportunity to be
- * notified about it. The result will be missup of this event, since we will
- * need just another one to wake up the task from sleep call.
- *
- * In wait queue following sniplet of code can be used on receiver side:
- * 0: os_atomic_t conditional_test;
+ * Following template of code is used on receiver side:
+ * 0: uint32_t test_condition; does not have to be atomic type
  *
  * 1: while(1) {
  * 2:   os_waitqueue_prepare(&waitqueue, timeout);
- * 3:   if(conditional_test) {
+ * 3:   if(test_condition) {
  * 4:      os_waitqueue_finish();
  * 5:      break;
  * 6:   }
  * 7:   ret = os_waitqueue_wait();
  * 8: }
  *
- * On notifier side following sniplet can be used:
- * 10: conditional_test = true;
+ * Following template is used on notifier side:
+ * 10: conditional_test = 1;
  * 11: os_waitqueue_wakeup(&waitqueue);
  *
- * The main goal is to wake the receiver while avoiding the race ondition betwen
- * conditional_test and os_waitqueue_wait() call. In some cases such problem
- * can be also solved by using of semaphore but wait_queues has several
- * advantages over semaphore.
- * - for producer-consumer scenarios where consumer task would just like to
- *   know if there was any notification (not how many of them) semaphore is not
- *   really the best choice from synchronization primitives. It's because in
- *   case multiple events will be signalized before receiver will suspend on
+ * Wait_queue has following characteristics:
+ * - it is a building block for notifier/receiver scenario where notifier side
+ *   triggers notification and receiver side is being notified about event
+ * - could be used as synchronization mechanism for data exchange scenario
+ *   between parties but it is not bounded to data type being exchanged or
+ *   exchange scheme.
+ * - the notifier side calls os_waitqueue_wakeup() in order to notify the
+ *   receiver.
+ * - the receiver side calls two functions in row, os_waitqueue_prepare() and
+ *   than os_waitqueue_wait() in order to suspend for event or
+ *   os_waitqueue_finish() in order to break from suspend loop
+ * - wait_queue does not accumulate notifications. In other words any
+ *   notification posted when no receiver is waiting on wait_queue will be lost.
+ *   It means that notification will not make any effects on future of receiver
+ *   actions in case notifier calls os_waitqueue_wakeup() before receiver enter
+ *   to os_waitqueue_prepare() or already exit from os_waitqueue_wait().  But if
+ *   notifier calls os_waitqueue_wakeup() after receiver entered to
+ *   os_waitqueue_prepare() and before return from os_waitqueue_wait() it is
+ *   guarantied to wake up the receiver task (is is guarantied that
+ *   os_waitqueue_wait() will force receiver to return).
+ * - usage of work_queues eliminates the race condition which may arise between
+ *   receiver check the test_condition and suspend on os_waitqueue_wait().
+ * - it also means that condition in line 3 does not have to be atomic. It only
+ *   cannot give false positives. There is guarantee that after calling
+ *   os_waitqueue_prepare() the receiver task will either see the condition_test
+ *   to be true or it will be woken up to check the condition_test again.
+ *
+ * - wait_queue should be used instead of semaphore in scenarios where receiver
+ *   task would just like to know if there was any notification (not how many of
+ *   them). If we really would like to use semaphore for that case, than in case
+ *   multiple events will be signalized before receiver will suspend on
  *   semaphore, the cumulative semaphore value will be greater than 1.  This
- *   would require from receiver to spin several times in busy loop until it
- *   finally suspend on semaphore. The reason for that is receiver need to
- *   consume all signals from semaphore.
- * - wait_queue can be seen as "message box" or "message queue" form more
- *   traditional RTOS'es, but withound conceptual bounding to paticular data
- *   structure (like data pointer in case of message box or queue of data
- *   pointers for message queue). It means that wait_queue is more generic and
- *   data agnostic which allows to be used not only for data passing scheme.
- * - when using semaphores in scenarios where single notifier would like to wake
- *   up multiple receivers, we would have to know the number of receivers to be
- *   able to signalize the semaphore required number of times. In case of
- *   wait_queue we don't have to know the number of the receivers to wake all of
- *   them, notifier can simply pass OS_WAITQUEUE_ALL as nbr parameter of
- *   os_waitqueue_wakeup()
- * - os_waitqueue_prepare is very fast because it has optimized path for cases
- *   where task does not really need to sleep. Wait_queue is much faster then
- *   semaphore since we don't need to disable interrupts for
- *   os_waitqueue_prepare() (to be exact unless we specify timeout guard for
- *   that call).
+ *   would potentially require that receiver should spin several times in busy
+ *   loop to detect that there was no new event before finally suspend on
+ *   empty semaphore. Semaphore limit also does not solve the case since we
+ *   would have to modify the condition than signalize the semaphore. In case of
+ *   two notifications in row it is possible that receiver will preempt notifier
+ *   between condition change and second signalization of semaphore. Receiver
+ *   will than check status of second condition change and could wrap around back
+ *   to suspend on semaphore. After context switch to notifier it will finish
+ *   the remain signalization of semaphore which will unnecessary wake up
+ *   receiver.
+ * - wait_queue also allows to implement more sophisticated scenarios like where
+ *   single notifier would like to wake up multiple receivers. Again semaphore
+ *   cannot be really used for that, since we would have to know the number of
+ *   receivers to be able to signalize the semaphore required number of times.
+ *   Even so there is no guarantee that all tasks will be woken up since one or
+ *   more tasks may consume more than one signal from semaphore. In case of
+ *   wait_queue we don't have to know the number of the receivers since it
+ *   natively support such scenario (to wake up all the suspended threads, nbr
+ *   parameter from os_waitqueue_wakeup() should be given as OS_WAITQUEUE_ALL,
+ *   no mater how many of task are currently suspended on wait_queue, all of
+ *   them will be woken up excluding future wakeups of those which were not
+ *   suspended in moment of os_waitqueue_wakeup() call.
+ * - wait_queue does not disable interrupts in case receiver does not have to
+ *   suspend nor use timeouts. This is because os_waitqueue_prepare() nor
+ *   os_waitqueue_finalize() does not disable interrupts in such cases. Such
+ *   approach mitigate adding of unnecessary jitter to interrupt service delay.
  *
- * This primitive works by utilizing the fact that task durring task switch,
- * scheduler schecks the task_current->wait_queue pointer. If that pointer is
- * set, it does not push the task_current into ready_queue (where it will wait
- * for futire schedule()) but instead, it put it into wait_queue->task_queue (a
- * task queue asosiated with wait_queue).
+ * The main goal of wait_queue implementation is to wake the receiver while
+ * mitigating the race condition between conditional_test and
+ * os_waitqueue_wait() call. If such race condition happen it would mean that
+ * there was a preemption (either to other user task or to interrupt).
+ * Wait_queue works by utilizing the fact that during task switch,
+ * scheduler checks the value of task_current->wait_queue pointer. If that
+ * pointer is set, it does not push the task_current into ready_queue (where it
+ * will wait for future schedule()) but instead, it put it into
+ * wait_queue->task_queue (a task queue associated with wait_queue). This action
+ * itself is the same what happens during os_waitqueue_wait() call. It mens
+ * that the receiver is either way putted into sleep.
  *
- * The proff of concept is following. We must to consider 3 places where
- * preemption may kick-in and ISR or some other task may issue lines 10 and 11
- * on notifier side.
- * 1) betwen line 2 and 3
- * 2) betwen line 6 and 7
+ * The proof of concept is following. We must to consider 3 places where
+ * interrupt or preemption may kick-in. This allows other task/ISR to issue
+ * lines 10 and 11 on notifier side.
+ * 1) between line 2 and 3
+ * 2) between line 6 and 7
  *
- * One additional spot is betwen lines 3 and 4 but there task already knows that
+ * One additional spot is between lines 3 and 4 but there task already knows that
  * it was signalized (because condition was meet) and it just need to clean-up
- * with os_waitqueue_finish() call
+ * with os_waitqueue_finish() call.
+ *
+ * There are two main cases depending if receiver task would be preempted or
+ * interrupt will be issued.
  *
  * If receiver is cooperating with ISR, both lines 10 and 11 are issued
- * simoutaniusly form user task perspective.i Additionaly keep in mind that
- * durring ISR which preempt mentioned 3 points, task_current is set to task
- * which we consider as wounerable. If we look at os_waitqueue_wakeup() we will
- * see that there is a special case for this.
- * 1) task_current->wait_queue is atomicaly set before ISR, so in ISR line 10
- *    and 11 are done atomicaly to user code. If we look at
+ * simultaneously form user task perspective. Additionally keep in mind that
+ * during ISR which may happen between mentioned 3 points, task_current is set
+ * to task which we consider as vulnerable. If we look at os_waitqueue_wakeup()
+ * we will see that there is a special case for this.
+ * 1) task_current->wait_queue is atomically set before ISR, so in ISR line 10
+ *    and 11 are done atomically vs the user code. If we look at
  *    os_waitqueue_wakeup_sync it will show that there is special case that
  *    detects that we are in ISR and we preempted the task which waits on the
  *    same condition which we try to signalize. In this case we only set
  *    task_current->wait_queue = NULL
- * 2) if we look at os_waitqueue_wait() we will see that it veiry if
- *    task_current->wait_queue is still set, if not it exits righ away. It will be
+ * 2) if we look at os_waitqueue_wait() we will see that it verify if
+ *    task_current->wait_queue is still set, if not it exits right away. It will be
  *    NULL since we set it to NULL in line 11 of ISR (inside os_waitqueue_wakeup())
  *
  * If receiver is cooperating with some other task, then in
  * os_waitqueue_wakeup() the task_current is set to different value then task
  * which wait for condition. In other words now it is different story comparing
- * to ISR. What is more important, line 10 and 11 may not be issued atomicaly.
+ * to ISR. What is more important, line 10 and 11 may not be issued atomically.
  * 1) if we will have task preemption at this point it is enough that notifier
- *    execute line 10, since receiver will detect that in line 3 (and will skipp
+ *    execute line 10, since receiver will detect that in line 3 (and will skip
  *    the sleep). If notifier will execute also line 11 it will see the
  *    receiver task in wait_queue->task_queue since scheduler puts it there while
  *    preempting (look at os_task_makeready() and NULL != task->wait_queue

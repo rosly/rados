@@ -102,6 +102,7 @@ void os_waitqueue_prepare(
    }
 }
 
+/* \TODO change it to os_waitqueue_break() */
 void os_waitqueue_finish(void)
 {
    OS_ASSERT(0 == isr_nesting); /* this function may be called only form user code */

@@ -30,17 +30,18 @@
  */
 
 /**
- * /file Test os OS port (step 2)
+ * /file Test OS port (step 2)
  * /ingroup tests
  *
  * This is second of basic test to check the port.
  * This test verify arch_context_switch() implementation and checks if task can
- * be switched betwen two task while blocking on sem and signalizing the
- * oposite, Also test some minor features like task param, task return value,
+ * be switched between two task while blocking on sem and signalizing the
+ * opposite. Also test some minor features like task param, task return value,
  * and task finalization.
- * Test if following services are implemented corecly:
- * - arch_context_switch implemented corectly (will be called at each task blocking call)
- * - arch_task_init implemented correcly(at least param passing and calling
+ * Test if following services are implemented correctly:
+ * - arch_context_switch implemented correctly (will be called at each task
+ *   blocking call)
+ * - arch_task_init implemented correctly(at least param passing and calling
  *   os_task_test_result at the end of task lifetime) /{
  */
 
@@ -62,7 +63,8 @@ static task_data_t  task_data[2];
 
 void test_idle(void)
 {
-   /* both task must run exacly X times, smaller value means OS scheduling bug */
+   /* both task must run exactly TEST_CYCLES times, different value means OS
+    * scheduling bug */
    test_assert(TEST_CYCLES == task_data[0].loop);
    test_assert(TEST_CYCLES == task_data[1].loop);
    test_result(0);

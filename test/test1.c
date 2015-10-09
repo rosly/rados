@@ -30,15 +30,16 @@
  */
 
 /**
- * /file Test os OS port (step 1)
+ * /file Test OS port (step 1)
  * /ingroup tests
  *
  * This is first basic test to check the port.
  * Test if task_proc is called and if it can block on semaphore, test if idle
  * procedure will be called (because of task block)
- * Test in following services are implemented corecly:
- * - task (stack and context) initalization is pefromed corectly
- * - arch_context_switch implemented corectly (at least called 2 times init_idle->task1->idle)
+ * Test in following services are implemented correctly:
+ * - task (stack and context) initialization is performed correctly
+ * - arch_context_switch implemented correctly (at least called 2 times
+ *   init_idle->task1->idle)
  * /{
  */
 
@@ -48,7 +49,7 @@
 static os_task_t task1;
 static OS_TASKSTACK task1_stack[OS_STACK_MINSIZE];
 static os_sem_t sem1;
-static int task1_started = 0;
+static volatile int task1_started = 0;
 
 void test_idle(void)
 {

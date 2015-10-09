@@ -30,20 +30,20 @@
  */
 
 /**
- * /file Test os OS port (step 3)
+ * /file Test OS port (step 3)
  * /ingroup tests
  *
  * This is third of basic test to check the port.
- * Test checks it preemption is working by starting two CPU intensive tasks
- * which don't call any of OS functions.  In backgroung tick procedure should
- * kick the preemption and switch betwen tasks. If test_setuptick() is
- * implemented corectly to call os_tick(), tasks should  be forced to give up
- * the CPU to the other task. When both task will finish, test_idle task should be
+ * Test checks if preemption is working by starting two CPU intensive tasks
+ * which don't call any of OS functions. From time to time os_tick() procedure
+ * should kick the preemption and switch between tasks. If test_setuptick() is
+ * implemented correctly to call os_tick(), tasks should  be forced to give up
+ * the CPU to the other task. When both task will finish, idle task will be
  * scheduled() and check the results.
  *
- * Test in following services are
- * implemented corecly:
- * - test is arch_context_switch fully working (from preemptive point of view) (will be called at each os_tick)
+ * Test in following services are implemented correctly:
+ * - test is arch_context_switch fully working (from preemptive point of view,
+ *   os_schedule() will be called at each os_tick)
  * - preemption and test_setupmain()
  * /{
  */
@@ -58,7 +58,7 @@ static os_task_t task2;
 static OS_TASKSTACK task1_stack[OS_STACK_MINSIZE];
 static OS_TASKSTACK task2_stack[OS_STACK_MINSIZE];
 /* keep it small to allow 8bit processor to increment in few cycles */
-static uint8_t counter[2] = { 0, 0 };
+static volatile uint8_t counter[2] = { 0, 0 };
 
 void test_idle(void)
 {

@@ -170,10 +170,10 @@ void os_task_create(
 
    arch_critical_enter(cristate);
    os_task_enqueue(&ready_queue, task);
+   /* 1 as a param allows context switch only if created task has higher
+    * priority than task_curernt */
+   os_schedule(1);
    arch_critical_exit(cristate);
-
-   os_schedule(1); /* 1 as a param allows context switch only if created task
-                      has higher priority than task_curernt */
 }
 
 int os_task_join(os_task_t *task)

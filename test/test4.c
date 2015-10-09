@@ -36,12 +36,12 @@
  * This is forth of basic test to check the port.
  * Two tasks and two semaphores. Both tasks will block on semaphores. The
  * semaphores should be signalized by timer ISR, by driving the timer freq all
- * tree types of switching may be tested, intresting case is when timer is
- * generated eah CPU cycle (can be used to test the critical sections)
+ * tree types of switching may be tested, interesting case is when timer is
+ * generated each CPU cycle (can be used to test the critical sections)
  *
- * Test if following services are implemented corecly:
- * - test is arch_context_switch fully working (from preemptive point of view)
- * (will be called at each os_tick)
+ * Test if following services are implemented correctly:
+ * - test is arch_context_switch fully working (from preemptive point of view,
+ *   os_schedule() will be called at each os_tick)
  * /{
  */
 
@@ -71,7 +71,7 @@ void test_idle(void)
 {
    if((task_data[0].idx < TEST_CYCLES) || (task_data[1].idx < TEST_CYCLES))
    {
-     return; /* this is not the end, continue */
+      return; /* this is not the end, continue */
    }
 
    /* both task reach its ends, finalize test */
@@ -104,8 +104,7 @@ void test_init(void)
 
    /* frequent ticks help test race conditions.  The best would be to call tick
     * ISR every instruction, 1ns tick should force almost flood of tick ISR on
-    * any arch */
-   /* but using 1ms for debuging */
+    * any arch, but using 1ms for debugging */
    test_setuptick(tick_clbck, 1000000);
 }
 

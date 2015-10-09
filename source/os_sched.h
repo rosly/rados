@@ -257,6 +257,14 @@ void os_task_create(
 int os_task_join(os_task_t *task);
 
 /**
+ * Function allows to give back the processor to other task READY task with the same
+ * priority. Context switch will be made if only some other task with the same
+ * priority is in READY state. Therefore idle task will not be scheduled() by
+ * this function.
+ */
+void os_yield(void);
+
+/**
  * Function verify if task stack was not overflowed
  *
  * @param task pointer to task structure which stack we would like to verify

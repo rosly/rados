@@ -212,6 +212,15 @@ int os_task_join(os_task_t *task)
    return ret;
 }
 
+void os_yield(void)
+{
+   arch_criticalstate_t cristate;
+
+   arch_critical_enter(cristate);
+   os_schedule(0);
+   arch_critical_exit(cristate);
+}
+
 void os_task_check(os_task_t *task)
 {
 #ifdef OS_CONFIG_CHECKSTACK

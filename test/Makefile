@@ -47,6 +47,7 @@ include ../arch/$(ARCH)/source.mk
 
 TESTSOURCE = \
 	test1.c \
+	test11.c \
 	test2.c \
 	test3.c \
 	test4.c

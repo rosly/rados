@@ -32,7 +32,10 @@
 #ifndef __OS_SCHED_
 #define __OS_SCHED_
 
-/** Definition of task states. Typical to other RTOS'es */
+/**
+ * Definition of task states. Typical to other RTOS'es
+ * @warning DO NOT CHANGE THE ORDER OF THE STATES SINCE CODE COMPARES THEM
+ */
 typedef enum {
    TASKSTATE_RUNNING = 0, /**< Task is currently running, means task_current
                                point to TCB with that state */

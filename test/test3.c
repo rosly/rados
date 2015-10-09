@@ -69,28 +69,44 @@ void test_idle(void)
    test_result(0);
 }
 
-int task_proc(void* param)
+/* this task will progres only if task2 will keep up with task1 */
+int task1_proc(void* OS_UNUSED(param))
 {
-   unsigned idx = (unsigned)(size_t)param;
-
-   while((counter[idx]) < TEST_CYCLES) {
-      (counter[idx])++;
+   while ((counter[0]) < TEST_CYCLES)
+   {
+      if (counter[0] != counter[1])
+      {
+         os_yield();
+      }
+      (counter[0])++;
    }
-   /* check that second task preempted this one. Such test will confirm that both
-    * tasks share the CPU time because of equal priorities */
-   test_assert(0 != counter[(idx + 1) % 2]);
 
    return 0;
 }
 
+/* this task will progress only if it is behind task1 but it will not yield the
+ * processor. So we make sure that only preemption can switch the context back to
+ * task1. There fore we test if preemption from os_tick() is working */
+int task2_proc(void* OS_UNUSED(param))
+{
+   while ((counter[1]) < TEST_CYCLES)
+   {
+      if (counter[1] < counter[0])
+      {
+         (counter[1])++;
+      }
+   }
+
+   return 0;
+}
 void test_init(void)
 {
    /* it would be better to use 1ns tick since it can force "tick ISR flood" on any arch
-    * but using 1ms for easier debuging */
+    * but using 1ms for easier debugging */
    test_setuptick(NULL, 1000000);
 
-   os_task_create(&task1, 1, task1_stack, sizeof(task1_stack), task_proc, (void*)0);
-   os_task_create(&task2, 1, task2_stack, sizeof(task2_stack), task_proc, (void*)1);
+   os_task_create(&task1, 1, task1_stack, sizeof(task1_stack), task1_proc, NULL);
+   os_task_create(&task2, 1, task2_stack, sizeof(task2_stack), task2_proc, NULL);
 }
 
 int main(void)

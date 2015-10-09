@@ -36,8 +36,8 @@
 typedef enum {
    TASKSTATE_RUNNING = 0, /**< Task is currently running, means task_current
                                point to TCB with that state */
-   TASKSTATE_READY,       /**< Task is ready to be run, TCB with that state are
-                               placed in ready_queue */
+   TASKSTATE_READY,       /**< Task is ready to be run and waits for CPU time,
+                               TCB with that state are placed in ready_queue */
    TASKSTATE_WAIT,        /**< Task waits for synchronization object (mtx, sem
                                or wait_queue), TCB with that state are placed in
                                task queues of synchronization object */

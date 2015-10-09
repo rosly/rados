@@ -272,34 +272,35 @@ void os_waitqueue_wakeup_sync(
    arch_criticalstate_t cristate;
    os_task_t *task;
 
-   /* This function may be called both from ISR and user code.
-    * There is possibility that ISR will interrupt the task which currently try
-    * to suspend on wait_queue. Generally we must check if task do not try to
-    * wake up itself, but we need to take interruption case into account
-    * (therefore following strange looking assert condition) */
+   /* For mtx and sem we wake up tasks that have been placed in sem->task_queue.
+    * But for wait_queue we also have to consider task which prepared for
+    * sleeping but does not actually yet been suspended. Imagine scenario where
+    * os_waitqueue_wakeup() is called from ISR and we interrupted the task,
+    * which tried to suspend on the same wait_queue which the ISR is going to
+    * signalize. It will mean that task_current is after os_waitqueue_prepare()
+    * and right now spinning and checking the user condition while the interrupt
+    * happened. */
+
+   /* the golden rule is that tasks cannot wake its won wait_queues beside
+    * situation where thay were interrupted by ISR */
    OS_ASSERT((isr_nesting > 0) || (task_current->wait_queue != queue));
 
    arch_critical_enter(cristate);
 
-   /* We need to consider some corrner cases, here is one of them.
-    * Imagine the case, where we call this function from ISR code while the
-    * interrupted task tries to suspend on the same wait_queue as this
-    * given by parameter of this function call. It will mean that task_current
-    * is after os_waitqueue_prepare() and right now spinning and checking the
-    * user condition, while we just want to signalize its wait_queue from ISR.
-    * Following condition is exactly consideration of that case,
-    * we simply have to check if task_current->wait_queue is the same queue as
-    * from function parameter */
+   /* check if we are in ISR but we interrupted the task which tried to suspend
+    * on wait_queue which one ISR is signalizing */
    if ((isr_nesting > 0) && (task_current->wait_queue == queue))
    {
-      /* this means that we entered ISR while task_current associated with
-       * this queue was spinning for condition. It is worth to wakeup this
-       * task instead of any other, because this will save CPU time, which
-       * otherwise will be be wasted for unnecessary context switching. It
-       * should also not broke the FIFO semantics, since everything would be OK
-       * it the interrupt would trigger just few cycles earlier, right ? Since
-       * task_current is not in task_queue of wait_queue, all what we need to do
-       * is disassociate the task from wait queue */
+      /* We are trying to wake up the task_current. Since this task is already
+       * in RUNNING state it would be waste of CPU power to force it to sleep
+       * and then wakeup another task.  (unnecessary co next switches) in case
+       * we put this task to ready queue and pick another some other one).  If
+       * we allow it to run than we will not broke the scheduling semantics
+       * (priorities and FIFO), since everything would be almost the same it the
+       * interrupt would actually trigger just few cycles latter than in
+       * reality, right ? Since task_current is not in task_queue of wait_queue,
+       * the only action which we need to do in scope of scheduling is
+       * disassociate it from wait_queue */
       task_current->wait_queue = NULL;
 
       /* we need to destroy the timer here, because otherwise it may fire right

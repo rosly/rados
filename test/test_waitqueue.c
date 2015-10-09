@@ -134,14 +134,20 @@ int slavetask_proc(void* param)
          }
          else if(OS_DESTROYED == data->retcode)
          {
-            test_verbose_debug("Task %u exiting by OS_DESTROYED", data->idx);
+            test_verbose_debug("Task %u returned from wait_queue with code OS_DESTROYED", data->idx);
 
-            /* overwrite the waitobj and wait for a while, so we can check if timeout is properly
-             * torn down (in case of bug timeout callback will fire and use the
-             * overwritten memory) */
+            /* overwrite the waitobj and wait for a while, so we can check if
+             * timeout is properly torn down (in case of bug timeout callback
+             * will fire and use the overwritten memory) */
             memset(&waitobj, 0, sizeof(waitobj));
+
+            /* spin for 10 ticks */
             unsigned local_tick_cnt = global_tick_cnt;
-            while(global_tick_cnt < local_tick_cnt + 10); /* spin for 10 ticks */
+            while(global_tick_cnt < local_tick_cnt + 10)
+            {
+               os_yield();
+            }
+
             return 0;
          }
       }
@@ -371,7 +377,7 @@ int testcase_5regresion(void)
 
    /* destroy the waitobj */
    memset(&waitobj, 0, sizeof(waitobj));
-   /* spin for a while to see if timer was really stooped,
+   /* spin for a while to see if timer was really stopped,
     * in case of some bug we will have timer callback which would like to use
     * timer in waitobj (that will cause a crash) */
    while(1) {

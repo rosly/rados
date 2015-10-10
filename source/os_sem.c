@@ -144,6 +144,9 @@ void os_sem_up_sync(os_sem_t* sem, bool sync)
     * up task until cnt in this loop > 0, Example how to do it is in
     * waitqueue_wakeup() */
 
+   /* sync must be == false in case we are called from ISR */
+   OS_ASSERT((isr_nesting == 0) || (sync == false));
+
    arch_critical_enter(cristate);
 
    /* check if semaphore value would overflow */

@@ -165,6 +165,7 @@ void os_waitqueue_prepare(
    OS_ASSERT(NULL == task_current->wait_queue);
    /* in case of timeout guard, we need to have waitobj ptr valid */
    OS_ASSERT((OS_TIMEOUT_INFINITE == timeout_ticks) || (NULL != waitobj));
+   OS_ASSERT(timeout_ticks > OS_TIMEOUT_TRY); /* timeout must be either specific or infinite */
 
    /* associate/link task with wait_queue, this will change the behaviour inside
     * os_task_makeready() and instead of ready_queue, task will be added to
@@ -272,6 +273,8 @@ void os_waitqueue_wakeup_sync(
    arch_criticalstate_t cristate;
    os_task_t *task;
 
+   OS_ASSERT(nbr > 0); /* number of tasks to wake up must be > 0 */
+
    /* For mtx and sem we wake up tasks that have been placed in sem->task_queue.
     * But for wait_queue we also have to consider task which prepared for
     * sleeping but does not actually yet been suspended. Imagine scenario where
@@ -284,6 +287,8 @@ void os_waitqueue_wakeup_sync(
    /* the golden rule is that tasks cannot wake his own wait_queues beside
     * situation where its looking like that by it because it was interrupted by ISR */
    OS_ASSERT((isr_nesting > 0) || (task_current->wait_queue != queue));
+   /* sync must be == false in case we are called from ISR */
+   OS_ASSERT((isr_nesting == 0) || (sync == false));
 
    arch_critical_enter(cristate);
 

@@ -232,28 +232,19 @@ os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(void)
    /* we need to disable the interrupts since wait_queue may be signalized from
     * ISR (we need to add task to wait_queue->task_queue in atomic manner) */
    arch_critical_enter(cristate);
-   do
-   {
-      /* check if we are still in 'prepared' state
-       * if not than it means that we where woken up in mean time by other task,
-       * ISR or timer timeout callback */
-      if (NULL == task_current->wait_queue)
-      {
-         /* we was woken up, cleanup, destroy timeout if it was created */
-         /* \TODO simplyfy this code, merge this break with normal execution
-          * path */
-         os_blocktimer_destroy(task_current);
-         break;
-      }
 
-      /* now block and switch the context */
+   /* check if we are still in 'prepared' state
+    * if not than it means that we where woken up in mean time by other task,
+    * ISR or timer timeout callback */
+   if (task_current->wait_queue)
+   {
+      /* there was no wakeup nor timeout, block and switch the context */
       os_block_andswitch(&(task_current->wait_queue->task_queue),
                          OS_TASKBLOCK_WAITQUEUE);
+   }
 
-      /* cleanup, destroy timeout if it was created */
-      os_blocktimer_destroy(task_current);
-
-   } while (0);
+   /* cleanup, destroy timeout if it was created */
+   os_blocktimer_destroy(task_current);
 
    /* the block code is either OS_OK (set in os_waitqueue_wakeup_sync()) or
     * OS_TIMEOUT (set in os_waitqueue_timerclbck()) or OS_DESTROYED (set in

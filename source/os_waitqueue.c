@@ -193,8 +193,11 @@ void os_waitqueue_finish(void)
 {
    OS_ASSERT(0 == isr_nesting); /* cannot call os_waitqueue_finish() from ISR */
 
-   /* check if we had assigned timer for timeout guard
-    * if so, we need to destroy timer before we make any other actions */
+   /* sine os_waitqueue_finish() should be fast we should consider of cost
+    * optimization by not entering critical section. For that we can check by
+    * atomic operation if we had assigned timer for timeout guard. If so than we
+    * will have to enter the critical section, if not than we can prevent from
+    * interrupt handling jitter and also save some CPU cycles */
    if (NULL != os_atomicptr_read(task_current->timer))
    {
       arch_criticalstate_t cristate;
@@ -216,7 +219,8 @@ void os_waitqueue_finish(void)
       arch_critical_exit(cristate);
 
    } else {
-      /* remove wait_queue to task association/link */
+      /* we can clear the wait_queue to task association/link without critical
+       * section by using of atomic operation */
       os_atomicptr_write(task_current->wait_queue, NULL);
    }
 }
@@ -230,7 +234,9 @@ os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(void)
    OS_ASSERT(task_current->prio_current > 0); /* idle task cannot call blocking functions (will crash OS) */
 
    /* we need to disable the interrupts since wait_queue may be signalized from
-    * ISR (we need to add task to wait_queue->task_queue in atomic manner) */
+    * ISR (we need to add task to wait_queue->task_queue in atomic manner)
+    * there is no sense to make some critical section optimizations here since
+    * this is slow patch function (task decided to suspend) */
    arch_critical_enter(cristate);
 
    /* check if we are still in 'prepared' state
@@ -283,8 +289,9 @@ void os_waitqueue_wakeup_sync(
 
    arch_critical_enter(cristate);
 
-   /* check if we are in ISR but we interrupted the task which tried to suspend
-    * on wait_queue which one ISR is signalizing */
+   /* check if we are in ISR but we interrupted the task which is prepared to suspend
+    * on wait_queue which one ISR is signalizing (and there was no timeout yet)
+    */
    if ((isr_nesting > 0) && (task_current->wait_queue == queue))
    {
       /* We are trying to wake up the task_current. Since this task is already

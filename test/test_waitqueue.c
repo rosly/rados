@@ -81,6 +81,8 @@ static os_waitqueue_t global_wait_queue;
 static os_sem_t global_sem;
 static volatile unsigned global_tick_cnt = 0;
 
+static volatile unsigned irq_trigger_tick = 0;
+static os_waitqueue_t *irq_trigger_waitqueue = NULL;
 
 void idle(void)
 {
@@ -362,6 +364,7 @@ int testcase_5regresion(void)
 {
    unsigned local_tick_cnt;
    os_waitobj_t waitobj;
+   size_t i;
 
    /* reset tickcnt's */
    local_tick_cnt = global_tick_cnt = 0;
@@ -376,7 +379,7 @@ int testcase_5regresion(void)
    test_assert(task_main.timer == NULL);
 
    /* destroy the waitobj */
-   memset(&waitobj, 0, sizeof(waitobj));
+   memset(&waitobj, 0xff, sizeof(waitobj));
    /* spin for a while to see if timer was really stopped,
     * in case of some bug we will have timer callback which would like to use
     * timer in waitobj (that will cause a crash) */
@@ -388,8 +391,13 @@ int testcase_5regresion(void)
       if(local_tick_cnt != global_tick_cnt) {
          test_verbose_debug("Main detected tick increase %u != %u",
                             local_tick_cnt, global_tick_cnt);
+         local_tick_cnt = global_tick_cnt;
       }
-      local_tick_cnt = global_tick_cnt;
+   }
+   uint8_t *ptr = (uint8_t*)&waitobj;
+   for (i = 0; i < sizeof(waitobj); i++)
+   {
+      test_assert(0xff == ptr[i]);
    }
    test_verbose_debug("Main finishing test5");
 
@@ -397,26 +405,20 @@ int testcase_5regresion(void)
 }
 
 /**
- * Regresion test case
- * os_waitqueue_wait had a bug. If wait_queue was signalized (bu timeout) before task reach
- * os_waitqueue_wait() then timeout was not cleared out.
- * Tetsing os_waitqueue_wait() implementation while timeout guard
+ * Testing os_waitqueue_wait() and os_waitqueue_finish() implementation with
+ * timeout guard.
  */
-int testcase_6regresion(void)
+int testcase_6_impl(os_waitqueue_t *waitqueue, bool wait, bool timeout)
 {
    unsigned local_tick_cnt;
-   os_waitqueue_t waitqueue;
    os_waitobj_t waitobj;
    os_retcode_t ret;
+   size_t i;
 
    /* reset tickcnt's */
    local_tick_cnt = global_tick_cnt = 0;
 
-   /* use wait_queue with timeout (2 ticks), after timeout will burn off, try to
-    * use the wait_queue again. If bug is still there, OS_SELFCHECK_ASSERT(NULL ==
-    * task_current->timer) will trigger inside os_blocktimer_create() */
-   test_verbose_debug("Main tries to timeout on waitqueue, than use that waitqueue again");
-   os_waitqueue_prepare(&waitqueue, &waitobj, 2);
+   os_waitqueue_prepare(waitqueue, &waitobj, 3);
 
    while(1) {
       if(global_tick_cnt > 5) {
@@ -426,19 +428,85 @@ int testcase_6regresion(void)
       if(local_tick_cnt != global_tick_cnt) {
          test_verbose_debug("Main detected tick increase %u != %u",
                             local_tick_cnt, global_tick_cnt);
+         local_tick_cnt = global_tick_cnt;
       }
-      local_tick_cnt = global_tick_cnt;
    }
-   /* now try to wait on it, in mean time there was timeout so we should hit the
-    * special condition if(NULL == task_current->wait_queue) */
-   ret = os_waitqueue_wait();
-   test_assert(OS_TIMEOUT == ret);
 
-   /* now try to use the wait queue again, if bug is still there this will fail */
-   os_waitqueue_prepare(&waitqueue, &waitobj, 2);
+   if (wait)
+   {
+      ret = os_waitqueue_wait();
+      test_assert(ret == (timeout ? OS_TIMEOUT : OS_OK));
+   } else {
+      os_waitqueue_finish();
+   }
 
-   /* cleanup and finish test case */
-   os_waitqueue_finish();
+   /* verify the cleanup */
+   test_assert(NULL == task_current->wait_queue);
+   test_assert(NULL == task_current->timer);
+
+   /* destroy the waitobj */
+   memset(&waitobj, 0xff, sizeof(waitobj));
+   /* spin for a while to see if timer was really stopped,
+    * in case of some bug we will have timer callback which would like to use
+    * timer in waitobj (that will also possibly cause a crash) */
+   while(1) {
+      if(global_tick_cnt > 10) {
+         /* break after 10'th tick */
+         break;
+      }
+      if(local_tick_cnt != global_tick_cnt) {
+         test_verbose_debug("Main detected tick increase %u != %u",
+                            local_tick_cnt, global_tick_cnt);
+         local_tick_cnt = global_tick_cnt;
+      }
+   }
+   uint8_t *ptr = (uint8_t*)&waitobj;
+   for (i = 0; i < sizeof(waitobj); i++)
+   {
+      test_assert(0xff == ptr[i]);
+   }
+
+   return 0;
+}
+
+int testcase_6(void)
+{
+   os_waitqueue_t waitqueue;
+
+   os_waitqueue_create(&waitqueue);
+
+   /* test timeout behaviour without wakeup */
+   test_verbose_debug("testing timeout impl with os_waitqueue_wait()");
+   testcase_6_impl(&waitqueue, false, true);
+   test_verbose_debug("testing timeout impl with os_waitqueue_finish()");
+   testcase_6_impl(&waitqueue, true, true);
+
+   /* test timeout behaviour when wakeup happen from ISR before timeout (but
+    * before suspend) */
+   irq_trigger_waitqueue = &waitqueue;
+   irq_trigger_tick = 2;
+   test_verbose_debug("testing timeout impl with os_waitqueue_wait() with wakeup"
+                      "from ISR before timeout");
+   testcase_6_impl(&waitqueue, false, false);
+   test_verbose_debug("testing timeout impl with os_waitqueue_finish() with wakeup"
+                      "from ISR before timeout");
+   testcase_6_impl(&waitqueue, true, false);
+
+   /* test timeout behaviour when wakeup happen from ISR after timeout (but
+    * before suspend) */
+   irq_trigger_waitqueue = &waitqueue;
+   irq_trigger_tick = 4;
+   test_verbose_debug("testing timeout impl with os_waitqueue_wait() with wakeup"
+                      "from ISR after timeout");
+   testcase_6_impl(&waitqueue, false, true);
+   test_verbose_debug("testing timeout impl with os_waitqueue_finish() with wakeup"
+                      "from ISR after timeout");
+   testcase_6_impl(&waitqueue, true, true);
+
+   irq_trigger_waitqueue = NULL;
+   irq_trigger_tick = 0;
+
+   os_waitqueue_destroy(&waitqueue);
 
    return 0;
 }
@@ -504,13 +572,6 @@ int testcase_7(void)
  * revoke fixes, make the regresion test and then apply fixes again to verify
  * that this work
  *
- * \TODO \FIXME
- * if os_waitqueue_wakeup will be called from ISR while task_current is spining
- * on condition (or about to call waitqueue_wait), and we make a
- * waitqueue_prepare call with timeout .. then the spetial condition in
- * waitqueue_waueup will just task_current->wait_queue = NULL without even
- * considering timer destroy!!!
- *
  * \TODO \FIXME second bug!!!
  * again calling waitqueue_wakeup when task_current is spinning, so the same
  * special condition will triger and totaly piss off nbr parameter, so if we
@@ -566,7 +627,7 @@ int mastertask_proc(void* OS_UNUSED(param))
       testcase_3,
       testcase_4regresion,
       testcase_5regresion,
-      testcase_6regresion,
+      testcase_6,
       testcase_7,
    };
 
@@ -582,15 +643,21 @@ int mastertask_proc(void* OS_UNUSED(param))
    return 0;
 }
 
-void test_tickprint(void)
+void test_tick(void)
 {
-  global_tick_cnt++;
-  test_verbose_debug("Tick %u", global_tick_cnt);
+   test_verbose_debug("Tick %u", global_tick_cnt);
+
+   global_tick_cnt++;
+
+   if (irq_trigger_waitqueue && (irq_trigger_tick == global_tick_cnt))
+   {
+      os_waitqueue_wakeup(irq_trigger_waitqueue, 1);
+   }
 }
 
 void init(void)
 {
-   test_setuptick(test_tickprint, 50000000);
+   test_setuptick(test_tick, 50000000);
 
    os_task_create(
       &task_main, OS_CONFIG_PRIOCNT - 1,

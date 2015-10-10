@@ -40,7 +40,7 @@
  * - semaphore can be signaled from ISR (call of os_sem_up()), but you cannot
  *   call os_sem_down() from ISR
  * - semaphore is signalization primitive, in opposition to mutex nobody can own
- *   the semaphore. Thread can only wait until semaphore will be signaled but
+ *   the semaphore. Task can only wait until semaphore will be signaled but
  *   after signalization it does not make any permanent logic connection to this
  *   semaphore. The most common usage of semaphore is producer-consumer
  *   signalization mechanism.
@@ -55,7 +55,7 @@
 
 /** Definition of semaphore structure */
 typedef struct os_sem_tag {
-   /** queue of threads suspended on this semaphore */
+   /** queue of tasks suspended on this semaphore */
    os_taskqueue_t task_queue;
 
    /* Semaphore value, os_atomit_c since semaphores can be incremented from ISR */
@@ -67,7 +67,7 @@ typedef struct os_sem_tag {
  * Function creates the semaphore.
  *
  * Semaphore structure can be allocated by from any memory. Function initializes
- * semaphore structure given by @param mtx (does not use dynamic memory of any
+ * semaphore structure given by @param sem (does not use dynamic memory of any
  * kind)
  *
  * @param sem pointer to semaphore
@@ -78,8 +78,8 @@ void os_sem_create(os_sem_t* sem, os_atomic_t init_value);
 /**
  * Function destroys the semaphore
  *
- * Function does overwite semaphore structure memory. As same as with
- * os_sem_create() it does not use any dynamic memory.
+ * Function overwrite semaphore structure memory. As same as with
+ * os_sem_create() it does not refer to any dynamic memory.
  *
  * @param sem pointer to semaphore
  *
@@ -89,22 +89,22 @@ void os_sem_create(os_sem_t* sem, os_atomic_t init_value);
  * @post semaphore will be uninitialized after this call. Such semaphore cannot
  *       be used by any other function until it will be initialized again. If
  *       semaphore is also used from ISR (like for signaling) calling of
- *       os_sem_destroy() may create race conditions. User must prevent design
+ *       os_sem_destroy() may create race conditions. User must design
  *       application in a way which will prevent such cases to be possible (use
- *       after destroy). Threads which was suspended on semaphore prior call of
+ *       after destroy). Tasks which was suspended on semaphore prior call of
  *       os_sem_destroy() will be released with OS_DESTROYED as return code from
  *       os_sem_down(). But calls of os_sem_down() after os_sem_destroy() have
- *       returned are forbidden.
- * @post this function may cause preemption since this function wakes up threads
+ *       been returned are forbidden.
+ * @post this function may cause preemption since this function wakes up tasks
  *       suspended on semaphore (possibly with higher priority than calling
- *       thread)
+ *       task)
  */
 void os_sem_destroy(os_sem_t* sem);
 
 /**
  * Function consumes the single signal from semaphore. In case semaphore value
- * (signal counter) is 0 function will suspend calling thread on this semaphore.
- * Thread will be woken up if other thread will signal semaphore or when
+ * (signal counter) is 0 function will suspend calling task on this semaphore.
+ * Task will be woken up if other task will signal semaphore or when
  * requested timeout will burn off.
  *
  * @param sem pointer to semaphore
@@ -112,7 +112,7 @@ void os_sem_destroy(os_sem_t* sem);
  *        operation will time out. If user would like to not use of timeout, than
  *        @param timeout should be OS_TIMEOUT_INFINITE.
  *        If user would like to perform TRY operation (which will return instead
- *        of suspending the thread) than @param timeout should be
+ *        of suspending the task) than @param timeout should be
  *        OS_TIMEOUT_TRY. In this scenario function return code will be
  *        OS_WOULDBLOCK.
  *
@@ -121,8 +121,10 @@ void os_sem_destroy(os_sem_t* sem);
  * @pre this function cannot be used from ISR nor idle task
  *
  * @return OS_OK in case signal was consumed from semaphore.
- *         OS_DESTROYED in case semaphore was destroyed while calling thread was
- *         suspended on semaphore
+ *         OS_DESTROYED in case semaphore was destroyed while calling task was
+ *         suspended on semaphore. Please read about race conditions while
+ *         destroying of semaphore described in documentation of
+ *         os_sem_destroy()
  *         OS_WOULDBLOCK in case semaphore did not contain any signals and
  *         @param timeout was OS_TIMEOUT_TRY
  *         OS_TIMEOUT in case operation timeout expired
@@ -142,9 +144,10 @@ os_retcode_t OS_WARN_UNUSEDRET os_sem_down(
  *        priority task would be woken up. By passing 'false' in this parameter
  *        application specifies that context switches are allowed. This feature
  *        can be used in application code which will trigger the scheduler
- *        anyway after return from os_sem_up_sync() by some other API call. This
- *        helps to save CPU cycles by preventing from unnecessary context
- *        switches.
+ *        anyway after return from os_sem_up_sync() by some other OS API call.
+ *        This helps to save CPU cycles by preventing from unnecessary context
+ *        switches. This parameter must be set to 'false' in case function is
+ *        called from ISR.
  *
  * @pre this function CAN be called from ISR. This is one of basic use cases for
  *      semaphore.

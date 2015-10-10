@@ -343,7 +343,7 @@ int testcase_4regresion(void)
       test_assert(worker_tasks[i].spin_spincnt > 1);
    }
 
-   /* clean up after test, stop the spinning of threads */
+   /* clean up after test, stop the spinning of tasks */
    for(i = 0; i < TEST_TASKS - 1; i++) {
       worker_tasks[i].spin_intcond = 1;
       worker_tasks[i].spin_intcond_reload = 0;

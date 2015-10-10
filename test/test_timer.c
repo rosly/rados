@@ -220,7 +220,7 @@ int task_main_proc(void* OS_UNUSED(param))
 
 void init(void)
 {
-  /* for testing we will need just one thread */
+  /* for testing we will need just one task */
    os_task_create(
       &task_main, OS_CONFIG_PRIOCNT - 1,
       task_main_stack, sizeof(task_main_stack),

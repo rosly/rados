@@ -82,7 +82,7 @@ int test_scen1_worker(void* param)
       test_atomic[0]++;
       test_atomic[1] = task_idx;
 
-      /* force thread switch to check if mtx properly secures the critical
+      /* force task switch to check if mtx properly secures the critical
        * section - this can involve context switch but once remain task call
        * os_mtx_lock() we should go back to current task again */
       test_reqtick();
@@ -91,12 +91,12 @@ int test_scen1_worker(void* param)
       test_assert(1 == test_atomic[0]);
       test_assert(task_idx == test_atomic[1]);
 
-      /* reset the magic numbers in protected variables for another thread */
+      /* reset the magic numbers in protected variables for another task */
       --test_atomic[0];
       test_atomic[1] = -1;
       os_mtx_unlock(&test_mtx[0]);
 
-      /* add randomness to test, force thread switch with 50% of probability */
+      /* add randomness to test, force task switch with 50% of probability */
       if( 0 == (rand() % 2) ) test_reqtick();
    }
 
@@ -144,7 +144,7 @@ int test_scen2_workerM(void* OS_UNUSED(param))
    test_assert(0 == ret);
 
    /* B should be scheduled after H
-    * Verify that H finishes his thread function */
+    * Verify that H finishes his task function */
    test_assert(1 == test_atomic[0]);
    test_atomic[0] = 2;
 
@@ -162,21 +162,21 @@ int test_scen2_workerL(void* OS_UNUSED(param))
    test_assert(0 == ret);
 
    /* now signalize/wake up the H and M */
-   /* following call will cause context switch to H and prio boost of this thread */
+   /* following call will cause context switch to H and prio boost of this task */
    os_sem_up(&test_sem[0]);
    /* once H will call os_mtx_lock we will return here (since it will block on
     * mtx). Since now we have effective prio equal to H (prio boost) following
     * call should not cause context switch to M */
    os_sem_up(&test_sem[1]);
 
-   /* unlock the mtx and reset the effective prio of this thread to L
+   /* unlock the mtx and reset the effective prio of this task to L
     * following call should switch context to H which ten will finish (exit the
-    * thread function). This should then cause context switch to M, which will
-    * verify values in test_atomic[0] and also exit the thread function. */
+    * task function). This should then cause context switch to M, which will
+    * verify values in test_atomic[0] and also exit the task function. */
    os_mtx_unlock(&test_mtx[0]);
 
    /* finally after yet another context switch we should return here
-    * verify that M finished thread function */
+    * verify that M finished task function */
    test_assert(2 == test_atomic[0]);
 
    return 0;
@@ -361,11 +361,11 @@ int test_scen4_workerH(void* OS_UNUSED(param))
    test_assert(12 == test_atomic[0]); /* verify the valid progress of test state */
    test_atomic[0] = 13;
 
-   /* prepare to finish thread */
+   /* prepare to finish task */
    os_mtx_unlock(&test_mtx[2]);
    test_assert(13 == test_atomic[0]); /* verify the valid progress of test state */
    test_atomic[0] = 14;
-   /* by finishing the thread we should switch to HM */
+   /* by finishing the task we should switch to HM */
 
    return 0;
 }
@@ -390,11 +390,11 @@ int test_scen4_workerHM(void* OS_UNUSED(param))
    test_assert(14 == test_atomic[0]); /* verify the valid progress of test state */
    test_atomic[0] = 15;
 
-   /* prepare to finish thread (no ctx switch this time) */
+   /* prepare to finish task (no ctx switch this time) */
    os_mtx_unlock(&test_mtx[1]);
    test_assert(15 == test_atomic[0]); /* verify the valid progress of test state */
    test_atomic[0] = 16;
-   /* by finishing the thread we should switch to M */
+   /* by finishing the task we should switch to M */
 
    return 0;
 }
@@ -439,8 +439,8 @@ int test_scen4_workerM(void* OS_UNUSED(param))
    test_assert(16 == test_atomic[0]); /* verify the valid progress of test state */
    test_atomic[0] = 17;
 
-   /* prepare to finish thread */
-   /* by finishing the thread we should switch to L */
+   /* prepare to finish task */
+   /* by finishing the task we should switch to L */
 
    return 0;
 }
@@ -591,7 +591,7 @@ int test_scen5_workerL(void* OS_UNUSED(param))
    test_atomic[0] = 5;
 
    /* unlock mtx1. In properly implemented priority inversion this should wake
-    * up the thread H since nothing more block it from running */
+    * up the task H since nothing more block it from running */
    os_mtx_unlock(&test_mtx[1]);
 
    test_assert(8 == test_atomic[0]); /* verify the valid progress of test state */
@@ -691,7 +691,7 @@ int test_scen6_workerL(void* OS_UNUSED(param))
 
    /* unlock mtx0 we want to release mtx in the same order as we lock them (not
     * reverse order), in properly implemented priority inversion this should
-    * wake up the thread H since nothing more block it from running This is
+    * wake up the task H since nothing more block it from running This is
     * allowed since mutex does not enforce any locking sequence. User should
     * prevent from making deadlock possible */
    os_mtx_unlock(&test_mtx[0]);

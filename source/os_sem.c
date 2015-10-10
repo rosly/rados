@@ -101,15 +101,15 @@ os_retcode_t OS_WARN_UNUSEDRET os_sem_down(
          break;
       }
 
-      /* sem->value == 0, need to block the calling thread */
+      /* sem->value == 0, need to block the calling task */
       if (OS_TIMEOUT_TRY == timeout_ticks)
       {
-         /* thread request to bail out in case operation would block */
+         /* task request to bail out in case operation would block */
          ret = OS_WOULDBLOCK;
          break;
       }
 
-      /* does thread request timeout guard for operation? */
+      /* does task request timeout guard for operation? */
       if (OS_TIMEOUT_INFINITE != timeout_ticks)
       {
          /* we will get callback to os_sem_timerclbck() in case of timeout */
@@ -119,7 +119,7 @@ os_retcode_t OS_WARN_UNUSEDRET os_sem_down(
       /* now block and switch the context */
       os_block_andswitch(&(sem->task_queue), OS_TASKBLOCK_SEM);
 
-      /* we return here once other thread call os_sem_up() or timeout burs off
+      /* we return here once other task call os_sem_up() or timeout burs off
        * cleanup, destroy timeout associated with task if it was created */
       os_blocktimer_destroy(task_current);
 

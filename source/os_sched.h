@@ -147,7 +147,7 @@ typedef struct {
     int ret_value;
 
     /** return code returned from blocking function, used for communication
-     * between owner and thread which wake it up */
+     * between owner and task which wake it up */
     os_retcode_t block_code;
   };
 

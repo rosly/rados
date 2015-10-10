@@ -281,8 +281,8 @@ void os_waitqueue_wakeup_sync(
     * and right now spinning and checking the user condition while the interrupt
     * happened. */
 
-   /* the golden rule is that tasks cannot wake its won wait_queues beside
-    * situation where thay were interrupted by ISR */
+   /* the golden rule is that tasks cannot wake his own wait_queues beside
+    * situation where its looking like that by it because it was interrupted by ISR */
    OS_ASSERT((isr_nesting > 0) || (task_current->wait_queue != queue));
 
    arch_critical_enter(cristate);

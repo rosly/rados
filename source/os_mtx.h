@@ -44,7 +44,7 @@
  *   but it will assert only when OS_CONFIG_APICHECK is defined
  * - mutex prevents from priority inversion problem while semaphores does not.
  *   Priority inheritance will boost the priority of task that holds the mutex
- *   to level of most prioritized thread which try's to obtain the lock
+ *   to level of most prioritized task which try's to obtain the lock
  * - mutex support the recursive locks. In other words owner which try's to lock
  *   the mutex again will not be blocked but simply increment the level of
  *   recursive lock (mutex tracks the owner). To free the mutex it must be
@@ -66,7 +66,7 @@ typedef struct {
    /** Task which currently owns the mutex */
    os_task_t *owner;
 
-   /** Queue of threads suspended on this mutex */
+   /** Queue of tasks suspended on this mutex */
    os_taskqueue_t task_queue;
 
    /** Recursive lock count
@@ -90,8 +90,8 @@ void os_mtx_create(os_mtx_t* mtx);
 /**
  * Function destroys the mutex
  *
- * Function does overwite mutex structure memory. As same as with
- * os_mtx_create() it does not use any dynamic memory.
+ * Function overwrite mutex structure memory. As same as with os_mtx_create() it
+ * does not refer to any dynamic memory.
  *
  * @param pointer to mutex
  *
@@ -106,21 +106,21 @@ void os_mtx_create(os_mtx_t* mtx);
  * @post mutex will be uninitialized after this call. Such mutex cannot be used
  *       by any other function until it will be initialized again. It means that
  *       user code has to prevent race conditions of accessing such mutex after
- *       return from os_mtx_destroy(). Threads which was suspended on mutex
+ *       return from os_mtx_destroy(). Tasks which was suspended on mutex
  *       prior call of os_mtx_destroy() will be released with OS_DESTROYED
  *       return code from os_mtx_lock(). But calls of os_mtx_lock() after
  *       os_mtx_destroy() have returned are forbidden.
- * @post this function also reset the prio of calling thread in case it was
+ * @post this function also reset the prio of calling task in case it was
  *       boosted by priority inheritance
- * @post this function may cause preemption since this function wakes up threads
+ * @post this function may cause preemption since this function wakes up tasks
  *       suspended on mutex (possibly with higher priority than calling
- *       thread)
+ *       task)
  */
 void os_mtx_destroy(os_mtx_t* mtx);
 
 /**
- * Function locks the mutex. If the mutex is already locked the calling thread
- * will sleep until owner thread will call os_mtx_unlock(). Only single thread
+ * Function locks the mutex. If the mutex is already locked the calling task
+ * will sleep until owner task will call os_mtx_unlock(). Only single task
  * can own the mutex at given time.
  *
  * @param pointer to mutex
@@ -129,19 +129,19 @@ void os_mtx_destroy(os_mtx_t* mtx);
  *      description of possible race conditions with os_mtx_destroy()
  * @pre this function cannot be used from ISR nor idle task
  *
- * @return OS_OK in case mutex was successfully locked by calling thread
- *         OS_DESTROYED in case mutex was destroyed while calling thread was
+ * @return OS_OK in case mutex was successfully locked by calling task
+ *         OS_DESTROYED in case mutex was destroyed while calling task was
  *         suspended on the lock operation
  * @note user code should always check the return code of os_mtx_lock()
  */
 os_retcode_t OS_WARN_UNUSEDRET os_mtx_lock(os_mtx_t* mtx);
 
 /**
- * Function unlock the mutex. Only owner thread can call this function.
+ * Function unlock the mutex. Only owner task can call this function.
  *
  * @param pointer to mutex
  *
- * @pre mutex must be locked (owned) by thread that calls this function
+ * @pre mutex must be locked (owned) by task that calls this function
  * @pre this function cannot be used from ISR
  */
 void os_mtx_unlock(os_mtx_t* mtx);

@@ -109,8 +109,8 @@ static void os_mtx_unlock_prio_reset(void)
       /* calculation of new priority is quite complicated since we may have been
        * boosted because:
        * 1) some nested dependency
-       * 2) another dependency by different mtx that this thread owns
-       * We need to iterate over all mtx held by this thread and new prio will
+       * 2) another dependency by different mtx that this task owns
+       * We need to iterate over all mtx held by this task and new prio will
        * be the max(p(wating_task)). Keep in mind that we use prio_current (not
        * prio_base) since we lock/unlock one mtx at the time and if the waiting
        * task has already boosted priority by another dependency chain than we
@@ -292,19 +292,20 @@ void os_mtx_unlock(os_mtx_t* mtx)
 }
 
 /* Comment 1
- * There are two possible solution of thread woke up:
+ * There are two possible solution of task wake up:
  * 1) Only single (top prio) task is woken up when mtx is unlocked.
  * 2) Woke up all of the tasks which sleep on mtx and the top prio will run as
- *    first.
+ *    first. Remain will be allowed to run after the all higher prio will block
+ *    or give back the CPU.
  * In first solution we have only one (possible) context switch and FIFO order
  * of sleeping task is preserved in wait queue of mtx. Second approach requires
  * the use of spin loop and creates multiple context switches from which only
- * one will succeed in locking the mutex (other thread will simply spin within
+ * one will succeed in locking the mutex (other task will simply spin within
  * WAIT->READY->WAIT cycle). While second approach also can change the
- * "wait/woke-up" order of threads (new threads out of initial wait-set will be
- * spread across wait queue while woken up threads will spin) it has better
- * starvation characteristics. In first solution we always woke up the top prio
- * thread which may lead to starvation of low prio thread.  Since this is RTOS
+ * "wait/woke-up" order of tasks (new tasks out of initial wait-set will be
+ * spread across wait queue while woken up tasks will spin) it has better
+ * anti-starvation characteristics. In first solution we always woke up the top
+ * prio task which may lead to starvation of low prio task.  Since this is RTOS
  * we assumed that user will be aware of starvation possibility and since
  * solution 1 has more conservative and predictable approach it was decided to
  * use it over solution 2. */
@@ -378,7 +379,7 @@ void os_mtx_unlock(os_mtx_t* mtx)
   * relinquish of mtx1. Even if p(LM) = p(H) LM is not allowed to run since it
   * is still blocked on mtx2 while M prevents L from relinquish mtx1 (not mtx2).
   * So M will be allowed to run as long as it would like and it blocks execution
-  * of all threads L, LM and even H.
+  * of all tasks L, LM and even H.
   *
   * To overcome this problem our simple priority inheritance rule that p(owner)
   * = max(p(waiters)) must be evaluated recursively for each owner of mutex

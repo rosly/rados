@@ -122,7 +122,7 @@ void init(void)
       .sa_mask = { { 0 } }, /* additional (beside the current signal) mask (they will be added to the mask instead of set) */
       .sa_flags = SA_SIGINFO , /* use sa_sigaction instead of old sa_handler */
       /* SA_NODEFER could be used if we would like to have the nesting enabled right durring the signal handler enter */
-      /* SA_ONSTACK could be sed if we would like to use the signal stack instead of thread stack */
+      /* SA_ONSTACK could be sed if we would like to use the signal stack instead of task stack */
    };
 
    os_sem_create(&sem1, 0);

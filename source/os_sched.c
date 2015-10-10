@@ -502,7 +502,7 @@ void OS_NORETURN OS_COLD os_task_exit(int retv)
    if (NULL != task_current->join_sem)
    {
 
-      /* since after join, master thread will probably remove the current task
+      /* since after join, master task will probably remove the current task
        * stack and task structure, we cannot use os_sem_up().
        * We simply avoiding this by locking the scheduler. (keep in mind that
        * critical section is different thing than scheduler lock)

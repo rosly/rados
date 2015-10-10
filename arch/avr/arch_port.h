@@ -52,14 +52,14 @@
  * approach (storing registers in arch_context_t uses more static task memory
  * while storing them on stack requires more stack memory).  Most of others RTOS
  * use the second method. This is mainly because storing registers stack is the
- * fastest way (require less CPU cycles). */
+ * fastest way (requires less CPU cycles). */
 typedef struct {
     uint16_t sp;
 } arch_context_t;
 
 /* AVR does not support direct memory manipulation since AVR is LOAD-STORE
  * architecure. At least we can read 8bit values without masking interrupts
- * But from other hand for 8bit increment we need do disable interupts,
+ * But on the other hand for 8bit increment we need to disable interrupts,
  * to make this operation atomic (load-increment-store) */
 typedef uint8_t arch_atomic_t;
 #define ARCH_ATOMIC_MAX UINT8_MAX
@@ -100,7 +100,7 @@ typedef uint8_t arch_criticalstate_t; /* size of AVR status register */
 #define OS_STACK_MINSIZE ((size_t)35 * 4) /* four times of context dump size */
 
 /* AVR does not support direct memory operations (LOAD-STORE architecture)
- * we mmust disable interupts to ensure atomicity */
+ * we must disable interrupts to ensure atomicity */
 #define os_atomic_inc(_atomic) \
   do { \
     arch_criticalstate_t cristate; \
@@ -110,7 +110,7 @@ typedef uint8_t arch_criticalstate_t; /* size of AVR status register */
   }while(0)
 
 #if 0
-/* \TODO following two instructions can be exchanged, since on AVR alvays one
+/* \TODO following two instructions can be exchanged, since on AVR always one
  * more instruction is executed after enabling interrupts
  * "out __SREG__, %0\n\t"
  * "st %[atomic], __tmp_reg__\n\t" */
@@ -130,7 +130,7 @@ typedef uint8_t arch_criticalstate_t; /* size of AVR status register */
 #endif
 
 /* AVR does not support direct memory operations (LOAD-STORE architecture)
- * we mmust disable interupts to ensure atomicity */
+ * we must disable interrupts to ensure atomicity */
 #define os_atomic_dec(_atomic) \
   do { \
     arch_criticalstate_t cristate; \
@@ -156,7 +156,7 @@ typedef uint8_t arch_criticalstate_t; /* size of AVR status register */
 #endif
 
 /* on AVR there is no instruction to load whole X, Y, or whole Z at once, we
- * need to disable interrupts if we whant to do it atomicaly */
+ * need to disable interrupts if we whant to do it atomically */
 #define os_atomicptr_read(_ptr) \
   ({ \
     typeof(_ptr) _tmp_widereg; \
@@ -243,7 +243,7 @@ typedef uint8_t arch_criticalstate_t; /* size of AVR status register */
       SREG = (_critical_state); \
    }while(0)
 
-/* do not mark memory as clobered, since this will destroy all compiler
+/* do not mark memory as clobbered, since this will destroy all compiler
  * optimizations for memory access and not add any beneficial value to generated
  * code */
 #define arch_dint() __asm__ __volatile__ ( "cli\n\t" :: )
@@ -251,31 +251,31 @@ typedef uint8_t arch_criticalstate_t; /* size of AVR status register */
 
 /* format of the context pushed on stack for AVR port
 hi adress
-    PC - pushed frst
+    PC - pushed first
     R0 - stored to gain one free register
     SREG
-    R1 - R31 - pusched last
+    R1 - R31 - pushed last
 low address
 */
 
-/* This function have to:
- - if neecessary, disable interrupts to block the neesting
- - store all registers (power control bits does not have to be necessarly stored)
+/* This function has to:
+ - if necessary, disable interrupts to block the nesting
+ - store all registers (power control bits do not have to be necessarily stored)
  - increment the isr_nesting
  - if isr_nesting is = 1 then
-    - store the context curr_tcb->ctx (may take benfit from already stored registers by storing only the stack pointer)
+    - store the context curr_tcb->ctx (may take benefit from already stored registers by storing only the stack pointer)
  - end
 
  - in some near future down in the ISR enable interrupts to support the nesting interrupts
 
- because ISR was called it means that interrupts was enabled. On some arch like MPS430 they may be automaticly disabled durring the enter to ISR
+ Because ISR was called it means that interrupts were enabled. On some archs (e.g. MSP430) they may be automatically disabled when entering ISR.
  On those architectures interrupts may be enabled when ISR will mask pending interrupt.
- In general disabling interrupt is usualy needed because we touch the task_current (usualy need 2 asm instructions) and we cannot be preempted by another interrupt.
- From other hand enabling the interrupts again as soon as possible is needed for realtime constrains.
- If your code does not need to be realtime constrained, it is not needed to enable the interupts in ISR, also the nesting interrupt code can be disabled
+ In general, disabling interrupts is usually needed because we touch the task_current (usually need 2 asm instructions) and we cannot be preempted by another interrupt.
+ On the other hand enabling the interrupts again as soon as possible is needed for realtime constraints.
+ If your code does not need to be realtime constrained, it is not needed to enable the interrupts in ISR, also the nesting interrupt code can be disabled.
 
- The reason why we skip the stack pointer storage in case of nesing is obvous. In case of nesting we was not in task but in other ISR. So the SP will not be the task SP.
- But we have to store all registers anyway. This is why we store all registers and then optionaly store the SP in context of tcb */
+ The reason why we skip the stack pointer storage in case of nesting is obvious. In case of nesting we were not in a task but in another ISR. So the SP will not be the task SP.
+ But we have to store all registers anyway. This is why we store all registers and then optionally store the SP in context of tcb. */
 
 
 #ifdef __AVR_HAVE_RAMPZ__
@@ -291,9 +291,9 @@ low address
     __asm__ __volatile__ ( \
         /* store r16 and use it as temporary register */ \
         "push    r16"           "\n\t" \
-        /* on AVR interupts will be masked when entering ISR \
+        /* on AVR interrupts will be masked when entering ISR \
            but since we entered ISR it means that they where enabled. \
-           Therefore we need to save a content of SREG as if global interupt \
+           Therefore we need to save the content of SREG as if global interrupt \
            flag was set. using sbr r16, 0x80 for that */ \
         "in      r16, __SREG__" "\n\t" \
         "sbr     r16, 0x80"     "\n\t" \
@@ -305,8 +305,8 @@ low address
          * first */ \
         "push    r28"           "\n\t" \
         "push    r29"           "\n\t" \
-        /* gcc threats r2-r17 as call-saved registes, if we store them first * \
-         * then arch_context_swich can be opimized */ \
+        /* gcc treats r2-r17 as call-saved registers, if we store them first * \
+         * then arch_context_switch can be optimized */ \
         "push    r0"            "\n\t" \
         "push    r1"            "\n\t" \
         "push    r2"            "\n\t" \
@@ -337,11 +337,11 @@ low address
         "push    r27"           "\n\t" \
         "push    r30"           "\n\t" \
         "push    r31"           "\n\t" \
-        /* incement isr_nesting */ \
+        /* increment isr_nesting */ \
         "lds     r16, isr_nesting" "\n\t" \
         "inc     r16"              "\n\t" \
         "sts     isr_nesting, r16" "\n\t" \
-        /* prepare frame pointer for future C code (usual ISR prolog skiped \
+        /* prepare frame pointer for future C code (usual ISR prolog skipped \
          * since OS_ISR was used */ \
         "in      r28, __SP_L__" "\n\t" /* load SPL into r28 (means Ya) */ \
         "in      r29, __SP_H__" "\n\t" /* load SPH into r29 (means Yb) */ \
@@ -350,28 +350,28 @@ low address
         "cpi     r16, 1"         "\n\t" \
         "brne    isr_contextstore_nested_%=\n\t" \
         /* store SP into task_current->ctx */ \
-        "lds     r30, task_current"  "\n\t"  /* load Z with curent_task pointer */ \
-        "lds     r31, task_current+1" "\n\t"  /* load Z with curent_task pointer */ \
+        "lds     r30, task_current"  "\n\t"  /* load Z with current_task pointer */ \
+        "lds     r31, task_current+1" "\n\t"  /* load Z with current_task pointer */ \
         "st      Z,   r28"      "\n\t"   /* store SPL into *(task_current) */ \
         "std     Z+1, r29"      "\n\t"   /* store SPH into *(task_current) */ \
      "isr_contextstore_nested_%=:\n\t" \
         :: )
 #else
 #define arch_contextstore_i(_isrName) \
-#error CPU with extended memory registers are not supported yet
+#error CPUs with extended memory registers are not supported yet
 /*      "in r0,_SFR_IO_ADDR(RAMPZ)\n\t"
         "push r0"               "\n\t"
         "in r0,_SFR_IO_ADDR(EIND)\n\t"
         "push r0"               "\n\t" */
 #endif
 
-/* This function have to:
- - disable IE (in case we achritecture allows for nesting)
+/* This function has to:
+ - disable IE (in case the architecture allows for nesting)
  - decrement the isr_nesting
  - if isr_nesting = 0 then
      - restore context from curr_tcb->ctx
  - restore all registers
- - perform actions that will lead to enable IE after reti
+ - perform actions that will lead to enabling IE after reti
  - return by reti
 
  Please first read the note for arch_context_StoreI. The important point here is why we need to enable the interrupt after reti in both cases (in normal and nested).
@@ -396,7 +396,7 @@ low address
         "lds     r16, isr_nesting"    "\n\t" \
         "dec     r16"                 "\n\t" \
         "sts     isr_nesting, r16"    "\n\t" \
-        /* check isr_nesting and skip restoring iof SP if isr_nesting != 0 */ \
+        /* check isr_nesting and skip restoring of SP if isr_nesting != 0 */ \
         "brne    isr_contextrestore_nested_%=\n\t" \
         /* restore SP from task_current->ctx */ \
         "lds     r30, task_current"   "\n\t" /* load Z with curent_task pointer */ \
@@ -441,11 +441,11 @@ low address
         "pop    r28"                 "\n\t" \
         /* pop RAMPZ if pressent */         \
         arch_pop_rampz                      \
-        /* in poped SEG, I bit may be either set or cleared depending if popped \
-         * task had interupts disabled (was switched out by internal OS call) \
-         * or enabled (swithed out by os_tick() from interrupt */ \
+        /* in popped SEG, I bit may be either set or cleared depending if popped \
+         * task had interrupts disabled (was switched out by internal OS call) \
+         * or enabled (switched out by os_tick() from interrupt */ \
         "pop    r16"                 "\n\t" \
-        /* check if interupts should be enabled after return, if not then we \
+        /* check if interrupts should be enabled after return, if not then we \
          * must use ret instead of reti, cause reti always enables interrupts \
          * interrupts must stay disabled if picked task to which we are switching \
          * now was pushed by arch_context_switch from inside of critical section \
@@ -458,9 +458,9 @@ low address
          * instruction passed, since we know that I bit in SREG is disabled */ \
         "ret"                        "\n\t" \
      "isr_contextrestore_enableint_%=:\n\t" \
-        /* here we know that I bit in SREG is enabled, we must enable interupts * \
-         * after return, but since betwen updating SREG and return we will have * \
-         * more that 2 instructions we need to temporarly disable the I bit and * \
+        /* here we know that I bit in SREG is enabled, we must enable interrupts * \
+         * after return, but since between updating SREG and return we will have * \
+         * more than 2 instructions we need to temporarily disable the I bit and * \
          * enable interrupts by reti */ \
         "cbr r16, 0x80"              "\n\t" \
         "out    __SREG__, r16"       "\n\t" \
@@ -472,7 +472,7 @@ low address
         :: )
 #else
 #define arch_contextrestore_i(_isrName) \
-#error CPU with extended memory registers are not supported yet
+#error CPUs with extended memory registers are not supported yet
 /*      "pop r0"                     "\n\t" \
         "in r0,_SFR_IO_ADDR(EIND)"   "\n\t" \
         "pop r0"                     "\n\t" \

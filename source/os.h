@@ -42,10 +42,10 @@
 #include "os_mtx.h"
 #include "os_waitqueue.h"
 
-/* need to be visiable for user because of arch_contextstore_i macros */
+/* needs to be visible to user because of arch_contextstore_i macros */
 extern os_task_t* task_current;
 
-/* need to be visiable for user because of arch_contextstore_i macros */
+/* needs to be visible to user because of arch_contextstore_i macros */
 extern volatile os_atomic_t isr_nesting;
 
 #endif

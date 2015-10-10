@@ -30,7 +30,7 @@
  */
 
 /**
- * /file Test os semaphore rutines
+ * /file Test OS semaphore routines
  * /ingroup tests
  *
  * Check (while intensive prremption is in charge)

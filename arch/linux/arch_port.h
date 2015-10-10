@@ -63,9 +63,9 @@ typedef struct {
 typedef sig_atomic_t arch_atomic_t;
 #define ARCH_ATOMIC_MAX SIG_ATOMIC_MAX
 
-/** Architecture dependent tick type definition, uint16 is ennough but to make
- * it convinient for 32 and 64 CPU's, we use uint_fast16_t (so it will be the
- * smallest and fastest type for paticular CPU */
+/** Architecture dependent tick type definition, uint16 is enough but to make
+ * it convenient for 32-bit and 64-bit CPUs, we use uint_fast16_t (so it will be the
+ * smallest and fastest type for particular CPU */
 typedef uint_fast16_t arch_ticks_t;
 #define ARCH_TICKS_MAX ((arch_ticks_t)UINT16_MAX)
 
@@ -75,7 +75,7 @@ typedef sigset_t arch_criticalstate_t;
  */
 extern sigset_t arch_crit_signals;
 
-#define OS_ISR /* not naked since signal in linux are handling the context registers via parameter. Signal handler always sees clobered registers */
+#define OS_ISR /* not naked since signals in linux are handling the context registers via parameter. Signal handler always sees clobbered registers */
 #define OS_NAKED __attribute__((naked))
 #define OS_NORETURN __attribute__ ((noreturn))
 #define OS_PURE __attribute__ ((pure))
@@ -102,8 +102,8 @@ extern sigset_t arch_crit_signals;
         "decq %[atomic]\n\t" \
             ::  [atomic] "m" (_atomic))
 
-/* all pointers in any linux are size of CPU register, no need to read or write
- * with any concurent handling */
+/* all pointers in any linux are the size of CPU register, no need to read or write
+ * with any concurrent handling */
 #define os_atomicptr_read(_ptr) (_ptr)
 #define os_atomicptr_write(_ptr, _val) ((_ptr) = (_val))
 #define os_atomicptr_xchnge(_ptr, _val) (OS_ASSERT(!"not implemented"))
@@ -133,41 +133,41 @@ extern sigset_t arch_crit_signals;
       (void)sigprocmask(SIG_UNBLOCK, &arch_crit_signals, NULL); \
    }while(0)
 
-/* This function have to:
- - if neecessary, disable interrupts to block the neesting
- - store all registers (power control bits does not have to be necessarly stored)
+/* This function has to:
+ - if necessary, disable interrupts to block the nesting
+ - store all registers (power control bits do not have to be necessarily stored)
  - increment the isr_nesting
  - if isr_nesting is = 1 then
-    - store the context curr_tcb->ctx (may take benfit from already stored
+    - store the context curr_tcb->ctx (may take benefit from already stored
       registers by storing only the stack pointer)
  - end
 
  - in some near future down in the ISR enable interrupts to support the nesting interrupts
 
- Because ISR was called it means that interrupts was enabled. On some arch like
- MPS430 they may be automaticly disabled durring the enter to ISR On those
+ Because ISR was called it means that interrupts were enabled. On some archs like
+ MPS430 they may be automatically disabled when entering ISR. On those
  architectures interrupts may be enabled when ISR will mask pending interrupt.
- In general disabling interrupt is usualy needed because we touch the
- task_current (usualy need 2 asm instructions) and we cannot be preempted by
- another interrupt.  From other hand enabling the interrupts again as soon as
- possible is needed for realtime constrains.  If your code does not need to be
- realtime constrained, it is not needed to enable the interupts in ISR, also the
- nesting interrupt code can be disabled
+ In general disabling interrupts is usually needed because we touch
+ task_current (usually need 2 asm instructions) and we cannot be preempted by
+ another interrupt. On the other hand enabling the interrupts again as soon as
+ possible is needed for realtime constraints.  If your code does not need to be
+ realtime constrained, it is not needed to enable the interrupts in ISR, also the
+ nesting interrupt code can be disabled.
 
- The reason why we skip the stack pointer storage in case of nesing is obvous.
- In case of nesting we was not in task but in other ISR. So the SP will not be
+ The reason why we skip the stack pointer storage in case of nesting is obvious.
+ In case of nesting we were not in a task but in another ISR. So the SP will not be
  the task SP.  But we have to store all registers anyway. This is why we store
- all registers and then optionaly store the SP in context of tcb
+ all registers and then optionally store the SP in context of tcb.
 
- For X86 port this macro need to be placed in signal handler function. This
- function have to be declared as compatible with SA_SIGINFO disposition and it
+ For X86 port this macro needs to be placed in signal handler function. This
+ function has to be declared as compatible with SA_SIGINFO disposition and it
  has to have the ucontext parameter which will point to stored context. This
- macoro will use this variable to copy the context (probably temporaly stored on
+ macro will use this variable to copy the context (probably temporarily stored on
  stack) into tack_current->ctx.context. This is required both by OS design and
  because this temporary context will be destroyed once signal handler will
  return. Linux will use this context to restore the process state. We use this
- feature to switch betwen tasks. Therefore arch_contextrestore_i only copy the
- newly chosen task into context on stack while Linux kernel do the main job
+ feature to switch between tasks. Therefore arch_contextrestore_i only copies the
+ newly chosen task into context on stack while Linux kernel does the main job
  which is restoring the register context. */
 #define arch_contextstore_i(_isrName) \
     do { \
@@ -180,8 +180,8 @@ extern sigset_t arch_crit_signals;
       } \
     } while(0)
 
-/* This function have to:
- - disable IE (in case we achritecture allows for nesting)
+/* This function has to:
+ - disable IE (in case the architecture allows for nesting)
  - decrement the isr_nesting
  - if isr_nesting = 0 then
      - restore context from curr_tcb->ctx
@@ -193,11 +193,11 @@ extern sigset_t arch_crit_signals;
 
  Please first read the note for arch_context_StoreI. The important point here is
  why we need to enable the interrupt after reti in both cases (in normal and
- nested).  This is because we disabled them for task_current manipulation in
+ nested). This is because we disabled them for task_current manipulation in
  first step. But we need to enable them because:
- - in case of not nested they was for sure enabled (need to be enabled because
+ - in case of not nested they were enabled for sure (need to be enabled because
    we enter ISR ;) )
- - in case of nested the was also for sure enabled (from the same reason, we
+ - in case of nested they were also enabled for sure (same reason, we
    enter nested ISR) */
 #define arch_contextrestore_i(_isrName) \
     do { \

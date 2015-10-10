@@ -145,13 +145,13 @@ hi address
  On those architectures interrupts may be enabled when ISR will mask pending interrupt.
  In general disabling interrupt is usualy needed because we touch the task_current (usualy need 2 asm instructions) and we cannot be preempted by another interrupt.
  From other hand enabling the interrupts again as soon as possible is needed for realtime constrains.
- If your code does not need to be realtime constrained, it is not needed to enable the interupts in ISR, also the nesting interrupt code can be disabled
+ If your code does not need to be realtime constrained, it is not needed to enable the interrupts in ISR, also the nesting interrupt code can be disabled
 
  The reason why we skip the stack pointer storage in case of nesing is obvous. In case of nesting we was not in task but in other ISR. So the SP will not be the task SP.
  But we have to store all registers anyway. This is why we store all registers and then optionaly store the SP in context of tcb */
 #define arch_contextstore_i(_isrName) \
     __asm__ __volatile__ ( \
-        /* on MSP430 interupts are disabled when entering ISR */ \
+        /* on MSP430 interrupts are disabled when entering ISR */ \
         "inc %[isr_nesting]\n\t" /* increment isr_nesting, here we destroy orginal SR but it already lay on stack*/ \
         "pushm 12,r15\n\t" /* pushing R4 -R15 */ \
         "cmp #1, %[isr_nesting]\n\t" /* check isr_nesting */ \

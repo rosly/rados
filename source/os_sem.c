@@ -40,6 +40,7 @@ static void os_sem_timerclbck(void* param);
 void os_sem_create(os_sem_t* sem, os_atomic_t init_value)
 {
    OS_ASSERT(init_value < OS_ATOMIC_MAX);
+   OS_ASSERT(NULL == task_current->wait_queue); /* cannot call from wait_queue loop */
 
    memset(sem, 0, sizeof(os_sem_t));
    os_taskqueue_init(&(sem->task_queue));
@@ -50,6 +51,9 @@ void os_sem_destroy(os_sem_t* sem)
 {
    arch_criticalstate_t cristate;
    os_task_t *task;
+
+   OS_ASSERT(0 == isr_nesting); /* cannot call from ISR */
+   OS_ASSERT(NULL == task_current->wait_queue); /* cannot call from wait_queue loop */
 
    arch_critical_enter(cristate);
 
@@ -81,8 +85,9 @@ os_retcode_t OS_WARN_UNUSEDRET os_sem_down(
    os_timer_t timer;
    arch_criticalstate_t cristate;
 
-   OS_ASSERT(0 == isr_nesting); /* cannot sem_down() from ISR */
+   OS_ASSERT(0 == isr_nesting); /* cannot call from ISR */
    OS_ASSERT(task_current->prio_current > 0); /* idle task cannot call blocking functions (will crash OS) */
+   OS_ASSERT(NULL == task_current->wait_queue); /* cannot call from wait_queue loop */
 
    /* critical section needed because: timers, ISR sem_up(), operating on
     * sem->task_queue */
@@ -146,6 +151,7 @@ void os_sem_up_sync(os_sem_t* sem, bool sync)
 
    /* sync must be == false in case we are called from ISR */
    OS_ASSERT((isr_nesting == 0) || (sync == false));
+   OS_ASSERT(NULL == task_current->wait_queue); /* cannot call from wait_queue loop */
 
    arch_critical_enter(cristate);
 

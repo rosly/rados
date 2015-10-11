@@ -120,6 +120,8 @@ static void os_waitqueue_timerclbck(void* param);
 
 void os_waitqueue_create(os_waitqueue_t* queue)
 {
+   OS_ASSERT(NULL == task_current->wait_queue); /* cannot call from wait_queue loop */
+
    memset(queue, 0, sizeof(os_waitqueue_t));
    os_taskqueue_init(&(queue->task_queue));
 }
@@ -128,6 +130,8 @@ void os_waitqueue_destroy(os_waitqueue_t* queue)
 {
    arch_criticalstate_t cristate;
    os_task_t *task;
+
+   OS_ASSERT(NULL == task_current->wait_queue); /* cannot call from wait_queue loop */
 
    arch_critical_enter(cristate);
 
@@ -270,8 +274,6 @@ void os_waitqueue_wakeup_sync(
    arch_criticalstate_t cristate;
    os_task_t *task;
 
-   OS_ASSERT(nbr > 0); /* number of tasks to wake up must be > 0 */
-
    /* For mtx and sem we wake up tasks that have been placed in sem->task_queue.
     * But for wait_queue we also have to consider task which prepared for
     * sleeping but does not actually yet been suspended. Imagine scenario where
@@ -284,8 +286,12 @@ void os_waitqueue_wakeup_sync(
    /* the golden rule is that tasks cannot wake his own wait_queues beside
     * situation where its looking like that by it because it was interrupted by ISR */
    OS_ASSERT((isr_nesting > 0) || (task_current->wait_queue != queue));
+   /* tasks also cannot call any OS functions if they are in wait_queue suspend
+    * loop, with exception to ISR's */
+   OS_ASSERT((isr_nesting > 0) || (NULL == task_current->wait_queue));
    /* sync must be == false in case we are called from ISR */
    OS_ASSERT((isr_nesting == 0) || (sync == false));
+   OS_ASSERT(nbr > 0); /* number of tasks to wake up must be > 0 */
 
    arch_critical_enter(cristate);
 

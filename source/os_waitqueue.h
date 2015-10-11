@@ -268,9 +268,6 @@ os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(void);
  *        This parameter must be set to 'false' in case function is called from
  *        ISR.
  *
- * @pre this function CANNOT be called by tasks which try to suspend on given
- *      wait_queue. In other words task cannot call os_waitqueue_wakeup() in
- *      case it already called os_waitqueue_prepare() on given wait_queue.
  * @pre this function CAN be called from ISR. This is one of basic use cases for
  *      wait_queues.
  */
@@ -287,9 +284,6 @@ void os_waitqueue_wakeup_sync(
  * @param queue pointer to wait_queue from which we will wakeup tasks
  * @param nbr number of task to wakeup. Must be > 0.
  *
- * @pre this function CANNOT be called by tasks which try to suspend on given
- *      wait_queue. In other words task cannot call os_waitqueue_wakeup() in
- *      case it already called os_waitqueue_prepare() on given wait_queue.
  * @pre this function CAN be called from ISR. This is one of basic use cases for
  *      wait_queues.
  */

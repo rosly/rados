@@ -156,6 +156,7 @@ static void os_mtx_unlock_prio_reset(void)
 void os_mtx_create(os_mtx_t* mtx)
 {
    OS_ASSERT(0 == isr_nesting); /* cannot operate on mtx from ISR */
+   OS_ASSERT(NULL == task_current->wait_queue); /* cannot call from wait_queue loop */
 
    memset(mtx, 0, sizeof(os_mtx_t));
    os_taskqueue_init(&(mtx->task_queue));
@@ -167,6 +168,7 @@ void os_mtx_destroy(os_mtx_t* mtx)
    os_task_t *task;
 
    OS_ASSERT(0 == isr_nesting); /* cannot operate on mtx from ISR */
+   OS_ASSERT(NULL == task_current->wait_queue); /* cannot call from wait_queue loop */
 
    arch_critical_enter(cristate);
 
@@ -205,6 +207,7 @@ os_retcode_t OS_WARN_UNUSEDRET os_mtx_lock(os_mtx_t* mtx)
 
    OS_ASSERT(0 == isr_nesting); /* cannot operate on mtx from ISR */
    OS_ASSERT(task_current->prio_current > 0); /* IDLE task cannot call blocking functions (will crash OS) */
+   OS_ASSERT(NULL == task_current->wait_queue); /* cannot call from wait_queue loop */
 
    arch_critical_enter(cristate);
    do
@@ -258,6 +261,7 @@ void os_mtx_unlock(os_mtx_t* mtx)
 
    OS_ASSERT(0 == isr_nesting); /* cannot operate on mtx from ISR */
    OS_ASSERT(mtx->owner == task_current);/* only owner can unlock the mutex */
+   OS_ASSERT(NULL == task_current->wait_queue); /* cannot call from wait_queue loop */
 
    arch_critical_enter(cristate);
    do

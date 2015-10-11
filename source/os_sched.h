@@ -261,6 +261,9 @@ int os_task_join(os_task_t *task);
  * priority. Context switch will be made if only some other task with the same
  * priority is in READY state. Therefore idle task will not be scheduled() by
  * this function.
+ *
+ * @pre this function cannot be called from ISR
+ * @pre this function cannot be called from idle task
  */
 void os_yield(void);
 

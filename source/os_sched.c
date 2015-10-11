@@ -82,7 +82,11 @@ static inline void os_scheduler_unlock(void)
    /* TODO verify if we should not reschedule right after that. Usually locking
     * scheduler is used to protect some user space critical section, so after
     * exiting we might need reschedule(), or we should expose os_schedule() to
-    * user (if not yet done) */
+    * user (if not yet done)
+    * also consider sync parameter to this function so it will be possible o
+    * unlock scheduler without causing context switch
+    * also since this function would possibly schedule it cannot b called from
+    * wait_queue suspend loop */
 }
 
 /* --- forward declaration of private functions --- */

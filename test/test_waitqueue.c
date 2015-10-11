@@ -75,7 +75,9 @@ typedef struct {
 typedef int (*test_case_t)(void);
 
 static os_task_t task_main;
+static os_task_t task_helper;
 static OS_TASKSTACK task_main_stack[OS_STACK_MINSIZE];
+static OS_TASKSTACK task_helper_stack[OS_STACK_MINSIZE];
 static task_data_t worker_tasks[TEST_TASKS];
 static os_waitqueue_t global_wait_queue;
 static os_sem_t global_sem;
@@ -410,18 +412,15 @@ int testcase_5regresion(void)
  */
 int testcase_6_impl(os_waitqueue_t *waitqueue, bool wait, bool timeout)
 {
-   unsigned local_tick_cnt;
+   unsigned local_tick_cnt = 0;
    os_waitobj_t waitobj;
    os_retcode_t ret;
    size_t i;
 
-   /* reset tickcnt's */
-   local_tick_cnt = global_tick_cnt = 0;
-
    os_waitqueue_prepare(waitqueue, &waitobj, 3);
 
    while(1) {
-      if(global_tick_cnt > 5) {
+      if(global_tick_cnt > 6) {
          /* break after 5 ticks */
          break;
       }
@@ -469,6 +468,38 @@ int testcase_6_impl(os_waitqueue_t *waitqueue, bool wait, bool timeout)
    return 0;
 }
 
+typedef struct {
+   os_waitqueue_t *waitqueue;
+   bool wait;
+   bool timeout;
+} helper_task_param_t;
+
+int helper_task_proc(void* param)
+{
+   helper_task_param_t *p = (helper_task_param_t*)param;
+   return testcase_6_impl(p->waitqueue, p->wait, p->timeout);
+}
+
+void start_helper_task(os_waitqueue_t *waitqueue, bool wait, bool timeout)
+{
+   static helper_task_param_t param;
+
+   param.waitqueue = waitqueue;
+   param.wait = wait;
+   param.timeout = timeout;
+   test_verbose_debug("creating helper task");
+   os_task_create(
+      &task_helper, OS_CONFIG_PRIOCNT - 1,
+      task_helper_stack, sizeof(task_helper_stack),
+      helper_task_proc, &param);
+}
+
+int join_helper_task(void)
+{
+   test_verbose_debug("joining helper task");
+   return os_task_join(&task_helper);
+}
+
 int testcase_6(void)
 {
    os_waitqueue_t waitqueue;
@@ -477,9 +508,20 @@ int testcase_6(void)
 
    /* test timeout behaviour without wakeup */
    test_verbose_debug("testing timeout impl with os_waitqueue_wait()");
+   global_tick_cnt = 0; /* reset tickcnt's */
    testcase_6_impl(&waitqueue, false, true);
    test_verbose_debug("testing timeout impl with os_waitqueue_finish()");
+   global_tick_cnt = 0; /* reset tickcnt's */
    testcase_6_impl(&waitqueue, true, true);
+
+   /* next we will test wakeup from ISR, in this case in os_waitqueue_wakeup()
+    * there is a special code which detects that we interrupted the task
+    * spinning wait_queue related condition which ISR is going to wakeup. There
+    * is also the second section for other tasks. We would like to test both of
+    * code sections so we create additional task for that. Both will share the
+    * same priority so we will always run both sections (either main_task will
+    * be the task_current or it will be the other task, depending on tick epoh)
+    */
 
    /* test timeout behaviour when wakeup happen from ISR before timeout (but
     * before suspend) */
@@ -487,9 +529,13 @@ int testcase_6(void)
    irq_trigger_tick = 2;
    test_verbose_debug("testing timeout impl with os_waitqueue_wait() with wakeup"
                       "from ISR before timeout");
+   global_tick_cnt = 0; /* reset tickcnt's */
+   start_helper_task(&waitqueue, false, false);
    testcase_6_impl(&waitqueue, false, false);
+   join_helper_task();
    test_verbose_debug("testing timeout impl with os_waitqueue_finish() with wakeup"
                       "from ISR before timeout");
+   global_tick_cnt = 0; /* reset tickcnt's */
    testcase_6_impl(&waitqueue, true, false);
 
    /* test timeout behaviour when wakeup happen from ISR after timeout (but
@@ -498,9 +544,11 @@ int testcase_6(void)
    irq_trigger_tick = 4;
    test_verbose_debug("testing timeout impl with os_waitqueue_wait() with wakeup"
                       "from ISR after timeout");
+   global_tick_cnt = 0; /* reset tickcnt's */
    testcase_6_impl(&waitqueue, false, true);
    test_verbose_debug("testing timeout impl with os_waitqueue_finish() with wakeup"
                       "from ISR after timeout");
+   global_tick_cnt = 0; /* reset tickcnt's */
    testcase_6_impl(&waitqueue, true, true);
 
    irq_trigger_waitqueue = NULL;
@@ -651,7 +699,8 @@ void test_tick(void)
 
    if (irq_trigger_waitqueue && (irq_trigger_tick == global_tick_cnt))
    {
-      os_waitqueue_wakeup(irq_trigger_waitqueue, 1);
+      /* 3 as nbr - wakeup main helper and make empty spin */
+      os_waitqueue_wakeup(irq_trigger_waitqueue, 3);
    }
 }
 

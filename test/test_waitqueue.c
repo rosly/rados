@@ -113,19 +113,17 @@ int slavetask_proc(void* param)
 
       while(1)
       {
-         os_waitobj_t waitobj;
-
-         os_waitqueue_prepare(
-           &global_wait_queue, &waitobj,
-           (0 == data->timeout) ? OS_TIMEOUT_INFINITE : data->timeout);
+         os_waitqueue_prepare(&global_wait_queue);
          test_verbose_debug("Task %u spins ...", data->idx);
          ++(data->spin_spincnt); /* signalize that we performed condition test */
          if(0 != data->spin_intcond)
          {
-            os_waitqueue_finish();
+            os_waitqueue_break();
             break;
          }
-         data->retcode = os_waitqueue_wait(); /* condition not meet, go to sleep */
+         /* condition not meet, go to sleep */
+         data->retcode = os_waitqueue_wait(
+            (0 == data->timeout) ? OS_TIMEOUT_INFINITE : data->timeout);
          /* only timeout and success is allowed as return code */
          if(OS_TIMEOUT == data->retcode)
          {
@@ -134,19 +132,6 @@ int slavetask_proc(void* param)
          else if(OS_DESTROYED == data->retcode)
          {
             test_verbose_debug("Task %u returned from wait_queue with code OS_DESTROYED", data->idx);
-
-            /* overwrite the waitobj and wait for a while, so we can check if
-             * timeout is properly torn down (in case of bug timeout callback
-             * will fire and use the overwritten memory) */
-            memset(&waitobj, 0, sizeof(waitobj));
-
-            /* spin for 10 ticks */
-            unsigned local_tick_cnt = global_tick_cnt;
-            while(global_tick_cnt < local_tick_cnt + 10)
-            {
-               os_yield();
-            }
-
             return 0;
          }
       }
@@ -306,8 +291,8 @@ int testcase_3(void)
 }
 
 /**
- * Initially I forgot about implementation of os_waitqueue_finish()
- * Testing of os_waitqueue_finish()
+ * Initially I forgot about implementation of os_waitqueue_break()
+ * Testing of os_waitqueue_break()
  */
 int testcase_4regresion(void)
 {
@@ -352,68 +337,16 @@ int testcase_4regresion(void)
 }
 
 /**
- * Regression test case
- * With main thread only, testing the os_waitqueue_finalize() for case with
- * timeout set. Test if timer guard is properly deleted.
- * Testing os_waitqueue_finish() implementation with timer guard
- */
-int testcase_5regresion(void)
-{
-   unsigned local_tick_cnt;
-   os_waitobj_t waitobj;
-   size_t i;
-
-   /* reset tickcnt's */
-   local_tick_cnt = global_tick_cnt = 0;
-
-   /* use waitqueue with timeout (2 ticks) and finish it right away (simulate
-    * early condition meet) */
-   test_verbose_debug("Main sleeping on waitqueue with timeout, then finish right away");
-   os_waitqueue_prepare(&global_wait_queue, &waitobj, 2);
-   os_waitqueue_finish();
-
-   /* test is timer was removed */
-   test_assert(task_main.timer == NULL);
-
-   /* destroy the waitobj */
-   memset(&waitobj, 0xff, sizeof(waitobj));
-   /* spin for a while to see if timer was really stopped,
-    * in case of some bug we will have timer callback which would like to use
-    * timer in waitobj (that will cause a crash) */
-   while(1) {
-      if(global_tick_cnt > 5) {
-         /* break after 5 ticks */
-         break;
-      }
-      if(local_tick_cnt != global_tick_cnt) {
-         test_verbose_debug("Main detected tick increase %u != %u",
-                            local_tick_cnt, global_tick_cnt);
-         local_tick_cnt = global_tick_cnt;
-      }
-   }
-   uint8_t *ptr = (uint8_t*)&waitobj;
-   for (i = 0; i < sizeof(waitobj); i++)
-   {
-      test_assert(0xff == ptr[i]);
-   }
-   test_verbose_debug("Main finishing test5");
-
-   return 0;
-}
-
-/**
- * Testing os_waitqueue_wait() and os_waitqueue_finish() implementation with
+ * Testing os_waitqueue_wait() and os_waitqueue_break() implementation with
  * timeout guard.
  */
 int testcase_6_impl(
    bool main, os_waitqueue_t *waitqueue, bool wait, bool timeout)
 {
    unsigned local_tick_cnt = 0;
-   os_waitobj_t waitobj;
    os_retcode_t ret;
-   size_t i;
 
-   os_waitqueue_prepare(waitqueue, &waitobj, 3);
+   os_waitqueue_prepare(waitqueue);
 
    while(1)
    {
@@ -433,39 +366,17 @@ int testcase_6_impl(
 
    if (wait)
    {
-      ret = os_waitqueue_wait();
+      ret = os_waitqueue_wait(3);
       test_assert(ret == (timeout ? OS_TIMEOUT : OS_OK));
    } else {
-      os_waitqueue_finish();
+      os_waitqueue_break();
    }
 
-   /* verify the cleanup */
-   test_assert(NULL == task_current->wait_queue);
+   /* verify the cleanup (following two will assert if waitqueue_current will no
+    * be properly cleared */
+   os_waitqueue_prepare(waitqueue);
+   os_waitqueue_break();
    test_assert(NULL == task_current->timer);
-
-   /* destroy the waitobj */
-   memset(&waitobj, 0xff, sizeof(waitobj));
-   /* spin for a while to see if timer was really stopped,
-    * in case of some bug we will have timer callback which would like to use
-    * timer in waitobj (that will also possibly cause a crash) */
-   while(1) {
-      if(global_tick_cnt > 10) {
-         /* break after 10'th tick */
-         break;
-      }
-      if(local_tick_cnt != global_tick_cnt)
-      {
-         test_verbose_debug("%s detected tick increase %u != %u",
-                            main ? "main" : "helper",
-                            local_tick_cnt, global_tick_cnt);
-         local_tick_cnt = global_tick_cnt;
-      }
-   }
-   uint8_t *ptr = (uint8_t*)&waitobj;
-   for (i = 0; i < sizeof(waitobj); i++)
-   {
-      test_assert(0xff == ptr[i]);
-   }
 
    return 0;
 }
@@ -514,11 +425,10 @@ int join_helper_task(void)
 int sleeper_task_proc(void* param)
 {
    os_waitqueue_t *waitqueue = (os_waitqueue_t*)param;
-   os_waitobj_t waitobj;
    os_retcode_t ret;
 
-   os_waitqueue_prepare(waitqueue, &waitobj, OS_TIMEOUT_INFINITE);
-   ret = os_waitqueue_wait();
+   os_waitqueue_prepare(waitqueue);
+   ret = os_waitqueue_wait(OS_TIMEOUT_INFINITE);
    sleeper_wokenup = true;
    test_assert(ret == OS_OK);
 
@@ -550,7 +460,7 @@ int testcase_6(void)
    test_verbose_debug("testing timeout impl with os_waitqueue_wait()");
    global_tick_cnt = 0; /* reset tickcnt's */
    testcase_6_impl(true, &waitqueue, false, true);
-   test_verbose_debug("testing timeout impl with os_waitqueue_finish()");
+   test_verbose_debug("testing timeout impl with os_waitqueue_break()");
    global_tick_cnt = 0; /* reset tickcnt's */
    testcase_6_impl(true, &waitqueue, true, true);
 
@@ -576,7 +486,7 @@ int testcase_6(void)
    join_helper_task();
    test_assert(false == sleeper_wokenup);
 
-   test_verbose_debug("testing timeout impl with os_waitqueue_finish() with wakeup"
+   test_verbose_debug("testing timeout impl with os_waitqueue_break() with wakeup"
                       "from ISR before timeout");
    global_tick_cnt = 0; /* reset tickcnt's */
    start_helper_task(&waitqueue, false, false);
@@ -596,7 +506,7 @@ int testcase_6(void)
    join_helper_task();
    test_assert(false == sleeper_wokenup);
 
-   test_verbose_debug("testing timeout impl with os_waitqueue_finish() with wakeup"
+   test_verbose_debug("testing timeout impl with os_waitqueue_break() with wakeup"
                       "from ISR after timeout");
    global_tick_cnt = 0; /* reset tickcnt's */
    start_helper_task(&waitqueue, false, false);
@@ -732,7 +642,6 @@ int mastertask_proc(void* OS_UNUSED(param))
       testcase_2,
       testcase_3,
       testcase_4regresion,
-      testcase_5regresion,
       testcase_6,
       testcase_7,
    };

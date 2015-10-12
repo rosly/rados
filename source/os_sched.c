@@ -60,23 +60,32 @@ volatile os_atomic_t isr_nesting = 0;
  * Used to explicitly lock the scheduler for any reason */
 volatile os_atomic_t sched_lock = 0;
 
+#ifdef OS_CONFIG_WAITQUEUE
+/** Pointer to wait_queue on which task_current prepared to suspend
+ *  Set in os_waitqueue_prepare(). After this call preemption is also disabled
+ */
+os_waitqueue_t *waitqueue_current = NULL;
+#endif
+
 /** Task structure for idle task
  * Since user programs does not explicitly create idle task, OS need to keep
  * internal task structure for IDLE task */
 static os_task_t task_idle;
 
-/* --- private inline functions --- */
+/* --- forward declaration of private functions --- */
 
-/**
- * Blocks the preemptive scheduling
- * Take into account that interrupts are still enabled, while only the task
- * switch will not be performed */
-static inline void os_scheduler_lock(void)
+static void os_task_check_init(os_task_t *task, void* stack, size_t stack_size);
+static void os_task_init(os_task_t* task, uint_fast8_t prio);
+
+/* --- public function implementation --- */
+/* all public functions are documented in os_sched.h file */
+
+void os_scheduler_lock(void)
 {
    os_atomic_inc(sched_lock);
 }
 
-static inline void os_scheduler_unlock(void)
+void os_scheduler_unlock(void)
 {
    os_atomic_dec(sched_lock);
    /* TODO verify if we should not reschedule right after that. Usually locking
@@ -89,13 +98,6 @@ static inline void os_scheduler_unlock(void)
     * wait_queue suspend loop */
 }
 
-/* --- forward declaration of private functions --- */
-
-static void os_task_check_init(os_task_t *task, void* stack, size_t stack_size);
-static void os_task_init(os_task_t* task, uint_fast8_t prio);
-
-/* --- public function implementation --- */
-/* all public functions are documented in os_sched.h file */
 
 void os_start(
    os_initproc_t app_init,
@@ -166,7 +168,7 @@ void os_task_create(
    OS_ASSERT(prio > 0); /* only idle task may have the prio 0 */
    OS_ASSERT(NULL != stack); /* stack must be given */
    OS_ASSERT(stack_size >= OS_STACK_MINSIZE); /* minimal size for stack */
-   OS_ASSERT(NULL == task_current->wait_queue); /* cannot call from wait_queue loop */
+   OS_ASSERT(NULL == waitqueue_current); /* cannot call from wait_queue loop */
 
    os_task_init(task, prio);
 
@@ -189,7 +191,7 @@ int os_task_join(os_task_t *task)
    OS_ASSERT(0 == isr_nesting); /* cannot join tasks from ISR */
    /* idle task cannot call blocking functions (will crash OS) */
    OS_ASSERT(task_current->prio_current > 0);
-   OS_ASSERT(NULL == task_current->wait_queue); /* cannot call from wait_queue loop */
+   OS_ASSERT(NULL == waitqueue_current); /* cannot call from wait_queue loop */
 
    arch_critical_enter(cristate);
    OS_ASSERT(NULL == task->join_sem); /* only one task is allowed to wait for particular task */
@@ -222,7 +224,7 @@ void os_yield(void)
 {
    OS_ASSERT(0 == isr_nesting); /* cannot join tasks from ISR */
    OS_ASSERT(task_current->prio_current > 0); /* idle task cannot call os_yield() */
-   OS_ASSERT(NULL == task_current->wait_queue); /* cannot call from wait_queue loop */
+   OS_ASSERT(NULL == waitqueue_current); /* cannot call from wait_queue loop */
 
    arch_criticalstate_t cristate;
 
@@ -573,7 +575,6 @@ static void os_task_init(
    task->prio_current = prio;
    task->state = TASKSTATE_READY;
    task->block_type = OS_TASKBLOCK_INVALID;
-   task->wait_queue = NULL;
    list_init(&(task->mtx_list));
 }
 

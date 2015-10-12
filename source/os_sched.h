@@ -114,16 +114,6 @@ typedef struct {
     /** associated timer while waiting on resource with timeout guard, valid
      * only if task state = TASKSTATE_WAIT */
     os_timer_t *timer;
-
-   /* This is pointer to wait_queue if task is associated with it
-    * (os_waitqueue_prepare())
-    * In case of preemption, scheduler instead of putting such task into
-    * ready_queue, it will put it into task_queue of associated wait_queue. It
-    * means that such tasks either are in TASKSTATE_ACTIVE while running and
-    * checking the condition associated with wait_queue, or are in
-    * TASKSTATE_WAIT and are placed in task_queue of proper wait_queue. The
-    * associated code is inside os_task_makeready() */
-    struct os_waitqueue_tag *wait_queue;
   };
 
   /** list of mutexes owned by task, this list is required to calculate new
@@ -175,6 +165,14 @@ typedef struct os_taskqueue_tag {
 /* --- forward declarations */
 typedef void (*os_initproc_t)(void);
 typedef int (*os_taskproc_t)(void* param);
+
+/**
+ * Blocks the preemptive scheduling
+ * Take into account that interrupts are still enabled, while only the task
+ * switch will not be performed */
+void os_scheduler_lock(void);
+
+void os_scheduler_unlock(void);
 
 /** Function initializes OS internals.
  *

@@ -29,7 +29,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+
 #include "os_private.h"
+
+#ifdef OS_CONFIG_WAITQUEUE
 
 /**
  * Technical description of wait_queue mechanics.
@@ -56,7 +59,7 @@
  * arise it would mean that there was a preemption and wait_queue was notified
  * (either from other user task or from interrupt).
  * Wait_queue works by utilizing the fact that during task switch,
- * scheduler checks the value of task_current->wait_queue pointer. If that
+ * scheduler checks the value of waitqueue_current pointer. If that
  * pointer is set, it does not push the task_current into ready_queue (where it
  * will wait for future schedule()) but instead, it put it into
  * wait_queue->task_queue (a task queue associated with wait_queue). This action
@@ -81,14 +84,14 @@
  * during ISR which may happen between mentioned 3 points, task_current is set
  * to task which we consider as vulnerable. If we look at os_waitqueue_wakeup()
  * we will see that there is a special case for this.
- * 1) task_current->wait_queue is atomically set before ISR, so in ISR line 10
+ * 1) waitqueue_current is atomically set before ISR, so in ISR line 10
  *    and 11 are done atomically vs the user code. If we look at
  *    os_waitqueue_wakeup_sync it will show that there is special case that
  *    detects that we are in ISR and we preempted the task which waits on the
  *    same condition which we try to signalize. In this case we only set
- *    task_current->wait_queue = NULL
+ *    waitqueue_current = NULL
  * 2) if we look at os_waitqueue_wait() we will see that it verify if
- *    task_current->wait_queue is still set, if not it exits right away. It will be
+ *    waitqueue_current is still set, if not it exits right away. It will be
  *    NULL since we set it to NULL in line 11 of ISR (inside os_waitqueue_wakeup())
  *
  * If receiver is cooperating with some other task, then in
@@ -120,7 +123,7 @@ static void os_waitqueue_timerclbck(void* param);
 
 void os_waitqueue_create(os_waitqueue_t* queue)
 {
-   OS_ASSERT(NULL == task_current->wait_queue); /* cannot call from wait_queue loop */
+   OS_ASSERT(NULL == waitqueue_current); /* cannot call from wait_queue loop */
 
    memset(queue, 0, sizeof(os_waitqueue_t));
    os_taskqueue_init(&(queue->task_queue));
@@ -131,7 +134,7 @@ void os_waitqueue_destroy(os_waitqueue_t* queue)
    arch_criticalstate_t cristate;
    os_task_t *task;
 
-   OS_ASSERT(NULL == task_current->wait_queue); /* cannot call from wait_queue loop */
+   OS_ASSERT(NULL == waitqueue_current); /* cannot call from wait_queue loop */
 
    arch_critical_enter(cristate);
 
@@ -141,7 +144,6 @@ void os_waitqueue_destroy(os_waitqueue_t* queue)
       /* destroy the timer if it was associated with task we plan to wake up */
       os_blocktimer_destroy(task);
 
-      task->wait_queue = NULL;
       task->block_code = OS_DESTROYED;
       os_task_makeready(task);
    }
@@ -157,85 +159,40 @@ void os_waitqueue_destroy(os_waitqueue_t* queue)
    arch_critical_exit(cristate);
 }
 
-void os_waitqueue_prepare(
-   os_waitqueue_t *queue,
-   os_waitobj_t *waitobj,
-   os_ticks_t timeout_ticks)
+void os_waitqueue_prepare(os_waitqueue_t *queue)
 {
    OS_ASSERT(0 == isr_nesting); /* cannot call os_waitqueue_prepare() from ISR */
    OS_ASSERT(task_current->prio_current > 0); /* idle task cannot call blocking functions (will crash OS) */
    /* check if task is not already subscribed on other wait_queue
     * currently we do not support waiting on multiple wait queues */
-   OS_ASSERT(NULL == task_current->wait_queue);
-   /* in case of timeout guard, we need to have waitobj ptr valid */
-   OS_ASSERT((OS_TIMEOUT_INFINITE == timeout_ticks) || (NULL != waitobj));
-   OS_ASSERT(timeout_ticks > OS_TIMEOUT_TRY); /* timeout must be either specific or infinite */
+   OS_ASSERT(NULL == waitqueue_current);
 
-   /* associate/link task with wait_queue, this will change the behaviour inside
-    * os_task_makeready() and instead of ready_queue, task will be added to
-    * wait_queue (task queue form wait_queue wait_queue->task_queue) */
-   os_atomicptr_write(task_current->wait_queue, queue);
-   task_current->block_code = OS_OK;
-
-   /* create and start timer (count time from now on). By doing so, time keeping
-    * will be done for both, the user condition checking code and sleep time
-    * inside os_waitqueue_wait() */
-   if (OS_TIMEOUT_INFINITE != timeout_ticks)
-   {
-      arch_criticalstate_t cristate;
-
-      /* timer addition requires os critical section - unfortunately ;( */
-      arch_critical_enter(cristate);
-      os_blocktimer_create(
-         &(waitobj->timer), os_waitqueue_timerclbck, timeout_ticks);
-      arch_critical_exit(cristate);
-   }
+   /* disable preemption */
+   os_scheduler_lock();
+   /* mark that we are prepared to suspend on wait_queue */
+   os_atomicptr_write(waitqueue_current, queue);
 }
 
 /* \TODO change it to os_waitqueue_break() */
-void os_waitqueue_finish(void)
+void os_waitqueue_break(void)
 {
    OS_ASSERT(0 == isr_nesting); /* cannot call os_waitqueue_finish() from ISR */
 
-   /* sine os_waitqueue_finish() should be fast we should consider of cost
-    * optimization by not entering critical section. For that we can check by
-    * atomic operation if we had assigned timer for timeout guard. If so than we
-    * will have to enter the critical section, if not than we can prevent from
-    * interrupt handling jitter and also save some CPU cycles */
-   if (NULL != os_atomicptr_read(task_current->timer))
-   {
-      arch_criticalstate_t cristate;
-
-      /* timer manipulation requires os critical section - unfortunately ;( */
-      arch_critical_enter(cristate);
-
-      /* remove wait_queue to task association/link, since we are in os critical
-       * section we do not have to use arch dependent atomicptr assignment, it
-       * may (but for most arch will not) add additional overhead */
-      task_current->wait_queue = NULL;
-
-      /* destroy timeout associated with task. Good to note is that we check
-       * task_curent->timer second time inside os_blocktimer_destroy(), since
-       * previous checking was done outside critical section (things could
-       * changed from that moment) */
-      os_blocktimer_destroy(task_current);
-
-      arch_critical_exit(cristate);
-
-   } else {
-      /* we can clear the wait_queue to task association/link without critical
-       * section by using of atomic operation */
-      os_atomicptr_write(task_current->wait_queue, NULL);
-   }
+   os_atomicptr_write(waitqueue_current, NULL);
+   os_scheduler_unlock();
 }
 
-os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(void)
+os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(os_ticks_t timeout_ticks)
 {
    os_retcode_t ret;
+   os_timer_t timer;
+   os_waitqueue_t *wait_queue;
    arch_criticalstate_t cristate;
 
    OS_ASSERT(0 == isr_nesting); /* cannot call os_waitqueue_wait() form ISR */
    OS_ASSERT(task_current->prio_current > 0); /* idle task cannot call blocking functions (will crash OS) */
+   /* in case of timeout guard, we need to have waitobj ptr valid */
+   OS_ASSERT(timeout_ticks > OS_TIMEOUT_TRY); /* timeout must be either specific or infinite */
 
    /* we need to disable the interrupts since wait_queue may be signalized from
     * ISR (we need to add task to wait_queue->task_queue in atomic manner)
@@ -243,18 +200,25 @@ os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(void)
     * this is slow patch function (task decided to suspend) */
    arch_critical_enter(cristate);
 
-   /* check if we are still in 'prepared' state
-    * if not than it means that we where woken up in mean time by other task,
-    * ISR or timer timeout callback */
-   if (task_current->wait_queue)
-   {
-      /* there was no wakeup nor timeout, block and switch the context */
-      os_block_andswitch(&(task_current->wait_queue->task_queue),
-                         OS_TASKBLOCK_WAITQUEUE);
-   }
+   /* first unlock the scheduler regardless of next steps */
+   os_scheduler_unlock();
 
-   /* cleanup, destroy timeout if it was created */
-   os_blocktimer_destroy(task_current);
+   /* check if we are still in 'prepared' state
+    * if not than it means that we where woken up by ISR in the mean time */
+   if (waitqueue_current)
+   {
+      if (OS_TIMEOUT_INFINITE != timeout_ticks)
+      {
+         os_blocktimer_create(&timer, os_waitqueue_timerclbck, timeout_ticks);
+      }
+
+      wait_queue = waitqueue_current;
+      waitqueue_current = NULL;
+      os_block_andswitch(&(wait_queue->task_queue), OS_TASKBLOCK_WAITQUEUE);
+
+      /* cleanup after return, destroy timeout if it was created */
+      os_blocktimer_destroy(task_current);
+   }
 
    /* the block code is either OS_OK (set in os_waitqueue_wakeup_sync()) or
     * OS_TIMEOUT (set in os_waitqueue_timerclbck()) or OS_DESTROYED (set in
@@ -274,21 +238,10 @@ void os_waitqueue_wakeup_sync(
    arch_criticalstate_t cristate;
    os_task_t *task;
 
-   /* For mtx and sem we wake up tasks that have been placed in sem->task_queue.
-    * But for wait_queue we also have to consider task which prepared for
-    * sleeping but does not actually yet been suspended. Imagine scenario where
-    * os_waitqueue_wakeup() is called from ISR and we interrupted the task,
-    * which tried to suspend on the same wait_queue which the ISR is going to
-    * signalize. It will mean that task_current is after os_waitqueue_prepare()
-    * and right now spinning and checking the user condition while the interrupt
-    * happened. */
-
-   /* the golden rule is that tasks cannot wake his own wait_queues beside
-    * situation where its looking like that by it because it was interrupted by ISR */
-   OS_ASSERT((isr_nesting > 0) || (task_current->wait_queue != queue));
-   /* tasks also cannot call any OS functions if they are in wait_queue suspend
-    * loop, with exception to ISR's */
-   OS_ASSERT((isr_nesting > 0) || (NULL == task_current->wait_queue));
+   /* tasks cannot call any OS functions if they are in wait_queue suspend
+    * loop, with exception to ISR's which can interrupt task_current during
+    * spinning on wait_queue suspend loop */
+   OS_ASSERT((isr_nesting > 0) || (NULL == waitqueue_current));
    /* sync must be == false in case we are called from ISR */
    OS_ASSERT((isr_nesting == 0) || (sync == false));
    OS_ASSERT(nbr > 0); /* number of tasks to wake up must be > 0 */
@@ -296,25 +249,14 @@ void os_waitqueue_wakeup_sync(
    arch_critical_enter(cristate);
 
    /* check if we are in ISR but we interrupted the task which is prepared to suspend
-    * on wait_queue which one ISR is signalizing (and there was no timeout yet)
-    */
-   if ((isr_nesting > 0) && (task_current->wait_queue == queue))
+    * on the same wait_queue which we signalize */
+   if ((isr_nesting > 0) && (waitqueue_current == queue))
    {
-      /* We are trying to wake up the task_current. Since this task is already
-       * in RUNNING state it would be waste of CPU power to force it to sleep
-       * and then wakeup another task.  (unnecessary co next switches) in case
-       * we put this task to ready queue and pick another some other one).  If
-       * we allow it to run than we will not broke the scheduling semantics
-       * (priorities and FIFO), since everything would be almost the same it the
-       * interrupt would actually trigger just few cycles latter than in
-       * reality, right ? Since task_current is not in task_queue of wait_queue,
-       * the only action which we need to do in scope of scheduling is
-       * disassociate it from wait_queue */
-      task_current->wait_queue = NULL;
-
-      /* we need to destroy the timer here, because otherwise it may fire right
-       * after we leave the critical section */
-      os_blocktimer_destroy(task_current);
+      /* We are trying to wake up the task_current. This task is in RUNNING
+       * state. Therefore task_current is not in wait_queue->task_queue of
+       * wait_queue. The only action which we need to do in scope of scheduling
+       * is disassociate it from wait_queue */
+      waitqueue_current = NULL;
 
       /* since we theoretically prevented from sleep one task, now we have one
        * task less to wake up */
@@ -329,11 +271,10 @@ void os_waitqueue_wakeup_sync(
        * prioritized task which should be woken up first, while this task maybe
        * should go to sleep. Also this is even more important in case parameter
        * nbr = 1.
-       * One additional note: look at os_schedule() at bottom of this function,
-       * this will not help either, because if nbr was 1, then this bottom
-       * section will not even fire.
-       * The most fair approach would be to put task_current into
-       * wait_queue->task_queue and then pick most prioritized one */
+       * The most fair approach would be to peek the wait_queue->task_queue and
+       * compare the priorities. In case peeked task would be higher prioritized
+       * then we should allow task_current to suspend on
+       * wait_queue->task_queue and wakeup the pick most prioritized one */
    }
 
    while ((OS_WAITQUEUE_ALL == nbr) || ((nbr--) > 0))
@@ -351,7 +292,6 @@ void os_waitqueue_wakeup_sync(
        * after we leave the critical section */
       os_blocktimer_destroy(task);
 
-      task->wait_queue = NULL; /* disassociate task from wait_queue */
       task->block_code = OS_OK; /* set the block code to NORMAL WAKEUP */
       os_task_makeready(task);
 
@@ -377,35 +317,25 @@ void os_waitqueue_wakeup_sync(
  */
 static void os_waitqueue_timerclbck(void* param)
 {
+   /* single timer has param in os_blocktimer_create() as pointer to task structure */
    os_task_t *task = (os_task_t*)param;
 
-   /* remove the wait_queue to task association
-    * only then we can call os_task_makeready(), check internals of it */
-   task->wait_queue = NULL;
-   task->block_code = OS_TIMEOUT;
+   OS_SELFCHECK_ASSERT(TASKSTATE_WAIT == task->state);
 
-   /* unlike to semaphores, timeout for wait_queues are created and than task is
-    * still in running state (we leave the OS critical section). It may happened
-    * that this timer will burn off while task is still running and not yet
-    * reached os_waitqueue_wait() function.
-    * It means that task for this timer may be in any state, WAIT, READY or even
-    * RUNNING. The WAIT state is most crucial since it will mean that this task
-    * is on some task_list. As in typical wake up sequence we need to do
-    * call os_task_makeready() then */
-   if (TASKSTATE_WAIT == task->state)
-   {
-      /* remove task from wait_queue->task queue (in os_waitqueue_wakeup() the
-       * os_task_dequeue() does that */
-      os_task_unlink(task);
-      os_task_makeready(task);
-   }
+   /* remove task from semaphore task queue (in os_waitqueue_wakeup() the
+    * os_task_dequeue() does that */
+   os_task_unlink(task);
+   task->block_code = OS_TIMEOUT;
+   os_task_makeready(task);
    /* we do not call the os_schedule() here, because this will be done at the
     * end of os_tick() (which calls the os_timer_tick() which then calls this
     * callback function) */
-   /* we do not need to destroy timer here, since it will be destroyed by
-    * cleanup code inside the woken up task (at os_waitqueue_finish() or
-    * os_waitqueue_wait()) */
+
+   /* we do not destroy timer here since this timer was created on stack of
+    * os_waitqueue_wait(), there is proper cleanup code in that function */
    /* timer is not auto reload so we don't have to worry about if it will call
     * this function again */
 }
+
+#endif
 

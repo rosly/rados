@@ -134,6 +134,9 @@
 
 /* Variables visible only for OS files, not for user */
 extern os_taskqueue_t ready_queue;
+#ifdef OS_CONFIG_WAITQUEUE
+extern os_waitqueue_t *waitqueue_current;
+#endif
 
 void OS_HOT os_task_enqueue(os_taskqueue_t* task_queue, os_task_t* task);
 void OS_HOT os_task_unlink(os_task_t* OS_RESTRICT task);
@@ -177,15 +180,7 @@ void arch_idle(void);
 static inline void os_task_makeready(os_task_t *task)
 {
    task->state = TASKSTATE_READY; /* set the task state */
-   if (NULL != task->wait_queue)
-   {
-       /* in case task has associated wait_queue, add task to task_queue of
-        * wait_queue assigned to this task */
-      os_task_enqueue(&(task->wait_queue->task_queue), task);
-   } else {
-      /* otherwise put it into ready_queue */
-      os_task_enqueue(&ready_queue, task);
-   }
+   os_task_enqueue(&ready_queue, task); /* put task into ready_queue */
 }
 
 static inline void os_task_makewait(

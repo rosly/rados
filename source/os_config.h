@@ -94,7 +94,7 @@
 //TBD #define OS_CONFIG_TIMER
 
 /** Define to enable wait queues (synchronization primitive) */
-//TBD #define OS_CONFIG_WAITQUEUE
+#define OS_CONFIG_WAITQUEUE
 
 /** Define to enable conditionals (synchronization primitive) */
 //TBD #define OS_CONFG_CONDITIONAL

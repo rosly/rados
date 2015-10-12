@@ -336,118 +336,98 @@ int testcase_4regresion(void)
    return 0;
 }
 
+void stack_overwrite(void)
+{
+   uint8_t tmp[64];
+   size_t i;
+
+   for (i = 0; i < 64; i++)
+   {
+      tmp = i;
+   }
+   test_assert(tmp[0] == 0);
+   test_assert(tmp[63] == 63);
+}
+
 /**
  * Testing os_waitqueue_wait() and os_waitqueue_break() implementation with
  * timeout guard.
  */
-int testcase_6_impl(
-   bool main, os_waitqueue_t *waitqueue, bool wait, bool timeout)
+int slave_proc(void* param)
 {
-   unsigned local_tick_cnt = 0;
+   slave_param_t *slave_param = (slave_param_t*)param;
    os_retcode_t ret;
 
    os_waitqueue_prepare(waitqueue);
 
+   /* lest spin and check if preemption will not kick in */
    while(1)
    {
-      if(global_tick_cnt > 6)
+      if (global_tick_cnt > slave_param->spin_until)
       {
-         /* break after 5 ticks */
+         test_verbose_debug("slave %zu finishes condition",
+                            slave_param->slave_idx);
          break;
-      }
-      if(local_tick_cnt != global_tick_cnt)
-      {
-         test_verbose_debug("%s detected tick increase %u != %u",
-                            main ? "main" : "helper",
-                            local_tick_cnt, global_tick_cnt);
-         local_tick_cnt = global_tick_cnt;
       }
    }
 
    if (wait)
    {
-      ret = os_waitqueue_wait(3);
-      test_assert(ret == (timeout ? OS_TIMEOUT : OS_OK));
+      slave_param->retcode = os_waitqueue_wait(slave_param->timeout);
    } else {
       os_waitqueue_break();
    }
+   slave_param->exit = true;
 
    /* verify the cleanup (following two will assert if waitqueue_current will no
     * be properly cleared */
-   os_waitqueue_prepare(waitqueue);
-   os_waitqueue_break();
+   stack_overwrite();
    test_assert(NULL == task_current->timer);
 
    return 0;
 }
 
 typedef struct {
+   size_t slave_idx;
    os_waitqueue_t *waitqueue;
-   bool wait;
-   bool timeout;
-} helper_task_param_t;
+   os_ticks_t spin_until;
+   os_ticks_t timeout,
+   os_retcode_t retcode;
+   bool exit;
+} slave_param_t;
 
 static volatile unsigned irq_trigger_tick = 0;
 static os_waitqueue_t *irq_trigger_waitqueue = NULL;
-static bool sleeper_wokenup = false;
+static uint_fast8_t irq_trigger_nbr = 0;
 
-static os_task_t task_helper;
-static os_task_t task_sleeper;
-static OS_TASKSTACK task_helper_stack[OS_STACK_MINSIZE];
-static OS_TASKSTACK task_sleeper_stack[OS_STACK_MINSIZE];
+static os_task_t slave_task[5];
+static OS_TASKSTACK slave_stack[5][OS_STACK_MINSIZE];
+static slave_param_t slave_param[5];
 
-int helper_task_proc(void* param)
+void start_helper_task(
+   size_t slave_idx,
+   os_waitqueue_t *waitqueue,
+   os_ticks_t spin_until,
+   os_ticks_t timeout)
 {
-   helper_task_param_t *p = (helper_task_param_t*)param;
-   return testcase_6_impl(false, p->waitqueue, p->wait, p->timeout);
-}
+   slave_param_t *param = &slave_param[slave_idx];
 
-void start_helper_task(os_waitqueue_t *waitqueue, bool wait, bool timeout)
-{
-   static helper_task_param_t param;
-
-   param.waitqueue = waitqueue;
-   param.wait = wait;
-   param.timeout = timeout;
-   test_verbose_debug("creating helper task");
+   param->slave_idx = slave_idx;
+   param->waitqueue = waitqueue;
+   param->spin_until = spin_until;
+   param->timeout = timeout;
+   param->spin = 0;
+   test_verbose_debug("creating slave task %zu", slave_idx);
    os_task_create(
-      &task_helper, OS_CONFIG_PRIOCNT - 1,
-      task_helper_stack, sizeof(task_helper_stack),
-      helper_task_proc, &param);
+      &slave_task, slave_idx == 0 ? 1 : 2, /* slave[0] with prio 1, rest 2 */
+      slave_stack[slave_idx], sizeof(slave_stack[slave_idx]),
+      slave_proc, param);
 }
 
-int join_helper_task(void)
+int join_helper_task(size_t slave_idx)
 {
-   test_verbose_debug("joining helper task");
-   return os_task_join(&task_helper);
-}
-
-int sleeper_task_proc(void* param)
-{
-   os_waitqueue_t *waitqueue = (os_waitqueue_t*)param;
-   os_retcode_t ret;
-
-   os_waitqueue_prepare(waitqueue);
-   ret = os_waitqueue_wait(OS_TIMEOUT_INFINITE);
-   sleeper_wokenup = true;
-   test_assert(ret == OS_OK);
-
-   return 0;
-}
-
-void start_sleeper_task(os_waitqueue_t *waitqueue)
-{
-   test_verbose_debug("creating sleeper task");
-   os_task_create(
-      &task_sleeper, OS_CONFIG_PRIOCNT - 2,
-      task_sleeper_stack, sizeof(task_sleeper_stack),
-      sleeper_task_proc, waitqueue);
-}
-
-int join_sleeper_task(void)
-{
-   test_verbose_debug("joining sleeper task");
-   return os_task_join(&task_sleeper);
+   test_verbose_debug("joining helper task %zu", slave_idx);
+   return os_task_join(&slave_task[slave_idx]);
 }
 
 int testcase_6(void)
@@ -456,8 +436,8 @@ int testcase_6(void)
 
    os_waitqueue_create(&waitqueue);
 
-   /* test timeout behaviour without wakeup */
-   test_verbose_debug("testing timeout impl with os_waitqueue_wait()");
+   /*  */
+   test_verbose_debug("main: ISR signal before timeout");
    global_tick_cnt = 0; /* reset tickcnt's */
    testcase_6_impl(true, &waitqueue, false, true);
    test_verbose_debug("testing timeout impl with os_waitqueue_break()");

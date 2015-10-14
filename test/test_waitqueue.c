@@ -350,30 +350,49 @@ int testcase_6_impl(
 
    while(1)
    {
-      if(global_tick_cnt > 6)
-      {
-         /* break after 5 ticks */
-         break;
-      }
       if(local_tick_cnt != global_tick_cnt)
       {
          test_verbose_debug("%s detected tick increase %u != %u",
                             main ? "main" : "helper",
                             local_tick_cnt, global_tick_cnt);
+         if (local_tick_cnt != 0)
+         {
+            test_verbose_debug("%s exit from spin on condition",
+                               main ? "main" : "helper");
+            break; /* break after one tick */
+         }
          local_tick_cnt = global_tick_cnt;
       }
    }
 
    if (wait)
    {
-      ret = os_waitqueue_wait(3);
+      test_verbose_debug("%s calling os_waitqueue_wait()",
+                         main ? "main" : "helper");
+      ret = os_waitqueue_wait(5);
       test_assert(ret == (timeout ? OS_TIMEOUT : OS_OK));
+      test_verbose_debug("%s returned from os_waitqueue_wait() -> %s",
+                         main ? "main" : "helper",
+                         timeout ? "OS_TIMEOUT": "OS_OK");
    } else {
+      test_verbose_debug("%s calling os_waitqueue_break()",
+                         main ? "main" : "helper");
       os_waitqueue_break();
+   }
+
+   /* spin with yield() for some time to be able to test the OS status after
+    * test will stabilize (all timeouts will burnoff IRS will wakeup etc) */
+   while(1)
+   {
+      if (global_tick_cnt > 10)
+         break;
+      os_yield();
    }
 
    /* verify the cleanup (following two will assert if waitqueue_current will no
     * be properly cleared */
+   test_verbose_debug("%s verify results",
+                      main ? "main" : "helper");
    os_waitqueue_prepare(waitqueue);
    os_waitqueue_break();
    test_assert(NULL == task_current->timer);
@@ -456,28 +475,78 @@ int testcase_6(void)
 
    os_waitqueue_create(&waitqueue);
 
-   /* test timeout behaviour without wakeup */
-   test_verbose_debug("testing timeout impl with os_waitqueue_wait()");
+   /* testing os_waitqueue_break on single thread - no wakeup */
+   test_verbose_debug("testing os_waitqueue_break() - no wakeup");
    global_tick_cnt = 0; /* reset tickcnt's */
-   testcase_6_impl(true, &waitqueue, false, true);
-   test_verbose_debug("testing timeout impl with os_waitqueue_break()");
+   irq_trigger_waitqueue = NULL;
+   irq_trigger_tick = 0;
+   testcase_6_impl(true, &waitqueue, false, false);
+
+   /* testing os_waitqueue_wait() on single thread - no wakeup */
+   test_verbose_debug("testing os_waitqueue_wait() timeout after 5 ticks - no wakeup");
    global_tick_cnt = 0; /* reset tickcnt's */
+   irq_trigger_waitqueue = NULL;
+   irq_trigger_tick = 0;
    testcase_6_impl(true, &waitqueue, true, true);
 
-   /* next we will test wakeup from ISR, in this case in os_waitqueue_wakeup()
-    * there is a special code which detects that we interrupted the task
-    * spinning wait_queue related condition which ISR is going to wakeup. There
-    * is also the second section for other tasks. We would like to test both of
-    * code sections so we create additional task for that. Both will share the
-    * same priority so we will always run both sections (either main_task will
-    * be the task_current or it will be the other task, depending on tick epoh)
-    */
+   /* testing os_waitqueue_wait() on single thread - wakeup in tick 3, after
+    * os_waitqueue_wait() */
+   test_verbose_debug("testing os_waitqueue_wait() - wakeup after wait()");
+   global_tick_cnt = 0; /* reset tickcnt's */
+   irq_trigger_waitqueue = &waitqueue;
+   irq_trigger_tick = 4;
+   testcase_6_impl(true, &waitqueue, true, false);
+
+   /* testing os_waitqueue_wait() on single thread - wakeup in tick 1, before
+    * os_waitqueue_wait() */
+   test_verbose_debug("testing os_waitqueue_wait() - wakeup before wait() after"
+                      " prepare()");
+   global_tick_cnt = 0; /* reset tickcnt's */
+   irq_trigger_waitqueue = &waitqueue;
+   irq_trigger_tick = 1;
+   testcase_6_impl(true, &waitqueue, true, false);
+
+   /* the same with 3 threads */
+   test_verbose_debug("testing using 3 threads\n");
+   start_sleeper_task(&waitqueue);
+
+   /* testing os_waitqueue_break - no wakeup */
+   test_verbose_debug("testing os_waitqueue_break() - no wakeup");
+   global_tick_cnt = 0; /* reset tickcnt's */
+   irq_trigger_waitqueue = NULL;
+   irq_trigger_tick = 0;
+   start_helper_task(&waitqueue, false, false);
+   testcase_6_impl(true, &waitqueue, false, false);
+   join_helper_task();
+
+   /* testing os_waitqueue_wait() - no wakeup */
+   test_verbose_debug("testing os_waitqueue_wait() timeout after 5 ticks - no wakeup");
+   global_tick_cnt = 0; /* reset tickcnt's */
+   irq_trigger_waitqueue = NULL;
+   irq_trigger_tick = 0;
+   start_helper_task(&waitqueue, true, true);
+   testcase_6_impl(true, &waitqueue, true, true);
+   join_helper_task();
+
+   /* testing os_waitqueue_wait() - wakeup in tick 3, after os_waitqueue_wait() */
+   test_verbose_debug("testing os_waitqueue_wait() - wakeup after wait()");
+   global_tick_cnt = 0; /* reset tickcnt's */
+   irq_trigger_waitqueue = &waitqueue;
+   irq_trigger_tick = 3;
+   start_helper_task(&waitqueue, true, false);
+   testcase_6_impl(true, &waitqueue, true, false);
+   join_helper_task();
+
+   /* we cannot test 2 threads being wakeup'ed before they call
+    * os_waitqueue_wait() since we disable preemption, and only one thread can
+    * spin since only one can be at RUNNING state */
+
+#if 0
    irq_trigger_waitqueue = &waitqueue;
    irq_trigger_tick = 2;
    start_sleeper_task(&waitqueue);
 
-   /* test timeout behaviour when wakeup happen from ISR before timeout (but
-    * before suspend) */
+   /* testing os_waitqueue_break on single thread - wakeup before timeout */
    test_verbose_debug("testing timeout impl with os_waitqueue_wait() with wakeup"
                       "from ISR before timeout");
    global_tick_cnt = 0; /* reset tickcnt's */
@@ -514,12 +583,14 @@ int testcase_6(void)
    join_helper_task();
    test_assert(false == sleeper_wokenup);
 
+
+#endif
    irq_trigger_waitqueue = NULL;
    irq_trigger_tick = 0;
 
    /* join sleeper task */
    os_waitqueue_wakeup(&waitqueue, 1);
-   (void)join_helper_task();
+   (void)join_sleeper_task();
    test_assert(true == sleeper_wokenup);
 
    os_waitqueue_destroy(&waitqueue);
@@ -622,6 +693,7 @@ int mastertask_proc(void* OS_UNUSED(param))
       worker_tasks[i].idx = i + 1;
    }
 
+#if 0
    /* create tasks and perform tests */
    for(i = 0; i < TEST_TASKS; i++) {
       worker_tasks[i].idx = i + 1;
@@ -653,6 +725,11 @@ int mastertask_proc(void* OS_UNUSED(param))
       test_debug_printf("test case %u: %s\n", i + 1, ret ? "FAILED" : "PASSED");
       retv |= ret;
    }
+#else
+   ret = 1;
+   ret = ret;
+   retv = testcase_6();
+#endif
 
    test_result(retv);
    return 0;
@@ -667,6 +744,7 @@ void test_tick(void)
    if (irq_trigger_waitqueue && (irq_trigger_tick == global_tick_cnt))
    {
       /* passing 2 as nbr will wake up main and helper task, but not the sleeper */
+      test_verbose_debug("wakeup from ISR!!!");
       os_waitqueue_wakeup(irq_trigger_waitqueue, 2);
    }
 }

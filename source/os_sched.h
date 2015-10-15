@@ -172,7 +172,7 @@ typedef int (*os_taskproc_t)(void* param);
  * switch will not be performed */
 void os_scheduler_lock(void);
 
-void os_scheduler_unlock(void);
+void os_scheduler_unlock(bool sync);
 
 /** Function initializes OS internals.
  *

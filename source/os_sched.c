@@ -82,22 +82,13 @@ static void os_task_init(os_task_t* task, uint_fast8_t prio);
 
 void os_scheduler_lock(void)
 {
-   os_atomic_inc(sched_lock);
+   os_scheduler_intlock();
 }
 
-void os_scheduler_unlock(void)
+void os_scheduler_unlock(bool sync)
 {
-   os_atomic_dec(sched_lock);
-   /* TODO verify if we should not reschedule right after that. Usually locking
-    * scheduler is used to protect some user space critical section, so after
-    * exiting we might need reschedule(), or we should expose os_schedule() to
-    * user (if not yet done)
-    * also consider sync parameter to this function so it will be possible o
-    * unlock scheduler without causing context switch
-    * also since this function would possibly schedule it cannot b called from
-    * wait_queue suspend loop */
+   os_scheduler_intunlock(sync);
 }
-
 
 void os_start(
    os_initproc_t app_init,
@@ -123,10 +114,10 @@ void os_start(
 
    /* we need to lock the scheduler since must prevent context switch to tasks
     * which will be created while app_init() */
-   os_scheduler_lock();
+   os_scheduler_intlock();
    /* user supplied function, it should initialize interrupts (tick and others) */
    app_init();
-   os_scheduler_unlock();
+   os_scheduler_intunlock(true); /* sync = true, do not schedule() yet */
    arch_eint(); /* we are ready for scheduling actions, enable the all interrupts */
 
    /* after all initialization actions, force first schedule (context switch)
@@ -255,7 +246,7 @@ void OS_HOT os_tick(void)
 
 void OS_COLD os_halt(void)
 {
-   os_scheduler_lock();
+   os_scheduler_intlock();
    arch_dint();
    arch_halt();
 }
@@ -523,9 +514,10 @@ void OS_NORETURN OS_COLD os_task_exit(int retv)
        * scheduler seems to be unnecessary, since we do not call schedule().
        * review this again and if really unnecessary remove scheduler locking
        * in below code */
-      os_scheduler_lock();
+      os_scheduler_intlock();
       os_sem_up_sync(task_current->join_sem, true);
-      os_scheduler_unlock(); /* re-enable task switch by scheduler */
+      os_scheduler_intunlock(true); /* true = sync, re-enable scheduler but not
+                                     schedule() yet */
    }
 
   /* Chose any READY task and switch to it - at least idle task is in READY

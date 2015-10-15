@@ -168,7 +168,7 @@ void os_waitqueue_prepare(os_waitqueue_t *queue)
    OS_ASSERT(NULL == waitqueue_current);
 
    /* disable preemption */
-   os_scheduler_lock();
+   os_scheduler_intlock();
    /* mark that we are prepared to suspend on wait_queue */
    os_atomicptr_write(waitqueue_current, queue);
 }
@@ -179,7 +179,9 @@ void os_waitqueue_break(void)
    OS_ASSERT(0 == isr_nesting); /* cannot call os_waitqueue_finish() from ISR */
 
    os_atomicptr_write(waitqueue_current, NULL);
-   os_scheduler_unlock();
+   os_scheduler_intunlock(false); /* false = nosync, unlock scheduler and
+                                  schedule() to higher prio READY task
+                                  imidiately */
 }
 
 os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(os_ticks_t timeout_ticks)
@@ -195,13 +197,12 @@ os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(os_ticks_t timeout_ticks)
    OS_ASSERT(timeout_ticks > OS_TIMEOUT_TRY); /* timeout must be either specific or infinite */
 
    /* we need to disable the interrupts since wait_queue may be signalized from
-    * ISR (we need to add task to wait_queue->task_queue in atomic manner)
-    * there is no sense to make some critical section optimizations here since
-    * this is slow patch function (task decided to suspend) */
+    * ISR (we need to add task to wait_queue->task_queue in atomic manner) there
+    * is no sense to make some critical section optimizations here since this is
+    * slow patch function (task decided to suspend) */
    arch_critical_enter(cristate);
 
-   /* first unlock the scheduler regardless of next steps */
-   os_scheduler_unlock();
+   os_scheduler_intunlock(true); /* true = sync, unlock scheduler but do not schedule() yet */
 
    /* check if we are still in 'prepared' state
     * if not than it means that we where woken up by ISR in the mean time */

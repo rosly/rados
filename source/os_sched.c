@@ -82,11 +82,17 @@ static void os_task_init(os_task_t* task, uint_fast8_t prio);
 
 void os_scheduler_lock(void)
 {
+   OS_ASSERT(0 == isr_nesting); /* cannot call from ISR */
+   OS_ASSERT(NULL == waitqueue_current); /* cannot call from wait_queue loop */
+
    os_scheduler_intlock();
 }
 
 void os_scheduler_unlock(bool sync)
 {
+   OS_ASSERT(0 == isr_nesting); /* cannot call from ISR */
+   OS_ASSERT(NULL == waitqueue_current); /* cannot call from wait_queue loop */
+
    os_scheduler_intunlock(sync);
 }
 

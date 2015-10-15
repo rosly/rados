@@ -167,14 +167,54 @@ typedef void (*os_initproc_t)(void);
 typedef int (*os_taskproc_t)(void* param);
 
 /**
- * Blocks the preemptive scheduling
- * Take into account that interrupts are still enabled, while only the task
- * switch will not be performed */
+ * Function disables the scheduling.
+ *
+ * Interrupts are not affected, they will remain enabled. Since function
+ * disables scheduling, also preemption will be disabled. Preemption will also
+ * be disabled.
+ * This function can be called multiple times. It tracks the nesting level of
+ * scheduler disable, so to unlock scheduler so_scheduler_unlock() must be
+ * called same number of times.
+ *
+ * @pre this function cannot be used from ISR, can be called from idle task with
+ *      proper care
+ * @pre this function cannot be called from waitqueue spin loop
+ * @post after return from this function scheduler will remain disabled until
+ *       os_scheduler_unlock() call same number of times as os_scheduler_lock()
+ *       was called
+ *
+ * @note use this function with care since locking scheduler for long periods of
+ *       time decreases responsiveness of system
+ */
 void os_scheduler_lock(void);
 
+/**
+ * Function enables the scheduling
+ *
+ * @param sync by passing 'true' in this parameter, user application will force
+ *        semaphore signaling in synchronized mode. It means that there will be
+ *        no context switches during os_sem_up_sync() call even if some higher
+ *        priority task would be woken up. By passing 'false' in this parameter
+ *        application specifies that context switches are allowed. This feature
+ *        can be used in application code which will trigger the scheduler
+ *        anyway after return from os_sem_up_sync() by some other OS API call.
+ *        This helps to save CPU cycles by preventing from unnecessary context
+ *        switches.
+ *        IMPORTANT: This parameter must be set to 'false' in case function is
+ *        called from ISR.
+ *
+ * @pre this function cannot be used from ISR, can be called from idle task with
+ *      proper care
+ * @pre this function cannot be called from waitqueue spin loop
+ * @post after return from this function scheduler will be enabled again. If
+ *       os_scheduler_lock() was called multiple times than to enable the
+ *       scheduler os_scheduler_unlock() must be called the same number of
+ *       times
+ */
 void os_scheduler_unlock(bool sync);
 
-/** Function initializes OS internals.
+/**
+ * Function initializes OS internals.
  *
  * Function should be called form user code main() function. It does not return.
  *

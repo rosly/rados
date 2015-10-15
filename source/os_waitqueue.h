@@ -32,6 +32,8 @@
 #ifndef __OS_WAITQUEUE_
 #define __OS_WAITQUEUE_
 
+#ifdef OS_CONFIG_WAITQUEUE
+
 /**
  * Wait_queue is synchronization primitive used for all variety of
  * notifier-receiver scenarios including those that involve data exchange like
@@ -121,20 +123,10 @@
 
 /** Definition of wait_queue structure */
 typedef struct os_waitqueue_tag {
-   /** Queue of tasks suspended on this wait_queue. This task_queue is also used
-    * in os_task_makeready() to push task_current into connected
-    * wait_queue->task_queue in case of preemption. Description of this process
-    * is at os_waitqueue.c */
+   /** Queue of tasks suspended on this wait_queue. */
    os_taskqueue_t task_queue;
 
 } os_waitqueue_t;
-
-/** Definition of wait_object structure. This object is given to
- * os_waitqueue_wait() by task which would like to suspend on wait_queue */
-typedef struct {
-   /** timer used in case of timeout guard for os_waitqueue_wait() */
-   os_timer_t timer;
-}os_waitobj_t;
 
 /**
  * Function creates the wait_queue
@@ -210,10 +202,7 @@ void os_waitqueue_destroy(os_waitqueue_t* queue);
  *       task is threated as it stills evaluating suspend condition. Calling of
  *       other OS function at this period is forbidden (results are undefined).
  */
-void os_waitqueue_prepare(
-   os_waitqueue_t *queue,
-   os_waitobj_t *waitobj,
-   os_ticks_t timeout_ticks);
+void os_waitqueue_prepare(os_waitqueue_t *queue);
 
 /**
  * Function breaks the suspend loop for wait_queue. Call to this function is
@@ -225,7 +214,7 @@ void os_waitqueue_prepare(
  *
  * @post After return from this function, task may again use other OS functions.
  */
-void os_waitqueue_finish(void);
+void os_waitqueue_break(void);
 
 /**
  * Function suspends task on wait_queue, until another task or ISR would wake it
@@ -249,7 +238,7 @@ void os_waitqueue_finish(void);
  *         will immediately return with OS_TIMEOUT return code.
  * @note user code should always check the return code of os_waitqueue_wait()
  */
-os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(void);
+os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(os_ticks_t timeout_ticks);
 
 /**
  * Function wakes up tasks suspended on wait_queue.
@@ -291,6 +280,8 @@ static inline void os_waitqueue_wakeup(os_waitqueue_t *queue, uint_fast8_t nbr)
 {
   os_waitqueue_wakeup_sync(queue, nbr, false);
 }
+
+#endif
 
 #endif
 

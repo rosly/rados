@@ -146,7 +146,8 @@ os_retcode_t OS_WARN_UNUSEDRET os_sem_down(
  *        can be used in application code which will trigger the scheduler
  *        anyway after return from os_sem_up_sync() by some other OS API call.
  *        This helps to save CPU cycles by preventing from unnecessary context
- *        switches. This parameter must be set to 'false' in case function is
+ *        switches.
+ *        IMPORTANT: This parameter must be set to 'false' in case function is
  *        called from ISR.
  *
  * @pre this function CAN be called from ISR. This is one of basic use cases for

@@ -176,6 +176,14 @@ typedef struct os_taskqueue_tag {
 typedef void (*os_initproc_t)(void);
 typedef int (*os_taskproc_t)(void* param);
 
+/**
+ * Blocks the preemptive scheduling
+ * Take into account that interrupts are still enabled, while only the task
+ * switch will not be performed */
+void os_scheduler_lock(void);
+
+void os_scheduler_unlock(bool sync);
+
 /** Function initializes OS internals.
  *
  * Function should be called form user code main() function. It does not return.

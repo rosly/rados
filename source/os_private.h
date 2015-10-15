@@ -134,6 +134,7 @@
 
 /* Variables visible only for OS files, not for user */
 extern os_taskqueue_t ready_queue;
+extern volatile os_atomic_t sched_lock;
 
 void OS_HOT os_task_enqueue(os_taskqueue_t* task_queue, os_task_t* task);
 void OS_HOT os_task_unlink(os_task_t* OS_RESTRICT task);
@@ -217,6 +218,23 @@ static inline void os_blocktimer_destroy(os_task_t *task)
    {
       os_timer_destroy(task->timer);
       task->timer = NULL;
+   }
+}
+
+static inline void os_scheduler_intlock(void)
+{
+   os_atomic_inc(sched_lock);
+}
+
+static inline void os_scheduler_intunlock(bool sync)
+{
+   os_atomic_dec(sched_lock);
+
+   if (!sync)
+   {
+      /* switch to more prioritized READY task, if there is such (1 as param
+       * in os_schedule() means just that */
+      os_schedule(1);
    }
 }
 

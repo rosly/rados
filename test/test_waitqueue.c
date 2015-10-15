@@ -41,7 +41,7 @@
 
 #define TEST_TASKS ((unsigned)10)
 
-#if 1
+#if 0
 #define test_verbose_debug test_debug
 //#define test_verbose_debug(format, ...)
 
@@ -188,6 +188,8 @@ int testcase_isr_wakeup_impl(
 {
    unsigned local_tick_cnt = 0;
    os_retcode_t ret;
+
+   main = main; /* to silence compilation warning in case of suppressed debugs */
 
    os_waitqueue_prepare(waitqueue);
 
@@ -436,29 +438,6 @@ int testcase_destroy(void)
 /* \TODO write bit banging on two threads and waitqueue as test5
  * this will be the stress proff of concept */
 
-#if 0
-#warning There are some regresion test to be made for following cases (probably already fixed in the code)
-#endif
-/* following bugs was probably fixed in some of last commit, but we need to
- * revoke fixes, make the regresion test and then apply fixes again to verify
- * that this work
- *
- * \TODO \FIXME second bug!!!
- * again calling waitqueue_wakeup when task_current is spinning, so the same
- * special condition will triger and totaly piss off nbr parameter, so if we
- * would like to wake up many task from ISR, but in the same  time task_current
- * was about to block on waitqueue_wait then we will unblock just this one ano
- * no more of others
- *
- * KISS keep it simple stupid!!!
- *
- * \TODO \FIXME another bug
- * waitqueue timer has missing check for os_task_makeready if task state is
- * already RUNNING. From fisr sight this may cause some problems since we
- * touching ready_queue in that case while this is forbiden for such task (it is
- * already scheduled)!!!
- */
-
 /**
  * The main task for tests manage
  */
@@ -467,8 +446,11 @@ int mastertask_proc(void* OS_UNUSED(param))
    int retv;
 
    retv = testcase_task_wakeup();
+   test_debug("wakeup from task OK");
    retv |= testcase_isr_wakeup();
+   test_debug("wakeup from ISR OK");
    retv |= testcase_destroy();
+   test_debug("wakeup from destroy() OK");
 
    test_result(retv);
    return 0;

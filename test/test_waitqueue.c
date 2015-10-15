@@ -382,11 +382,19 @@ int testcase_6_impl(
 
    /* spin with yield() for some time to be able to test the OS status after
     * test will stabilize (all timeouts will burnoff IRS will wakeup etc) */
+   test_verbose_debug("%s yield() loop for verification", main ? "main" : "helper");
    while(1)
    {
+      os_yield();
       if (global_tick_cnt > 10)
          break;
-      os_yield();
+      if(local_tick_cnt != global_tick_cnt)
+      {
+         test_verbose_debug("%s detected tick increase %u != %u",
+                            main ? "main" : "helper",
+                            local_tick_cnt, global_tick_cnt);
+         local_tick_cnt = global_tick_cnt;
+      }
    }
 
    /* verify the cleanup (following two will assert if waitqueue_current will no
@@ -511,7 +519,7 @@ int testcase_6(void)
    start_sleeper_task(&waitqueue);
 
    /* testing os_waitqueue_break - no wakeup */
-   test_verbose_debug("testing os_waitqueue_break() - no wakeup");
+   test_verbose_debug("testing multi os_waitqueue_break() - no wakeup");
    global_tick_cnt = 0; /* reset tickcnt's */
    irq_trigger_waitqueue = NULL;
    irq_trigger_tick = 0;
@@ -520,7 +528,7 @@ int testcase_6(void)
    join_helper_task();
 
    /* testing os_waitqueue_wait() - no wakeup */
-   test_verbose_debug("testing os_waitqueue_wait() timeout after 5 ticks - no wakeup");
+   test_verbose_debug("testing multi os_waitqueue_wait() timeout after 5 ticks - no wakeup");
    global_tick_cnt = 0; /* reset tickcnt's */
    irq_trigger_waitqueue = NULL;
    irq_trigger_tick = 0;
@@ -529,17 +537,18 @@ int testcase_6(void)
    join_helper_task();
 
    /* testing os_waitqueue_wait() - wakeup in tick 3, after os_waitqueue_wait() */
-   test_verbose_debug("testing os_waitqueue_wait() - wakeup after wait()");
+   test_verbose_debug("testing multi os_waitqueue_wait() - wakeup after wait()");
    global_tick_cnt = 0; /* reset tickcnt's */
    irq_trigger_waitqueue = &waitqueue;
-   irq_trigger_tick = 3;
+   irq_trigger_tick = 4;
    start_helper_task(&waitqueue, true, false);
    testcase_6_impl(true, &waitqueue, true, false);
    join_helper_task();
 
-   /* we cannot test 2 threads being wakeup'ed before they call
-    * os_waitqueue_wait() since we disable preemption, and only one thread can
-    * spin since only one can be at RUNNING state */
+   /* we cannot test 2 threads wakeup's before they call os_waitqueue_wait()
+    * since after os_wait_prepare() preemption is disabled.
+    * Only single thread will be scheduled until os_waitqueue_wait() will be
+    * called */
 
 #if 0
    irq_trigger_waitqueue = &waitqueue;

@@ -88,6 +88,7 @@ typedef struct {
    os_waitqueue_t *waitqueue;
    size_t idx;
    bool wokenup;
+   bool repeat;
 } victim_task_param_t;
 
 void idle(void)
@@ -126,7 +127,7 @@ void start_sleeper_task(
    test_verbose_debug("creating sleeper task");
    sleeper_wokenup = false;
    os_task_create(
-      &task_sleeper, OS_CONFIG_PRIOCNT - 2,
+      &task_sleeper, OS_CONFIG_PRIOCNT - 4,
       task_sleeper_stack, sizeof(task_sleeper_stack),
       sleeper_task_proc, &param);
 }
@@ -268,7 +269,7 @@ void start_helper_task(os_waitqueue_t *waitqueue, bool wait, bool timeout)
    param.timeout = timeout;
    test_verbose_debug("creating helper task");
    os_task_create(
-      &task_helper, OS_CONFIG_PRIOCNT - 1,
+      &task_helper, OS_CONFIG_PRIOCNT - 3,
       task_helper_stack, sizeof(task_helper_stack),
       helper_task_proc, &param);
 }
@@ -410,7 +411,7 @@ int testcase_destroy(void)
       param[i].wokenup = false;
 
       os_task_create(
-         &task_victim[i], OS_CONFIG_PRIOCNT - 2,
+         &task_victim[i], OS_CONFIG_PRIOCNT - 4,
          task_victim_stack[i], sizeof(task_victim_stack[i]),
          victim_task_proc, &param[i]);
    }
@@ -435,6 +436,76 @@ int testcase_destroy(void)
    return 0;
 }
 
+int hiprio_task_proc(void* param)
+{
+   victim_task_param_t *p = (victim_task_param_t*)param;
+   os_retcode_t ret;
+
+   do
+   {
+      test_verbose_debug("hiprio[%zu] os_waitqueue_prepare()", p->idx);
+      os_waitqueue_prepare(p->waitqueue);
+      test_verbose_debug("hiprio[%zu] os_waitqueue_wait(TIMEOUT_INFINITE)", p->idx);
+      ret = os_waitqueue_wait(OS_TIMEOUT_INFINITE);
+      p->wokenup = true;
+      test_assert(ret == OS_OK);
+   } while (p->repeat);
+
+   return 0;
+}
+
+/* this test checks if os_waitqueue_wakeup() wakes up all suspended task exactly
+ * once. In this test we wake up tasks with higher priority than main task. In
+ * case wakeup will switch context right after making the woken up task READY,
+ * we will stuck in infinite loop. If os_waitqueue_wakeup() will be implemented
+ * correctly, it will make all tasks READY, but the context switch will be done
+ * out of wake up loop. So each task will be woken up exactly once!! */
+int testcase_wakeup_hiprio(void)
+{
+   int ret;
+   size_t i;
+   os_waitqueue_t waitqueue;
+   victim_task_param_t param[3];
+
+   os_waitqueue_create(&waitqueue);
+
+   test_verbose_debug("creating hiprio tasks");
+   for (i = 0; i < 2; i++)
+   {
+      param[i].waitqueue = &waitqueue;
+      param[i].idx = i;
+      param[i].wokenup = false;
+      param[i].repeat = true;
+
+      os_task_create(
+         &task_victim[i], OS_CONFIG_PRIOCNT - (i > 0 ? 1 : 2),
+         task_victim_stack[i], sizeof(task_victim_stack[i]),
+         hiprio_task_proc, &param[i]);
+   }
+
+   test_verbose_debug("waking up all hiprio");
+   os_waitqueue_wakeup_sync(&waitqueue, OS_WAITQUEUE_ALL, false);
+
+   for (i = 0; i < 2; i++)
+   {
+      test_assert(true == param[i].wokenup);
+      param[i].repeat = false;
+   }
+   test_verbose_debug("waking up all hiprio - to exit");
+   os_waitqueue_wakeup_sync(&waitqueue, OS_WAITQUEUE_ALL, false);
+
+   test_verbose_debug("joining victim tasks");
+   for (i = 0; i < 2; i++)
+   {
+      ret = os_task_join(&task_victim[i]);
+      test_assert(0 == ret);
+   }
+
+   os_waitqueue_destroy(&waitqueue);
+
+   return 0;
+}
+
 /* \TODO write bit banging on two threads and waitqueue as test5
  * this will be the stress proff of concept */
 
@@ -451,6 +522,8 @@ int mastertask_proc(void* OS_UNUSED(param))
    test_debug("wakeup from ISR OK");
    retv |= testcase_destroy();
    test_debug("wakeup from destroy() OK");
+   retv |= testcase_wakeup_hiprio();
+   test_debug("wakeup hiprio OK");
 
    test_result(retv);
    return 0;
@@ -475,7 +548,7 @@ void init(void)
    test_setuptick(test_tick, 50000000);
 
    os_task_create(
-      &task_main, OS_CONFIG_PRIOCNT - 1,
+      &task_main, OS_CONFIG_PRIOCNT - 3,
       task_main_stack, sizeof(task_main_stack),
       mastertask_proc, NULL);
 }

@@ -181,7 +181,7 @@ void os_sem_up_sync(os_sem_t* sem, bool sync)
       task->block_code = OS_OK; /* set the block code to NORMAL WAKEUP */
       os_task_makeready(task);
 
-      /* do not call schedule() if user have some plans to do so.
+      /* do not call schedule() if user requested sync mode.
        * User code may call some other OS function right away which will trigger
        * the os_schedule(). Parameter 'sync' is used for such optimization
        * request */

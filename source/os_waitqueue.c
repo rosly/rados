@@ -163,12 +163,14 @@ void os_waitqueue_prepare(os_waitqueue_t *queue)
 {
    OS_ASSERT(0 == isr_nesting); /* cannot call os_waitqueue_prepare() from ISR */
    OS_ASSERT(task_current->prio_current > 0); /* idle task cannot call blocking functions (will crash OS) */
+
+   /* disable preemption */
+   os_scheduler_intlock();
+
    /* check if task is not already subscribed on other wait_queue
     * currently we do not support waiting on multiple wait queues */
    OS_ASSERT(NULL == waitqueue_current);
 
-   /* disable preemption */
-   os_scheduler_intlock();
    /* mark that we are prepared to suspend on wait_queue */
    os_atomicptr_write(waitqueue_current, queue);
 }
@@ -294,18 +296,20 @@ void os_waitqueue_wakeup_sync(
 
       task->block_code = OS_OK; /* set the block code to NORMAL WAKEUP */
       os_task_makeready(task);
-
-      /* do not call schedule() if user have some plans to do so.
-       * User code may call some other OS function right away which will trigger
-       * the os_schedule(). Parameter 'sync' is used for such optimization
-       * request */
-      if (!sync)
-      {
-         /* switch to more prioritized READY task, if there is such (1 as param
-          * in os_schedule() means just that */
-         os_schedule(1);
-     }
    }
+
+   /* to wake up all task exacly once, we have to schedule() out of wakeup loop.
+    * But do not call schedule() if user requested sync mode.
+    * User code may call some other OS function right away which will trigger
+    * the os_schedule(). Parameter 'sync' is used for such optimization
+    * request */
+   if (!sync)
+   {
+      /* switch to more prioritized READY task, if there is such (1 as param
+       * in os_schedule() means just that */
+      os_schedule(1);
+   }
+
    arch_critical_exit(cristate);
 }
 

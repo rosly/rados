@@ -51,6 +51,13 @@
  * - semaphores support timeout guard for os_sem_down() operation. The designed
  *   use case is to "wait for signal or timeout". In case of timeout the return
  *   code from os_sem_down() will be OS_TIMEOUTED
+ * - semaphores allow for single signalization per os_sem_up(). Defining API
+ *   which would allow for multiple signalizations per os_sem_up() would create
+ *   controversy behaviour. In case woken up task would have higher priority
+ *   than task which signal the semaphore it has to be decided if system should
+ *   allow for preemption and possibly the same task will return to suspend
+ *   point and consume next signal, or system should wakeup multiple task
+ *   simultaneously and then allow for preemption the signaling task.
  */
 
 /** Definition of semaphore structure */
@@ -152,6 +159,8 @@ os_retcode_t OS_WARN_UNUSEDRET os_sem_down(
  *
  * @pre this function CAN be called from ISR. This is one of basic use cases for
  *      semaphore.
+ * @post in case sync parameter is 'false', this function may cause preemption
+ *       since it can wake up task with higher priority than caller task
  */
 void os_sem_up_sync(os_sem_t* sem, bool sync);
 
@@ -165,6 +174,8 @@ void os_sem_up_sync(os_sem_t* sem, bool sync);
  *
  * @pre this function CAN be called from ISR. This is one of basic use cases for
  *      semaphore.
+ * @post this function may cause preemption since it can wake up task with
+ *       higher priority than caller task
  */
 static inline void os_sem_up(os_sem_t* sem)
 {

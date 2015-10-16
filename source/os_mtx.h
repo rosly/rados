@@ -143,6 +143,8 @@ os_retcode_t OS_WARN_UNUSEDRET os_mtx_lock(os_mtx_t* mtx);
  *
  * @pre mutex must be locked (owned) by task that calls this function
  * @pre this function cannot be used from ISR
+ * @post this function may cause preemption since it can wake up task with
+ *       higher priority than caller task
  */
 void os_mtx_unlock(os_mtx_t* mtx);
 

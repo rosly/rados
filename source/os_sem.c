@@ -138,6 +138,14 @@ os_retcode_t OS_WARN_UNUSEDRET os_sem_down(
    return ret;
 }
 
+/* Copy from semaphore description
+ * semaphores allow for single signalization per os_sem_up(). Defining API which
+ * would allow for multiple signalizations per os_sem_up() would create
+ * controversy behaviour. In case woken up task would have higher priority than
+ * task which signal the semaphore it has to be decided if system should allow
+ * for preemption and possibly the same task will return to suspend point and
+ * consume next signal, or system should wakeup multiple task simultaneously and
+ * then allow for preemption the signaling task. */
 void os_sem_up_sync(os_sem_t* sem, bool sync)
 {
    arch_criticalstate_t cristate;

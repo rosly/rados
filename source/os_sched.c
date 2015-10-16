@@ -61,8 +61,10 @@ volatile os_atomic_t isr_nesting = 0;
 volatile os_atomic_t sched_lock = 0;
 
 #ifdef OS_CONFIG_WAITQUEUE
-/** Pointer to wait_queue on which task_current prepared to suspend
- *  Set in os_waitqueue_prepare(). After this call preemption is also disabled
+/** Pointer to wait_queue on which task_current prepared to suspend.
+ * Set in os_waitqueue_prepare(). After this call preemption is also disabled.
+ * If this pointer is != NULL we say that task_current is in 'prepared' state
+ * (prepared for suspend).
  */
 os_waitqueue_t *waitqueue_current = NULL;
 #endif
@@ -83,7 +85,7 @@ static void os_task_init(os_task_t* task, uint_fast8_t prio);
 void os_scheduler_lock(void)
 {
    OS_ASSERT(0 == isr_nesting); /* cannot call from ISR */
-   OS_ASSERT(NULL == waitqueue_current); /* cannot call from wait_queue loop */
+   OS_ASSERT(NULL == waitqueue_current); /* cannot call after os_waitqueue_prepare() */
 
    os_scheduler_intlock();
 }
@@ -91,7 +93,7 @@ void os_scheduler_lock(void)
 void os_scheduler_unlock(bool sync)
 {
    OS_ASSERT(0 == isr_nesting); /* cannot call from ISR */
-   OS_ASSERT(NULL == waitqueue_current); /* cannot call from wait_queue loop */
+   OS_ASSERT(NULL == waitqueue_current); /* cannot call after os_waitqueue_prepare() */
 
    os_scheduler_intunlock(sync);
 }
@@ -165,7 +167,7 @@ void os_task_create(
    OS_ASSERT(prio > 0); /* only idle task may have the prio 0 */
    OS_ASSERT(NULL != stack); /* stack must be given */
    OS_ASSERT(stack_size >= OS_STACK_MINSIZE); /* minimal size for stack */
-   OS_ASSERT(NULL == waitqueue_current); /* cannot call from wait_queue loop */
+   OS_ASSERT(NULL == waitqueue_current); /* cannot call after os_waitqueue_prepare() */
 
    os_task_init(task, prio);
 
@@ -188,7 +190,7 @@ int os_task_join(os_task_t *task)
    OS_ASSERT(0 == isr_nesting); /* cannot join tasks from ISR */
    /* idle task cannot call blocking functions (will crash OS) */
    OS_ASSERT(task_current->prio_current > 0);
-   OS_ASSERT(NULL == waitqueue_current); /* cannot call from wait_queue loop */
+   OS_ASSERT(NULL == waitqueue_current); /* cannot call after os_waitqueue_prepare() */
 
    arch_critical_enter(cristate);
    OS_ASSERT(NULL == task->join_sem); /* only one task is allowed to wait for particular task */
@@ -221,7 +223,7 @@ void os_yield(void)
 {
    OS_ASSERT(0 == isr_nesting); /* cannot join tasks from ISR */
    OS_ASSERT(task_current->prio_current > 0); /* idle task cannot call os_yield() */
-   OS_ASSERT(NULL == waitqueue_current); /* cannot call from wait_queue loop */
+   OS_ASSERT(NULL == waitqueue_current); /* cannot call after os_waitqueue_prepare() */
 
    arch_criticalstate_t cristate;
 

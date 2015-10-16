@@ -34,87 +34,6 @@
 
 #ifdef OS_CONFIG_WAITQUEUE
 
-/**
- * Technical description of wait_queue mechanics.
- *
- * Following template of code is used on receiver side:
- * 0: uint32_t test_condition; does not have to be atomic type
- *
- * 1: while(1) {
- * 2:   os_waitqueue_prepare(&waitqueue, timeout);
- * 3:   if (test_condition) {
- * 4:      os_waitqueue_finish();
- * 5:      break;
- * 6:   }
- * 7:   ret = os_waitqueue_wait();
- * 8: }
- *
- * Following template is used on notifier side:
- * 10: conditional_test = 1;
- * 11: os_waitqueue_wakeup(&waitqueue);
- *
- * The main goal of wait_queue implementation is to wake the receiver while
- * mitigating the race condition between conditional_test and
- * os_waitqueue_wait() call (between line 3 and 7). If such race condition
- * arise it would mean that there was a preemption and wait_queue was notified
- * (either from other user task or from interrupt).
- * Wait_queue works by utilizing the fact that during task switch,
- * scheduler checks the value of waitqueue_current pointer. If that
- * pointer is set, it does not push the task_current into ready_queue (where it
- * will wait for future schedule()) but instead, it put it into
- * wait_queue->task_queue (a task queue associated with wait_queue). This action
- * itself is the same what happens during os_waitqueue_wait() call. It mens
- * that the receiver is either way putted into sleep.
- *
- * The proof of concept is following. We must to consider 3 places where
- * interrupt or preemption may kick-in. This allows other task/ISR to issue
- * lines 10 and 11 on notifier side.
- * 1) between line 2 and 3
- * 2) between line 6 and 7
- *
- * One additional spot is between lines 3 and 4 but there task already knows that
- * it was signalized (because condition was meet) and it just need to clean-up
- * with os_waitqueue_finish() call.
- *
- * There are two main cases depending if receiver task would be preempted or
- * interrupt will be issued.
- *
- * If receiver is cooperating with ISR, both lines 10 and 11 are issued
- * simultaneously form user task perspective. Additionally keep in mind that
- * during ISR which may happen between mentioned 3 points, task_current is set
- * to task which we consider as vulnerable. If we look at os_waitqueue_wakeup()
- * we will see that there is a special case for this.
- * 1) waitqueue_current is atomically set before ISR, so in ISR line 10
- *    and 11 are done atomically vs the user code. If we look at
- *    os_waitqueue_wakeup_sync it will show that there is special case that
- *    detects that we are in ISR and we preempted the task which waits on the
- *    same condition which we try to signalize. In this case we only set
- *    waitqueue_current = NULL
- * 2) if we look at os_waitqueue_wait() we will see that it verify if
- *    waitqueue_current is still set, if not it exits right away. It will be
- *    NULL since we set it to NULL in line 11 of ISR (inside os_waitqueue_wakeup())
- *
- * If receiver is cooperating with some other task, then in
- * os_waitqueue_wakeup() the task_current is set to different value then task
- * which wait for condition. In other words now it is different story comparing
- * to ISR. What is more important, line 10 and 11 may not be issued atomically.
- * 1) if we will have task preemption at this point it is enough that notifier
- *    execute line 10, since receiver will detect that in line 3 (and will skip
- *    the sleep). If notifier will execute also line 11 it will see the
- *    receiver task in wait_queue->task_queue since scheduler puts it there while
- *    preempting (look at os_task_makeready() and NULL != task->wait_queue
- *    condition in that function). This means that receiver task will be woken
- *    up by os_waitqueue_wakeup() and it will continue in line 3, while
- *    condition is already set.
- * 2) receiver already passes the condition, so executing line 10 in notifier
- *    will not have any effect. But here also we need to pass scheduler in case of
- *    preemption. It means that os_task_makeready() will again put the receiver
- *    into wait_queue->task_list before line 10 and 11 in notifier and this will
- *    mean that it is almost the same as in 1). The only difference is that after
- *    receiver is woken up, it will return to line 8 instead of 3, so we must to
- *    make a loop and check condition again.
- */
-
 /* private function forward declarations */
 static void os_waitqueue_timerclbck(void* param);
 
@@ -123,7 +42,7 @@ static void os_waitqueue_timerclbck(void* param);
 
 void os_waitqueue_create(os_waitqueue_t* queue)
 {
-   OS_ASSERT(NULL == waitqueue_current); /* cannot call from wait_queue loop */
+   OS_ASSERT(NULL == waitqueue_current); /* cannot call after os_waitqueue_prepare() */
 
    memset(queue, 0, sizeof(os_waitqueue_t));
    os_taskqueue_init(&(queue->task_queue));
@@ -134,16 +53,14 @@ void os_waitqueue_destroy(os_waitqueue_t* queue)
    arch_criticalstate_t cristate;
    os_task_t *task;
 
-   OS_ASSERT(NULL == waitqueue_current); /* cannot call from wait_queue loop */
+   OS_ASSERT(NULL == waitqueue_current); /* cannot call after os_waitqueue_prepare() */
 
    arch_critical_enter(cristate);
 
-   /* wake up all task which waits on sem->task_queue */
+   /* wake up all task which suspended on wait_queue */
    while (NULL != (task = os_task_dequeue(&(queue->task_queue))))
    {
-      /* destroy the timer if it was associated with task we plan to wake up */
-      os_blocktimer_destroy(task);
-
+      os_blocktimer_destroy(task); /* destroy the tasks timer */
       task->block_code = OS_DESTROYED;
       os_task_makeready(task);
    }
@@ -161,7 +78,7 @@ void os_waitqueue_destroy(os_waitqueue_t* queue)
 
 void os_waitqueue_prepare(os_waitqueue_t *queue)
 {
-   OS_ASSERT(0 == isr_nesting); /* cannot call os_waitqueue_prepare() from ISR */
+   OS_ASSERT(0 == isr_nesting); /* cannot call from ISR */
    OS_ASSERT(task_current->prio_current > 0); /* idle task cannot call blocking functions (will crash OS) */
 
    /* disable preemption */
@@ -171,7 +88,9 @@ void os_waitqueue_prepare(os_waitqueue_t *queue)
     * currently we do not support waiting on multiple wait queues */
    OS_ASSERT(NULL == waitqueue_current);
 
-   /* mark that we are prepared to suspend on wait_queue */
+   /* mark that we are prepared to suspend on wait_queue
+    * some CPU platforms might not have atomic pointer association ops so we use
+    * platform macro */
    os_atomicptr_write(waitqueue_current, queue);
 }
 
@@ -192,9 +111,8 @@ os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(os_ticks_t timeout_ticks)
    os_waitqueue_t *wait_queue;
    arch_criticalstate_t cristate;
 
-   OS_ASSERT(0 == isr_nesting); /* cannot call os_waitqueue_wait() form ISR */
+   OS_ASSERT(0 == isr_nesting); /* cannot call form ISR */
    OS_ASSERT(task_current->prio_current > 0); /* idle task cannot call blocking functions (will crash OS) */
-   /* in case of timeout guard, we need to have waitobj ptr valid */
    OS_ASSERT(timeout_ticks > OS_TIMEOUT_TRY); /* timeout must be either specific or infinite */
 
    /* we need to disable the interrupts since wait_queue may be signalized from
@@ -206,7 +124,7 @@ os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(os_ticks_t timeout_ticks)
    os_scheduler_intunlock(true); /* true = sync, unlock scheduler but do not schedule() yet */
 
    /* check if we are still in 'prepared' state
-    * if not than it means that we where woken up by ISR in the mean time */
+    * if not than it means that we were woken up by ISR in the mean time */
    if (waitqueue_current)
    {
       if (OS_TIMEOUT_INFINITE != timeout_ticks)
@@ -214,6 +132,7 @@ os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(os_ticks_t timeout_ticks)
          os_blocktimer_create(&timer, os_waitqueue_timerclbck, timeout_ticks);
       }
 
+      /* clear global 'prepare' flag since we will switch the context */
       wait_queue = waitqueue_current;
       waitqueue_current = NULL;
       os_block_andswitch(&(wait_queue->task_queue), OS_TASKBLOCK_WAITQUEUE);
@@ -240,9 +159,10 @@ void os_waitqueue_wakeup_sync(
    arch_criticalstate_t cristate;
    os_task_t *task;
 
-   /* tasks cannot call any OS functions if they are in wait_queue suspend
-    * loop, with exception to ISR's which can interrupt task_current during
-    * spinning on wait_queue suspend loop */
+   /* tasks cannot call any OS functions if they are are 'prepared' to suspend
+    * on wait_queue, with exception to ISR's which can interrupt task_current.
+    * In this case waitqueue_current will be in 'prepared' state (we need to
+    * handle that case) */
    OS_ASSERT((isr_nesting > 0) || (NULL == waitqueue_current));
    /* sync must be == false in case we are called from ISR */
    OS_ASSERT((isr_nesting == 0) || (sync == false));
@@ -251,13 +171,14 @@ void os_waitqueue_wakeup_sync(
    arch_critical_enter(cristate);
 
    /* check if we are in ISR but we interrupted the task which is prepared to suspend
-    * on the same wait_queue which we signalize */
+    * on the same wait_queue which we will signalize */
    if ((isr_nesting > 0) && (waitqueue_current == queue))
    {
-      /* We are trying to wake up the task_current. This task is in RUNNING
-       * state. Therefore task_current is not in wait_queue->task_queue of
-       * wait_queue. The only action which we need to do in scope of scheduling
-       * is disassociate it from wait_queue */
+      /* We are trying to wake up the task_current from ISR.
+       * task_current is in 'prepared' state and it is not pushed to any
+       * task_queue. The only action which we need to do is communicate with
+       * task_current that the suspend on wait_queue should not be done. We will
+       * make this by clearing out the 'prepared' state */
       waitqueue_current = NULL;
 
       /* since we theoretically prevented from sleep one task, now we have one
@@ -271,12 +192,12 @@ void os_waitqueue_wakeup_sync(
        * tasks in wait_queue->task_queue, so preventing it from sleep is not
        * fair in scope of scheduling (to some degree). There may be some more
        * prioritized task which should be woken up first, while this task maybe
-       * should go to sleep. Also this is even more important in case parameter
+       * should go to sleep. This is even more important in case parameter
        * nbr = 1.
        * The most fair approach would be to peek the wait_queue->task_queue and
        * compare the priorities. In case peeked task would be higher prioritized
-       * then we should allow task_current to suspend on
-       * wait_queue->task_queue and wakeup the pick most prioritized one */
+       * then we should allow task_current to suspend on wait_queue->task_queue
+       * and wakeup the most prioritized one */
    }
 
    while ((OS_WAITQUEUE_ALL == nbr) || ((nbr--) > 0))
@@ -298,7 +219,7 @@ void os_waitqueue_wakeup_sync(
       os_task_makeready(task);
    }
 
-   /* to wake up all task exacly once, we have to schedule() out of wakeup loop.
+   /* to wake up all task exactly once, we have to schedule() out of wakeup loop.
     * But do not call schedule() if user requested sync mode.
     * User code may call some other OS function right away which will trigger
     * the os_schedule(). Parameter 'sync' is used for such optimization
@@ -326,8 +247,8 @@ static void os_waitqueue_timerclbck(void* param)
 
    OS_SELFCHECK_ASSERT(TASKSTATE_WAIT == task->state);
 
-   /* remove task from semaphore task queue (in os_waitqueue_wakeup() the
-    * os_task_dequeue() does that */
+   /* remove task from task queue (in os_waitqueue_wakeup() the
+    * os_task_dequeue() does the same job */
    os_task_unlink(task);
    task->block_code = OS_TIMEOUT;
    os_task_makeready(task);
@@ -340,6 +261,40 @@ static void os_waitqueue_timerclbck(void* param)
    /* timer is not auto reload so we don't have to worry about if it will call
     * this function again */
 }
+
+/**
+ * Technical description of last change for wait_queue mechanics.
+ *
+ * Following template of code was used on receiver side:
+ * 0: uint32_t test_condition; does not have to be atomic type
+ *
+ * 1: while(1) {
+ * 2:   os_waitqueue_prepare(&waitqueue, timeout);
+ * 3:   if (test_condition) {
+ * 4:      os_waitqueue_break();
+ * 5:      break;
+ * 6:   }
+ * 7:   ret = os_waitqueue_wait();
+ * 8: }
+ *
+ * Following template was used on notifier side:
+ * 10: conditional_test = 1;
+ * 11: os_waitqueue_wakeup(&waitqueue);
+ *
+ * Previous implementation allowed for preemption during step 3. This was not
+ * valid solution since if the condition was 'true' and preemption happened in
+ * 3, than such preempted task instead of going to ready_queue was pushed to
+ * wait_queue->task_queue. The problem is that such task could be never woken
+ * up, since the condition was already set to 'true' (the wakeup signal should
+ * not be needed, receiver task should be able to detect the condition 'true')
+ *
+ * In current solution we forbid for preemption in step 3 by disabling the
+ * scheduler. This simplify the code a lot, since the only case where task could
+ * be woken up between 2 and 7 is the case of interrupt. In ISR we simply check
+ * the global waitqueue_current pointer to see if ISR is trying to wakeup the
+ * task_current. In other words we removed all complication from
+ * os_task_makeready() (which was very ugly BTW).
+ */
 
 #endif
 

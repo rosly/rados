@@ -40,7 +40,7 @@ static void os_sem_timerclbck(void* param);
 void os_sem_create(os_sem_t* sem, os_atomic_t init_value)
 {
    OS_ASSERT(init_value < OS_ATOMIC_MAX);
-   OS_ASSERT(NULL == waitqueue_current); /* cannot call from wait_queue loop */
+   OS_ASSERT(NULL == waitqueue_current); /* cannot call after os_waitqueue_prepare() */
 
    memset(sem, 0, sizeof(os_sem_t));
    os_taskqueue_init(&(sem->task_queue));
@@ -53,16 +53,14 @@ void os_sem_destroy(os_sem_t* sem)
    os_task_t *task;
 
    OS_ASSERT(0 == isr_nesting); /* cannot call from ISR */
-   OS_ASSERT(NULL == waitqueue_current); /* cannot call from wait_queue loop */
+   OS_ASSERT(NULL == waitqueue_current); /* cannot call after os_waitqueue_prepare() */
 
    arch_critical_enter(cristate);
 
-   /* wake up all task which are suspended on sem->task_queue */
+   /* wake up all task which suspended on semaphore */
    while (NULL != (task = os_task_dequeue(&(sem->task_queue))))
    {
-      /* destroy the timer if it was associated with task which we plan to wake up */
-      os_blocktimer_destroy(task);
-
+      os_blocktimer_destroy(task); /* destroy the tasks timer */
       task->block_code = OS_DESTROYED;
       os_task_makeready(task);
    }
@@ -87,7 +85,7 @@ os_retcode_t OS_WARN_UNUSEDRET os_sem_down(
 
    OS_ASSERT(0 == isr_nesting); /* cannot call from ISR */
    OS_ASSERT(task_current->prio_current > 0); /* idle task cannot call blocking functions (will crash OS) */
-   OS_ASSERT(NULL == waitqueue_current); /* cannot call from wait_queue loop */
+   OS_ASSERT(NULL == waitqueue_current); /* cannot call after os_waitqueue_prepare() */
 
    /* critical section needed because: timers, ISR sem_up(), operating on
     * sem->task_queue */
@@ -159,7 +157,7 @@ void os_sem_up_sync(os_sem_t* sem, bool sync)
 
    /* sync must be == false in case we are called from ISR */
    OS_ASSERT((isr_nesting == 0) || (sync == false));
-   OS_ASSERT(NULL == waitqueue_current); /* cannot call from wait_queue loop */
+   OS_ASSERT(NULL == waitqueue_current); /* cannot call after os_waitqueue_prepare() */
 
    arch_critical_enter(cristate);
 
@@ -209,7 +207,7 @@ static void os_sem_timerclbck(void* param)
    OS_SELFCHECK_ASSERT(TASKSTATE_WAIT == task->state);
 
    /* remove task from semaphore task queue (in os_sem_up() the
-    * os_task_dequeue() does that */
+    * os_task_dequeue() does the same job */
    os_task_unlink(task);
    task->block_code = OS_TIMEOUT;
    os_task_makeready(task);

@@ -75,6 +75,11 @@ typedef sigset_t arch_criticalstate_t;
  */
 extern sigset_t arch_crit_signals;
 
+/* since linux support only arch with > 32 bits we could easly use uint32_t
+ * but since we did not use more than 8 prios we stick to uint8_t */
+typedef uint8_t arch_bitfield_t;
+#define ARCH_BITFIELD_MAX 8
+
 #define OS_ISR /* not naked since signals in linux are handling the context registers via parameter. Signal handler always sees clobbered registers */
 #define OS_NAKED __attribute__((naked))
 #define OS_NORETURN __attribute__ ((noreturn))
@@ -112,6 +117,23 @@ extern sigset_t arch_crit_signals;
   do { \
       *(_dst) = *(_src); /* we can copy as val since linux works on arch > 32bit */ \
   }while(0)
+
+#define arch_bitfield_set(_bitfield, _bit) \
+   do { \
+      _bitfield |= 1 << _bit; \
+   } while(0);
+
+#define arch_bitfield_clear(_bitfield, _bit) \
+   do { \
+      _bitfield &= ~(1 << _bit); \
+   } while(0);
+
+static inline uint_fast8_t arch_bitfield_fls(arch_bitfield_t bitfield)
+{
+   return ((bitfield == 0) ?
+      0 : ((sizeof(unsigned int) * 8) - __builtin_clz((unsigned int)bitfield)));
+}
+
 
 #define arch_critical_enter(_critical_state) \
    do { \

@@ -49,6 +49,11 @@ os_task_t* task_current = NULL;
  * task queue we pick task which will be running as current one */
 os_taskqueue_t ready_queue;
 
+/** Task structure for idle task
+ * Since user programs does not explicitly create idle task, OS need to keep
+ * internal task structure for IDLE task */
+static os_task_t task_idle;
+
 /** Counter to mark ISR nesting
  * Allows to track the nesting level of ISR and control the task state
  * dump/restore on ISR enter/exit. Also used for locking the preemption Can be
@@ -68,11 +73,6 @@ volatile os_atomic_t sched_lock = 0;
  */
 os_waitqueue_t *waitqueue_current = NULL;
 #endif
-
-/** Task structure for idle task
- * Since user programs does not explicitly create idle task, OS need to keep
- * internal task structure for IDLE task */
-static os_task_t task_idle;
 
 /* --- forward declaration of private functions --- */
 
@@ -267,39 +267,38 @@ void OS_COLD os_halt(void)
  * task_queue internals. It also links task with task_queue but does not update
  * the task state! This must be done before call of this function */
 void OS_HOT os_task_enqueue(
-   os_taskqueue_t* OS_RESTRICT task_queue,
-   os_task_t* OS_RESTRICT task)
+   os_taskqueue_t* task_queue,
+   os_task_t* task)
 {
+   /* enqueue the task to task_queue bucket */
    list_append(&(task_queue->tasks[task->prio_current]), &(task->list));
    task->task_queue = task_queue;
-   if (task_queue->priomax < task->prio_current)
-   {
-     task_queue->priomax = task->prio_current;
-   }
-}
 
-/**
- * Function recalculates the priomax inside task_queue after task unlink
- * operation. Function does not unlink the task! this must be done before
- * calling this function
- */
-void OS_HOT os_taskqueue_remax(os_taskqueue_t* OS_RESTRICT task_queue)
-{
-   while ((0 != (task_queue->priomax)) &&
-          list_is_empty(&(task_queue->tasks[task_queue->priomax])))
-   {
-     --(task_queue->priomax);
-   }
+   /* update the mask for task_queue buckets */
+   arch_bitfield_set(task_queue->mask, task->prio_current);
 }
 
 /**
  * Function unlink the task from task_queue
  * Need to be called each time OS wants to dequeue specific task from task_queue
  */
-void OS_HOT os_task_unlink(os_task_t* OS_RESTRICT task)
+void OS_HOT os_task_unlink(os_task_t* task)
 {
+   os_taskqueue_t *task_queue;
+   uint_fast8_t prio;
+
+   /* unlink the task form task_queue bucket */
    list_unlink(&(task->list));
-   os_taskqueue_remax(task->task_queue);
+
+   /* we need to recalculate the mask for task queue buckets */
+   task_queue = task->task_queue;
+   prio = task->prio_current;
+   if (list_is_empty(&task_queue->tasks[prio]))
+   {
+      /* mark that this prio list is empty */
+      arch_bitfield_clear(task_queue->mask, prio);
+   }
+
    task->task_queue = NULL;
 }
 
@@ -313,23 +312,43 @@ void OS_HOT os_task_reprio(
 {
    os_taskqueue_t *task_queue;
 
-   /* TODO following code is slow since we recalculate priomax twice
-    * this remax() should be replaced with bitfield algorithm which would allow
-    * to calculate the new priomax with single CPU cycle (at least on some
-    * machines) */
-
-   /* check if we really change the prio so we do not unnecessarily change the
+   /* check if we really change the prio so we would not unnecessarily change the
     * order of waiting tasks */
    if (task->prio_current != new_prio)
    {
       task_queue = task->task_queue;
-      task->prio_current = new_prio;
+
+      /* if task was enqueued on task_queue we need to change the prio bucket */
       if (task_queue)
       {
          os_task_unlink(task);
+      }
+      task->prio_current = new_prio;
+      if (task_queue)
+      {
          os_task_enqueue(task_queue, task);
       }
    }
+}
+
+static os_task_t* _os_task_dequeue(
+   os_taskqueue_t *task_queue,
+   uint_fast8_t maxprio)
+{
+   list_t *task_list;
+   os_task_t *task;
+
+   /* get the max prio task */
+   task_list = &task_queue->tasks[maxprio];
+   task = os_container_of(list_detachfirst(task_list), os_task_t, list);
+   if (list_is_empty(task_list))
+   {
+      /* mark that this prio list is empty */
+      arch_bitfield_clear(task_queue->mask, maxprio);
+   }
+
+   task->task_queue = NULL;
+   return task;
 }
 
 /**
@@ -337,17 +356,19 @@ void OS_HOT os_task_reprio(
  * Function need to be called when OS need to obtain most prioritized task in
  * task_queue
  */
-os_task_t* OS_HOT os_task_dequeue(os_taskqueue_t* OS_RESTRICT task_queue)
+os_task_t* OS_HOT os_task_dequeue(os_taskqueue_t* task_queue)
 {
-   list_t *list = list_detachfirst(&(task_queue->tasks[task_queue->priomax]));
-   if (NULL == list)
+   uint_fast8_t maxprio;
+
+   /* get max prio to fetch from proper list */
+   maxprio = arch_bitfield_fls(task_queue->mask);
+   if (0 == maxprio)
    {
       return NULL;
    }
-   os_task_t *task = os_container_of(list, os_task_t, list);
-   os_taskqueue_remax(task_queue);
-   task->task_queue = NULL;
-   return task;
+   --maxprio; /* convert to index counted from 0 */
+
+   return _os_task_dequeue(task_queue, maxprio);
 }
 
 /**
@@ -355,14 +376,24 @@ os_task_t* OS_HOT os_task_dequeue(os_taskqueue_t* OS_RESTRICT task_queue)
  * in task queue has prio higher than this passed by @param prio
  */
 os_task_t* OS_HOT os_task_dequeue_prio(
-   os_taskqueue_t* OS_RESTRICT task_queue,
+   os_taskqueue_t* task_queue,
    uint_fast8_t prio)
 {
-   if (task_queue->priomax >= prio)
+   uint_fast8_t maxprio;
+
+   maxprio = arch_bitfield_fls(task_queue->mask);
+   if (0 == maxprio)
    {
-      return os_task_dequeue(task_queue);
+      return NULL;
    }
-   return NULL;
+   --maxprio; /* convert to index counted from 0 */
+
+   if (maxprio < prio)
+   {
+      return NULL;
+   }
+
+   return _os_task_dequeue(task_queue, maxprio);
 }
 
 /**
@@ -372,15 +403,23 @@ os_task_t* OS_HOT os_task_dequeue_prio(
  *  Use this function only when you are interested about some property of most
  *  prioritized task on the queue but you don't want to dequeue this task.
  */
-os_task_t* OS_HOT os_task_peekqueue(os_taskqueue_t* OS_RESTRICT task_queue)
+os_task_t* OS_HOT os_task_peekqueue(os_taskqueue_t* task_queue)
 {
-   list_t *list = list_peekfirst(&(task_queue->tasks[task_queue->priomax]));
-   /* in case task_queue was empty (cannot happen for ready_queue's) */
-   if (NULL == list)
+   uint_fast8_t maxprio;
+   list_t *task_list;
+
+   maxprio = arch_bitfield_fls(task_queue->mask);
+   if (0 == maxprio)
    {
       return NULL;
    }
-   os_task_t *task = os_container_of(list, os_task_t, list);
+   --maxprio; /* convert to index counted from 0 */
+
+   /* peek the max prio task */
+   task_list = &task_queue->tasks[maxprio];
+   os_task_t *task = os_container_of(
+      list_peekfirst(task_list), os_task_t, list);
+
    return task;
 }
 
@@ -389,13 +428,13 @@ os_task_t* OS_HOT os_task_peekqueue(os_taskqueue_t* OS_RESTRICT task_queue)
  */
 void os_taskqueue_init(os_taskqueue_t *task_queue)
 {
-   unsigned i;
+   uint_fast8_t i;
 
-   for(i = 0; i < os_element_cnt(task_queue->tasks); i++)
+   for (i = 0; i < os_element_cnt(task_queue->tasks); i++)
    {
       list_init(&(task_queue->tasks[i]));
    }
-   task_queue->priomax = 0;
+   task_queue->mask = 0;
 }
 
 /**
@@ -474,7 +513,7 @@ void OS_HOT os_schedule(uint_fast8_t higher_prio)
  * @warning This function cannot be called from ISR!!
  */
 void OS_HOT os_block_andswitch(
-   os_taskqueue_t* OS_RESTRICT task_queue,
+   os_taskqueue_t* task_queue,
    os_taskblock_t block_type)
 {
   /* block current task on pointed task queue */

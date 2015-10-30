@@ -74,6 +74,10 @@ typedef uint8_t arch_tickshz_t;
 
 typedef uint8_t arch_criticalstate_t; /* size of AVR status register */
 
+/* the largest sane type for bietfield operations on 8bit CPU, we could try extend that */
+typedef uint8_t arch_bitfield_t;
+#define ARCH_BITFIELD_MAX 8
+
 /* for ISR we use:
  * -naked - since we provide own register save-restore macros
  * -signal - seems to be proper attr for ISR, there is also interrupt but from
@@ -231,6 +235,18 @@ typedef uint8_t arch_criticalstate_t; /* size of AVR status register */
              : "0" (_src), "1" (_dst), "memory" ); \
   }while(0)
 #endif
+
+#define arch_bitfield_set(_bitfield, _bit) \
+   do { \
+      _bitfield |= 1 << _bit; \
+   } while(0);
+
+#define arch_bitfield_clear(_bitfield, _bit) \
+   do { \
+      _bitfield &= ~(1 << _bit); \
+   } while(0);
+
+uint_fast8_t arch_bitfield_fls(arch_bitfield_t bitfield);
 
 #define arch_critical_enter(_critical_state) \
    do { \

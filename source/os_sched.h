@@ -153,13 +153,12 @@ typedef struct {
  * and sem blocking mechanism */
 typedef struct os_taskqueue_tag {
 
-  /** buckets of tasks, there are a separate list for each priority level */
-  list_t tasks[OS_CONFIG_PRIOCNT];
+   /** buckets of tasks, there are a separate list for each priority level */
+   list_t tasks[OS_CONFIG_PRIOCNT];
 
-  /** priority of most important task in the wait_queue, used for fast access to
-   * most prioritized task in task_queue
-   * \TODO we should use bitfield and bitfield_to_prio map */
-  uint_fast8_t priomax;
+   /** mask for used priority levels */
+   arch_bitfield_t mask;
+
 } os_taskqueue_t;
 
 /* --- forward declarations */

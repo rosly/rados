@@ -84,7 +84,7 @@ os_retcode_t OS_WARN_UNUSEDRET os_sem_down(
    arch_criticalstate_t cristate;
 
    OS_ASSERT(0 == isr_nesting); /* cannot call from ISR */
-   OS_ASSERT(task_current->prio_current > 0); /* idle task cannot call blocking functions (will crash OS) */
+   OS_ASSERT(task_current != &task_idle); /* idle task cannot call blocking functions (will crash OS) */
    OS_ASSERT(NULL == waitqueue_current); /* cannot call after os_waitqueue_prepare() */
 
    /* critical section needed because: timers, ISR sem_up(), operating on

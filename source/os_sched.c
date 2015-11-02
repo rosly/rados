@@ -52,7 +52,7 @@ os_taskqueue_t ready_queue;
 /** Task structure for idle task
  * Since user programs does not explicitly create idle task, OS need to keep
  * internal task structure for IDLE task */
-static os_task_t task_idle;
+os_task_t task_idle;
 
 /** Counter to mark ISR nesting
  * Allows to track the nesting level of ISR and control the task state
@@ -189,7 +189,7 @@ int os_task_join(os_task_t *task)
 
    OS_ASSERT(0 == isr_nesting); /* cannot join tasks from ISR */
    /* idle task cannot call blocking functions (will crash OS) */
-   OS_ASSERT(task_current->prio_current > 0);
+   OS_ASSERT(task_current != &task_idle);
    OS_ASSERT(NULL == waitqueue_current); /* cannot call after os_waitqueue_prepare() */
 
    arch_critical_enter(cristate);
@@ -222,7 +222,7 @@ int os_task_join(os_task_t *task)
 void os_yield(void)
 {
    OS_ASSERT(0 == isr_nesting); /* cannot join tasks from ISR */
-   OS_ASSERT(task_current->prio_current > 0); /* idle task cannot call os_yield() */
+   OS_ASSERT(task_current != &task_idle); /* idle task cannot call os_yield() */
    OS_ASSERT(NULL == waitqueue_current); /* cannot call after os_waitqueue_prepare() */
 
    arch_criticalstate_t cristate;

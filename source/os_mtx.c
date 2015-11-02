@@ -206,7 +206,7 @@ os_retcode_t OS_WARN_UNUSEDRET os_mtx_lock(os_mtx_t* mtx)
    arch_criticalstate_t cristate;
 
    OS_ASSERT(0 == isr_nesting); /* cannot operate on mtx from ISR */
-   OS_ASSERT(task_current->prio_current > 0); /* IDLE task cannot call blocking functions (will crash OS) */
+   OS_ASSERT(task_current != &task_idle); /* IDLE task cannot call blocking functions (will crash OS) */
    OS_ASSERT(NULL == waitqueue_current); /* cannot call after os_waitqueue_prepare() */
 
    arch_critical_enter(cristate);

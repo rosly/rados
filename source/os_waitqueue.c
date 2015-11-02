@@ -79,7 +79,7 @@ void os_waitqueue_destroy(os_waitqueue_t* queue)
 void os_waitqueue_prepare(os_waitqueue_t *queue)
 {
    OS_ASSERT(0 == isr_nesting); /* cannot call from ISR */
-   OS_ASSERT(task_current->prio_current > 0); /* idle task cannot call blocking functions (will crash OS) */
+   OS_ASSERT(task_current != &task_idle); /* idle task cannot call blocking functions (will crash OS) */
 
    /* disable preemption */
    os_scheduler_intlock();
@@ -112,7 +112,7 @@ os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(os_ticks_t timeout_ticks)
    arch_criticalstate_t cristate;
 
    OS_ASSERT(0 == isr_nesting); /* cannot call form ISR */
-   OS_ASSERT(task_current->prio_current > 0); /* idle task cannot call blocking functions (will crash OS) */
+   OS_ASSERT(task_current != &task_idle); /* idle task cannot call blocking functions (will crash OS) */
    OS_ASSERT(timeout_ticks > OS_TIMEOUT_TRY); /* timeout must be either specific or infinite */
 
    /* we need to disable the interrupts since wait_queue may be signalized from

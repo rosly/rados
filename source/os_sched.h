@@ -161,7 +161,10 @@ typedef struct os_taskqueue_tag {
 
 } os_taskqueue_t;
 
-/* --- forward declarations */
+/* --- protected variables --- */
+extern os_task_t task_idle;
+
+/* --- forward declarations --- */
 typedef void (*os_initproc_t)(void);
 typedef int (*os_taskproc_t)(void* param);
 

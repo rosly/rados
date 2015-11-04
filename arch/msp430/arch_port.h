@@ -108,6 +108,18 @@ typedef uint16_t arch_criticalstate_t; /* size of CPU status register */
       *(_dst) = *(_src); /* we can copy as rval since MSP430 is 16bit arch and arch_ticks_t is 16bit*/ \
   }while(0)
 
+#define arch_bitfield_set(_bitfield, _bit) \
+   do { \
+      (_bitfield) |= 1 << (_bit); \
+   } while(0);
+
+#define arch_bitfield_clear(_bitfield, _bit) \
+   do { \
+      (_bitfield) &= ~(1 << (_bit)); \
+   } while(0);
+
+uint_fast8_t arch_bitfield_fls(arch_bitfield_t bitfield);
+
 #define arch_critical_enter(_critical_state) \
    do { \
       (_critical_state) = __read_status_register(); \

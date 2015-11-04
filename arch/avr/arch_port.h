@@ -238,12 +238,12 @@ typedef uint8_t arch_bitfield_t;
 
 #define arch_bitfield_set(_bitfield, _bit) \
    do { \
-      _bitfield |= 1 << _bit; \
+      (_bitfield) |= 1 << (_bit); \
    } while(0);
 
 #define arch_bitfield_clear(_bitfield, _bit) \
    do { \
-      _bitfield &= ~(1 << _bit); \
+      (_bitfield) &= ~(1 << (_bit)); \
    } while(0);
 
 uint_fast8_t arch_bitfield_fls(arch_bitfield_t bitfield);

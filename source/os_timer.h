@@ -48,12 +48,6 @@ typedef struct {
 #endif
 } os_timer_t;
 
-typedef struct
-{
-  os_ticks_t ticks_start;
-  os_ticks_t ticks_rem;
-} os_timeout_t;
-
 /** monotonic ticks counter, incremented each tick */
 extern os_ticks_t os_ticks_cnt;
 
@@ -68,12 +62,10 @@ void os_timer_destroy(os_timer_t* timer);
 
 static inline void os_ticks_now(os_ticks_t *ticks)
 {
-  arch_ticks_atomiccpy(ticks, &os_ticks_cnt);
+   arch_ticks_atomiccpy(ticks, &os_ticks_cnt);
 }
 
-os_ticks_t os_ticks_diff(os_ticks_t* ticks_start);
-void os_timeout_start(os_timeout_t* timeout, os_ticks_t ticks);
-int os_timeout_check(os_timeout_t* timeout);
+os_ticks_t os_ticks_diff(os_ticks_t ticks_start, os_ticks_t ticks_now);
 
 #endif
 

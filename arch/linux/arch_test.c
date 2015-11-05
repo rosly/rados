@@ -47,11 +47,15 @@ static const char* test_name = NULL;
 static void OS_ISR sig_alrm(int OS_UNUSED(signum), siginfo_t * OS_UNUSED(siginfo), void *ucontext)
 {
    arch_contextstore_i(sig_alrm);
+
+   /* we do not allowing or nested interrupts in this ISR, therefore we do not
+    * have to enter the critical section to call os_tick() */
    os_tick();
    if( NULL != test_tick_clbck )
    {
       test_tick_clbck();
    }
+
    arch_contextrestore_i(sig_alrm);
 }
 

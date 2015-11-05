@@ -31,37 +31,34 @@
 
 #include "os_private.h"
 
-/** Maximal number of unsychronized ticks */
+/** Maximal number of unsynchronized ticks
+ * This define is used to define the maximal number of quickly handled ticks.
+ * For more info look at timer_tick_unsynch */
 #define OS_TIMER_UNSYNCH_MAX ((os_ticks_t)1024)
 
-/** Prevent from craeting timer with to big timeout, so even if it will fit into
+/** Prevent from creating timer with to big timeout, even if timeout will fit into
  *  timeout datatype, it could create problems with high OS_TIMER_UNSYNCH_MAX */
 #define OS_TIMER_TICKSREM_MAX ((os_ticks_t)(UINT16_MAX - OS_TIMER_UNSYNCH_MAX))
 
 #define OS_TIMER_MAGIC1 ((uint_fast16_t)0xAABB)
 #define OS_TIMER_MAGIC2 ((uint_fast16_t)0xCCDD)
 
-/** current ticks counter, increamented each tick ISR call
- *  used for time keeping */
+/** Monotonic ticks counter, incremented each tick */
 os_ticks_t os_ticks_cnt = 0;
 
-/** /TODO In future we need some smarter algorithm than list for active timers,
- * list will not scale good so it will be only efective in case of small amout
- * of timers. For that I have following idea: Instead traversing whole list of
- * timers, check only the first which should burnoff and after it burnoff,
- * decrease the remain timers timeout by itimeout value of this first timer
- * To implement that we need additional variable (for instance timer_pending)
- * and timer list need to be keept in sorted order At each os_timer_tick
- * increment only the timer_pending and check only the first timer, if
- * timer_pending < timer->ticks_rem then do nothing In oposite case triger all
- * timers that have the same timeout value (traversing by list up to timer with
- * different ticks_rem). Then re-add timers if neccesary. Even in this case we
- * don't have to synchronize the timer-pending with remain timers ticks_rem. This
- * action is needed only when we add timer to list or readd timer due
- * autoreaload. Since that this operation should be names os_timer_synchronize
- * while timers should be added to queue (and soting should be done there) by
- * os_timer_add */
+/** Sorted list of all tracked timer in the system. Timers are sorted by
+ * remaining burn off time */
 static list_t timers;
+
+/** Number of "quickly" handled ticks.
+ *
+ * All timers are kept on sorted list and until first timer does not burn off
+ * it means that remain wont either. Because of this we do not iterate through
+ * timer list at each tick, but accumulate ticks in timer_tick_unsynch variable.
+ * When this variable will be equal to first timer burn off time, than we iterate
+ * through the timer list. Also due to limited maximal value which can be stored
+ * in os_ticks_t, we iterate from time to time just to keep track of timeout
+ * values. This spontaneous iterations are controlled by OS_TIMER_UNSYNCH_MAX */
 static os_ticks_t timer_tick_unsynch = 0;
 
 static void OS_HOT os_timer_add(os_timer_t *add_timer);
@@ -89,7 +86,7 @@ void os_timer_create(
    OS_ASSERT(timeout_ticks > 0);
    /* and cannot be to high, or it will create problems with unsynch ticks */
    OS_ASSERT(timeout_ticks < OS_TIMER_TICKSREM_MAX);
-   /* prevent double usage of initialized timer */
+   /* prevent from double usage of initialized timer */
    OS_ASSERT(timer->magic != OS_TIMER_MAGIC1);
 
    /* currently I assume that timers may be created from ISR, but I'm not sure
@@ -105,18 +102,20 @@ void os_timer_create(
    timer->magic = OS_TIMER_MAGIC1;
 #endif
 
-   /* timer list is iterated from ISR, we need to disable the interrupts */
+   /* timer list and timer_tick_unsynch are accessed from ISR, we need to
+    * disable the interrupts */
    arch_critical_enter(cristate);
    /* we need to take the timer_tick_unsynch into account now (it may be != 0)
-      it is enough that we add timer_tick_unsynch to ticks_rem, otherwise we
-      would need to waste CPU for os_time_synch() called from here */
-   timer->ticks_rem += timer_tick_unsynch; /* under critical section since timer_tick_unsynch is also accessed from ISR */
+      In case there are some unsynced ticks, it is enough that we increase the
+      burn off time for this timer. Once synch will be performed in some not
+      distant future, the added timeout will be compensated */
+   timer->ticks_rem += timer_tick_unsynch;
    os_timer_add(timer);
    arch_critical_exit(cristate);
 }
 
-/* \note this function is designed in way that allows to call it multiple times
- * until the memory for timer is valid this is safe */
+/* \note this function is designed in way, that ss long as the memory for timer
+ * is valid it allows for multiple destroy operations on the same timer */
 void os_timer_destroy(os_timer_t* timer)
 {
    arch_criticalstate_t cristate;
@@ -129,74 +128,73 @@ void os_timer_destroy(os_timer_t* timer)
    arch_critical_enter(cristate);
 
    /* only still active timers need some actions */
-   if( timer->ticks_rem > 0 )
+   if (timer->ticks_rem > 0)
    {
       /* detach from active timer list */
       list_unlink(&(timer->list));
       /* marking timer as expired, prevents double destroy */
       timer->ticks_rem = 0;
-      /* clearing the autoreload field, this will allow for safe destroy of
-       * timers from the timer_callback (timer will not be restarted if this
+      /* clearing the auto-reload field, this will allow for safe destroy of
+       * timers from the timer_callback (timer will not be restarted when this
        * field is 0) */
       timer->ticks_reload = 0;
    }
 
 #ifdef OS_CONFIG_APICHECK
-   /* obstruct magic, additionaly this value helps to spot that this timer was
-    * sucessfully destroyed */
+   /* obstruct magic, mark that this timer was successfully destroyed */
    timer->magic = OS_TIMER_MAGIC2;
 #endif
 
    arch_critical_exit(cristate);
 }
 
-/* \note this function can be called only from os_tick()
-   in other words this function can be called only from critical section */
+/* \note this function can be called only from os_tick().
+ * This code can be called only from inside of critical section */
 void OS_HOT os_timer_tick(void)
 {
    list_t *head;
    os_timer_t* head_timer;
 
-   /* increment system global ticks count
-    * to be able to use this counter properly, user code must call os_ticks_now
-    * and os_ticks_diff funtions whcih handle the overflow scenario */
+   /* Increment system global monotonic ticks counter
+    * Overflow scenario for this counter are handled by usage os_ticks_now()
+    * and os_ticks_diff() */
    ++os_ticks_cnt;
 
    /* handle the timer list */
    head = list_peekfirst(&timers);
-   if( NULL == head ) {
+   if (NULL == head) {
       /* if there is no timers in queue we can safely reset unsynch and no timer
        * actions is needed */
       timer_tick_unsynch = 0;
    } else {
-      /* if there are some timers on list, first try to avoid timer list
-       * traversal (unsynch), then check if traversal is realy needed
-       * -it can be that first timer on list was burned of
-       * -or we rach some resonable maximal unsunch value and because timeout
-       * fields has limited bytes it is better to synchronize anyway
-       */
+      /* if there are some timers on list, try to avoid timer list
+       * iteration (unsynch) and do it only on following cases:
+       * - it can be that first timer on list burned off
+       * - we reach quite high unsunch value and because timeout
+       *   fields (os_ticks_t) are usually limited to 16 bits we need to synch
+       *   from time to time */
       ++timer_tick_unsynch;
       head_timer = os_container_of(head, os_timer_t, list);
-      if( OS_UNLIKELY((timer_tick_unsynch >= head_timer->ticks_rem) ||
-                      (timer_tick_unsynch > OS_TIMER_UNSYNCH_MAX)) ) {
+      if (OS_UNLIKELY((timer_tick_unsynch >= head_timer->ticks_rem) ||
+                      (timer_tick_unsynch > OS_TIMER_UNSYNCH_MAX))) {
          os_timer_synch();
          os_timer_triger();
       }
    }
 }
 
-/** Function add the timer to the timer list
- *  The timer list is keept as sorted */
+/** Function add the timer to the timer list. Function keeps the timer list
+ * sorted by remaining burn off time of the timers. */
 static void OS_HOT os_timer_add(os_timer_t *add_timer)
 {
    list_t *itr;
    os_timer_t* itr_timer;
 
    itr = list_itr_begin(&timers);
-   while( false == list_itr_end(&timers, itr) )
+   while (false == list_itr_end(&timers, itr))
    {
       itr_timer = os_container_of(itr, os_timer_t, list);
-      if( itr_timer->ticks_rem > add_timer->ticks_rem ) {
+      if (itr_timer->ticks_rem > add_timer->ticks_rem) {
          break;
       }
       itr = itr->next;
@@ -214,7 +212,7 @@ static void OS_HOT os_timer_synch(void)
    os_timer_t* itr_timer;
 
    itr = list_itr_begin(&timers);
-   while( false == list_itr_end(&timers, itr) )
+   while (false == list_itr_end(&timers, itr))
    {
       itr_timer = os_container_of(itr, os_timer_t, list);
       itr_timer->ticks_rem -= timer_tick_unsynch;
@@ -224,8 +222,8 @@ static void OS_HOT os_timer_synch(void)
    timer_tick_unsynch = 0;
 }
 
-/** Function trigers the timeouted timers and reads them if they are autoreload
- */
+/** Function triggers the timers which had timeouted (timer->ticks_rem == 0) and
+ * rearm them in case they are auto reloaded */
 static void OS_HOT os_timer_triger(void)
 {
    list_t *itr;
@@ -233,81 +231,94 @@ static void OS_HOT os_timer_triger(void)
    os_timer_t* itr_timer;
    list_t list_autoreload;
 
-   list_init(&list_autoreload); /* init the temporary list */
-   itr = list_itr_begin(&timers); /* start te iteration from begin of the list */
-   while( false == list_itr_end(&timers, itr) )
+   /* for auto reloaded timers use temporary list */
+   list_init(&list_autoreload);
+   itr = list_itr_begin(&timers);
+   while (false == list_itr_end(&timers, itr))
    {
       /* the list will be modified, so we have to get pointer the next element
        * before modification */
       next = itr->next;
       itr_timer = os_container_of(itr, os_timer_t, list);
-      if( 0 != itr_timer->ticks_rem ) {
-         break; /* current timer does not burnoff, end of trigering loop */
+      if (0 != itr_timer->ticks_rem)
+      {
+         /* current timer does not burn off yet, following timers wont trigger either */
+         break;
       }
-      list_unlink(&(itr_timer->list)); /* in any case (autoreload and singleshot) remove timer from active list */
-      itr_timer->clbck(itr_timer->param); /* call the timer callback, from this callback it is allowed to call the os_timer_destroy */
-      if( itr_timer->ticks_reload > 0 ) {
-         list_append(&list_autoreload, &(itr_timer->list)); /* if timer is autoreload, add the timer to temporary list */
+
+      /* in any case (auto reload or single shot) remove timer from active list */
+      list_unlink(&(itr_timer->list));
+
+      /* call the timer callback, from this callback it is allowed to call the
+       * os_timer_destroy() */
+      itr_timer->clbck(itr_timer->param);
+
+      /* check if it is marked as auto reload.
+       * timer callback might destroy the timer but in tis case tick_reload will
+       * be 0 */
+      if (itr_timer->ticks_reload > 0)
+      {
+         /* timer is auto reload, put the timer to temporary auto reload list */
+         list_append(&list_autoreload, &(itr_timer->list));
       }
+
       itr = next;
    }
 
-   /* now re-add all autoreload timers from temporaty list
-      we need a temporary list because we keep all timers sorted, and we cannot
-      figure out the position of timers which we autoreload until we finish
-      processing of previous triger sequence */
-   while( NULL != (itr = list_detachfirst(&list_autoreload)) )
+   /* Now re-add all auto reload timers from temporary list.
+    * We need a temporary list because we keep all timers sorted, and we cannot
+    * figure out the position of timers which we auto reload until we finish
+    * processing of previous trigger sequence */
+   while (NULL != (itr = list_detachfirst(&list_autoreload)))
    {
       itr_timer = os_container_of(itr, os_timer_t, list);
       itr_timer->ticks_rem = itr_timer->ticks_reload;
-      os_timer_add(itr_timer); /* add timer at the proper place */
+      os_timer_add(itr_timer); /* add timer at the proper place at the list */
    }
 }
 
 /* \TODO unit test missing */
-os_ticks_t os_ticks_diff(os_ticks_t* OS_RESTRICT ticks_start)
+os_ticks_t os_ticks_diff(os_ticks_t* ticks_start)
 {
-  arch_criticalstate_t cristate;
-  os_ticks_t ret;
+   arch_criticalstate_t cristate;
+   os_ticks_t ret;
 
-  arch_critical_enter(cristate);
-  if(*ticks_start > os_ticks_cnt)
-    {
+   arch_critical_enter(cristate);
+   if(*ticks_start > os_ticks_cnt)
+   {
       OS_ASSERT(0); /* \TODO \FIXME check this under debugger!!!! */
       ret = OS_TICKS_MAX - *ticks_start + 1 + os_ticks_cnt;
-    }
-  else
-    {
+   } else {
       ret = os_ticks_cnt - *ticks_start;
-    }
-  *ticks_start = os_ticks_cnt;
-  arch_critical_exit(cristate);
+   }
+   *ticks_start = os_ticks_cnt;
+   arch_critical_exit(cristate);
 
-  return ret;
+   return ret;
 }
 
 /* \TODO unit test missing */
-void os_timeout_start(os_timeout_t* OS_RESTRICT timeout, os_ticks_t ticks)
+void os_timeout_start(os_timeout_t* timeout, os_ticks_t ticks)
 {
-  os_ticks_now(&(timeout->ticks_start));
-  timeout->ticks_rem = ticks;
+   os_ticks_now(&(timeout->ticks_start));
+   timeout->ticks_rem = ticks;
 }
 
 /* \TODO unit test missing */
-int os_timeout_check(os_timeout_t* OS_RESTRICT timeout)
+int os_timeout_check(os_timeout_t* timeout)
 {
-  os_ticks_t ticks_tmp;
+   os_ticks_t ticks_tmp;
 
-  ticks_tmp = os_ticks_diff(&(timeout->ticks_start));
-  if(ticks_tmp >= timeout->ticks_rem)
-    {
+   ticks_tmp = os_ticks_diff(&(timeout->ticks_start));
+   if(ticks_tmp >= timeout->ticks_rem)
+   {
       timeout->ticks_rem = 0;
       return 1;
-    }
-  else
-    {
+   }
+   else
+   {
       timeout->ticks_rem -= ticks_tmp;
       return 0;
-    }
+   }
 }
 

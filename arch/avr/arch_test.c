@@ -99,11 +99,15 @@ void test_reqtick(void)
 void OS_ISR TIMER1_COMPA_vect(void)
 {
    arch_contextstore_i(tick);
+
+   /* we do not allowing or nested interrupts in this ISR, therefore we do not
+    * have to enter the critical section to call os_tick() */
    os_tick();
    if( NULL != test_tick_clbck )
    {
       test_tick_clbck();
    }
+
    arch_contextrestore_i(tick);
 }
 

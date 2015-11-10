@@ -65,33 +65,31 @@ static inline void os_mtx_clear_owner(os_mtx_t *mtx)
  */
 static void os_mtx_lock_prio_boost(os_mtx_t *mtx)
 {
-   /* check for priority inversion precondition */
-   if (mtx->owner->prio_current < task_current->prio_current)
-   {
-      /* perform priority inheritance, why we use loop here ? see comment 2 */
-      os_task_t *task;
+  os_task_t *task = mtx->owner;
+  const uint_fast8_t task_current_prio = task_current->prio_current;
 
-      task = mtx->owner;
-      while (1)
+   /* check for priority inversion precondition */
+   if (task->prio_current < task_current_prio)
+   {
+      while (1) /* why we use loop here ? see comment 2 */
       {
          uint_fast8_t prio_new;
 
          /* boost the prio of task which hold mtx */
-         prio_new = os_max(task_current->prio_current, task->prio_current);
+         prio_new = os_max(task_current->prio_current, task_current_prio);
          os_task_reprio(task, prio_new);
 
          /* in case such task is also blocked on mtx, go down into the
           * blocking chain boost the prio of their blockers */
-         if ((TASKSTATE_WAIT == task->state) &&
-             (OS_TASKBLOCK_MTX == task->block_type))
+         if ((TASKSTATE_WAIT != task->state) ||
+             (OS_TASKBLOCK_MTX != task->block_type))
          {
-            /* because (OS_TASKBLOCK_MTX == task->block_type), task->task_queue
-             * points into os_mtx_t->task_queue */
-            task = os_container_of(
-               task->task_queue, os_mtx_t, task_queue)->owner;
-            continue;
+            break;
          }
-         break;
+         /* because (OS_TASKBLOCK_MTX == task->block_type), task->task_queue
+          * points into os_mtx_t->task_queue */
+         task = os_container_of(
+            task->task_queue, os_mtx_t, task_queue)->owner;
       }
    }
 }

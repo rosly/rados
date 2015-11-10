@@ -126,7 +126,6 @@ int task_test1a_proc(void* OS_UNUSED(param))
    test_reqtick();
    test_assert(true == timer_clbck[1]);
 
-
    /* clean up */
    os_timer_destroy(&timers[0]);
    os_timer_destroy(&timers[1]);
@@ -169,9 +168,46 @@ int task_test1b_proc(void* OS_UNUSED(param))
 }
 
 /**
+ * Test1 task procedure
+ * Test for timer unsynch algorithm feature during destroy
+ */
+int task_test1c_proc(void* OS_UNUSED(param))
+{
+   /* clean the clbck mark table */
+   memset(timer_clbck, 0, sizeof(timer_clbck));
+
+   /* create timer with 2 tick timeout */
+   os_timer_create(&timers[0], timer_proc, (void*)0, 2, 0);
+
+   /* generate 1 tick */
+   test_reqtick();
+
+   /* create timer with 2 tick timeout */
+   os_timer_create(&timers[1], timer_proc, (void*)1, 2, 0);
+
+   /* destroy timer[0] so unsynch should be synced in order to represend valid
+    * value aginst timer[1] which was moved forward */
+   os_timer_destroy(&timers[0]);
+
+   /* generate 1 tick, timer[1] should not expire */
+   test_reqtick();
+   test_assert(false == timer_clbck[1]);
+
+   /* generate 1 tick, timer[1] should now expire */
+   test_reqtick();
+   test_assert(true == timer_clbck[1]);
+
+   /* clean up */
+   os_timer_destroy(&timers[1]);
+
+   test_debug("subtest 1c OK");
+   return 0;
+}
+
+/**
  * Test2 task procedure
  * Check if timers are properly reloaded in defined periods
- * We test that by creating many timers and usinng both timeout and period, then
+ * We test that by creating many timers and using both timeout and period, then
  * we check if timer expires and it is reloaded at apropriate timestamps
  */
 int task_test2_proc(void* OS_UNUSED(param))
@@ -212,6 +248,7 @@ int task_main_proc(void* OS_UNUSED(param))
    task_test1_proc(NULL);
    task_test1a_proc(NULL);
    task_test1b_proc(NULL);
+   task_test1c_proc(NULL);
    task_test2_proc(NULL);
 
    test_result(0);

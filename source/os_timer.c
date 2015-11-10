@@ -62,7 +62,6 @@ static list_t timers;
 static os_ticks_t timer_tick_unsynch = 0;
 
 static void OS_HOT os_timer_add(os_timer_t *add_timer);
-static void OS_HOT os_timer_synch(void);
 static void OS_HOT os_timer_triger(void);
 
 /** Module initialization function, can be called only from os_start() */
@@ -177,7 +176,6 @@ void OS_HOT os_timer_tick(void)
       head_timer = os_container_of(head, os_timer_t, list);
       if (OS_UNLIKELY((timer_tick_unsynch >= head_timer->ticks_rem) ||
                       (timer_tick_unsynch > OS_TIMER_UNSYNCH_MAX))) {
-         os_timer_synch();
          os_timer_triger();
       }
    }
@@ -202,32 +200,11 @@ static void OS_HOT os_timer_add(os_timer_t *add_timer)
    list_put_before(itr, &(add_timer->list));
 }
 
-/** Function decreases all active timers remain ticks counter by timer_tick_unsynch
- *  In other words we push the fast skipped ticks count, to the timer remain life
- *  time variable
- */
-static void OS_HOT os_timer_synch(void)
-{
-   list_t *itr;
-   os_timer_t* itr_timer;
-
-   itr = list_itr_begin(&timers);
-   while (false == list_itr_end(&timers, itr))
-   {
-      itr_timer = os_container_of(itr, os_timer_t, list);
-      itr_timer->ticks_rem -= timer_tick_unsynch;
-      itr = itr->next;
-   }
-
-   timer_tick_unsynch = 0;
-}
-
 /** Function triggers the timers which had timeouted (timer->ticks_rem == 0) and
  * rearm them in case they are auto reloaded */
 static void OS_HOT os_timer_triger(void)
 {
    list_t *itr;
-   list_t *next;
    os_timer_t* itr_timer;
    list_t list_autoreload;
 
@@ -236,14 +213,14 @@ static void OS_HOT os_timer_triger(void)
    itr = list_itr_begin(&timers);
    while (false == list_itr_end(&timers, itr))
    {
-      /* the list will be modified, so we have to get pointer the next element
-       * before modification */
-      next = itr->next;
       itr_timer = os_container_of(itr, os_timer_t, list);
-      if (0 != itr_timer->ticks_rem)
+      /* the list will be modified, get pointer the next element before modification */
+      itr = itr->next;
+      if ((itr_timer->ticks_rem -= timer_tick_unsynch) > 0)
       {
-         /* current timer does not burn off yet, following timers wont trigger either */
-         break;
+         /* current timer does not burn off yet, following timers wont trigger
+          * either but we continue since w have to synchronize all of the timers */
+         continue;
       }
 
       /* in any case (auto reload or single shot) remove timer from active list */
@@ -261,9 +238,9 @@ static void OS_HOT os_timer_triger(void)
          /* timer is auto reload, put the timer to temporary auto reload list */
          list_append(&list_autoreload, &(itr_timer->list));
       }
-
-      itr = next;
    }
+
+   timer_tick_unsynch = 0;
 
    /* Now re-add all auto reload timers from temporary list.
     * We need a temporary list because we keep all timers sorted, and we cannot

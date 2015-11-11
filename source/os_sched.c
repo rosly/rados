@@ -275,7 +275,7 @@ void OS_HOT os_taskqueue_enqueue(
    task->task_queue = task_queue;
 
    /* update the mask for task_queue buckets */
-   arch_bitfield_set(task_queue->mask, task->prio_current);
+   arch_bitmask_set(task_queue->mask, task->prio_current);
 }
 
 /**
@@ -296,7 +296,7 @@ void OS_HOT os_taskqueue_unlink(os_task_t* task)
    if (list_is_empty(&task_queue->tasks[prio]))
    {
       /* mark that this prio list is empty */
-      arch_bitfield_clear(task_queue->mask, prio);
+      arch_bitmask_clear(task_queue->mask, prio);
    }
 
    task->task_queue = NULL;
@@ -344,7 +344,7 @@ static os_task_t* os_taskqueue_intdequeue(
    if (list_is_empty(task_list))
    {
       /* mark that this prio list is empty */
-      arch_bitfield_clear(task_queue->mask, maxprio);
+      arch_bitmask_clear(task_queue->mask, maxprio);
    }
 
    task->task_queue = NULL;
@@ -361,7 +361,7 @@ os_task_t* OS_HOT os_taskqueue_dequeue(os_taskqueue_t* task_queue)
    uint_fast8_t maxprio;
 
    /* get max prio to fetch from proper list */
-   maxprio = arch_bitfield_fls(task_queue->mask);
+   maxprio = arch_bitmask_fls(task_queue->mask);
    if (0 == maxprio)
    {
       return NULL;
@@ -381,7 +381,7 @@ os_task_t* OS_HOT os_taskqueue_dequeue_prio(
 {
    uint_fast8_t maxprio;
 
-   maxprio = arch_bitfield_fls(task_queue->mask);
+   maxprio = arch_bitmask_fls(task_queue->mask);
    if (0 == maxprio)
    {
       return NULL;
@@ -408,7 +408,7 @@ os_task_t* OS_HOT os_taskqueue_peek(os_taskqueue_t* task_queue)
    uint_fast8_t maxprio;
    list_t *task_list;
 
-   maxprio = arch_bitfield_fls(task_queue->mask);
+   maxprio = arch_bitmask_fls(task_queue->mask);
    if (0 == maxprio)
    {
       return NULL;

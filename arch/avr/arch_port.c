@@ -268,7 +268,7 @@ void arch_idle(void)
   /* \TODO implement power save code */
 }
 
-uint_fast8_t arch_bitfield_fls(arch_bitfield_t bitfield)
+uint_fast8_t arch_bitmask_fls(arch_bitmask_t bitfield)
 {
    static const uint8_t log2lkup[256] = {
       0U, 1U, 2U, 2U, 3U, 3U, 3U, 3U, 4U, 4U, 4U, 4U, 4U, 4U, 4U, 4U,

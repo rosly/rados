@@ -157,7 +157,7 @@ typedef struct os_taskqueue_tag {
    list_t tasks[OS_CONFIG_PRIOCNT];
 
    /** mask for used priority levels */
-   arch_bitfield_t mask;
+   arch_bitmask_t mask;
 
 } os_taskqueue_t;
 

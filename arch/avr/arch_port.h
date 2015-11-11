@@ -75,7 +75,7 @@ typedef uint8_t arch_tickshz_t;
 typedef uint8_t arch_criticalstate_t; /* size of AVR status register */
 
 /* the largest sane type for bietfield operations on 8bit CPU, we could try extend that */
-typedef uint8_t arch_bitfield_t;
+typedef uint8_t arch_bitmask_t;
 #define ARCH_BITFIELD_MAX 8
 
 /* for ISR we use:
@@ -236,17 +236,17 @@ typedef uint8_t arch_bitfield_t;
   }while(0)
 #endif
 
-#define arch_bitfield_set(_bitfield, _bit) \
+#define arch_bitmask_set(_bitfield, _bit) \
    do { \
       (_bitfield) |= 1 << (_bit); \
    } while(0);
 
-#define arch_bitfield_clear(_bitfield, _bit) \
+#define arch_bitmask_clear(_bitfield, _bit) \
    do { \
       (_bitfield) &= ~(1 << (_bit)); \
    } while(0);
 
-uint_fast8_t arch_bitfield_fls(arch_bitfield_t bitfield);
+uint_fast8_t arch_bitmask_fls(arch_bitmask_t bitfield);
 
 #define arch_critical_enter(_critical_state) \
    do { \

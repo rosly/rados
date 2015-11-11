@@ -77,7 +77,7 @@ static void os_mtx_lock_prio_boost(os_mtx_t *mtx)
 
          /* boost the prio of task which hold mtx */
          prio_new = os_max(task_current->prio_current, task_current_prio);
-         os_task_reprio(task, prio_new);
+         os_taskqueue_reprio(task, prio_new);
 
          /* in case such task is also blocked on mtx, go down into the
           * blocking chain boost the prio of their blockers */
@@ -127,7 +127,7 @@ static void os_mtx_unlock_prio_reset(void)
       {
          itr_mtx = os_container_of(itr, os_mtx_t, listh);
          /* peek (not dequeue) top prio task that is suspended on this mtx */
-         task = os_task_peekqueue(&(itr_mtx->task_queue));
+         task = os_taskqueue_peek(&(itr_mtx->task_queue));
          if (task)
          {
             /* os_max() means take bigger from two. It is important that we use
@@ -185,7 +185,7 @@ void os_mtx_destroy(os_mtx_t* mtx)
 #endif
 
       /* wake up all tasks from mtx->task_queue */
-      while (NULL != (task = os_task_dequeue(&(mtx->task_queue))))
+      while (NULL != (task = os_taskqueue_dequeue(&(mtx->task_queue))))
       {
          task->block_code = OS_DESTROYED;
          os_task_makeready(task);
@@ -238,7 +238,7 @@ os_retcode_t OS_WARN_UNUSEDRET os_mtx_lock(os_mtx_t* mtx)
 #endif
 
       /* block the current task and switch context to READY task */
-      os_block_andswitch(&(mtx->task_queue), OS_TASKBLOCK_MTX);
+      os_task_block_switch(&(mtx->task_queue), OS_TASKBLOCK_MTX);
 
       /* we will return from previous call when os_mtx_unlock() would be
        * performed by other task. Now we are the owner of this mtx. The
@@ -280,7 +280,7 @@ void os_mtx_unlock(os_mtx_t* mtx)
 
       /* since we unlocking the mtx we need to transfer the ownership to top
        * prio task which sleeps on this mtx. See comment 1 */
-      task = os_task_dequeue(&(mtx->task_queue));
+      task = os_taskqueue_dequeue(&(mtx->task_queue));
       if (NULL != task)
       {
          os_mtx_set_owner(mtx, task); /* lock and set ownership */

@@ -58,7 +58,7 @@ void os_sem_destroy(os_sem_t* sem)
    arch_critical_enter(cristate);
 
    /* wake up all task which suspended on semaphore */
-   while (NULL != (task = os_task_dequeue(&(sem->task_queue))))
+   while (NULL != (task = os_taskqueue_dequeue(&(sem->task_queue))))
    {
       os_blocktimer_destroy(task); /* destroy the tasks timer */
       task->block_code = OS_DESTROYED;
@@ -120,7 +120,7 @@ os_retcode_t OS_WARN_UNUSEDRET os_sem_down(
       }
 
       /* now block and switch the context */
-      os_block_andswitch(&(sem->task_queue), OS_TASKBLOCK_SEM);
+      os_task_block_switch(&(sem->task_queue), OS_TASKBLOCK_SEM);
 
       /* we return here once other task call os_sem_up() or timeout burs off
        * cleanup, destroy timeout associated with task if it was created */
@@ -165,7 +165,7 @@ void os_sem_up_sync(os_sem_t* sem, bool sync)
    OS_ASSERT(sem->value < (OS_ATOMIC_MAX - 1));
 
    /* check if there are some suspended tasks on this sem */
-   task = os_task_dequeue(&(sem->task_queue));
+   task = os_taskqueue_dequeue(&(sem->task_queue));
    if (NULL == task)
    {
       /* there was no suspended tasks, in this case just increment the sem value */
@@ -207,8 +207,8 @@ static void os_sem_timerclbck(void* param)
    OS_SELFCHECK_ASSERT(TASKSTATE_WAIT == task->state);
 
    /* remove task from semaphore task queue (in os_sem_up() the
-    * os_task_dequeue() does the same job */
-   os_task_unlink(task);
+    * os_taskqueue_dequeue() does the same job */
+   os_taskqueue_unlink(task);
    task->block_code = OS_TIMEOUT;
    os_task_makeready(task);
    /* we do not call the os_schedule() here, because this will be done at the

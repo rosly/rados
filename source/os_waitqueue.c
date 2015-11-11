@@ -58,7 +58,7 @@ void os_waitqueue_destroy(os_waitqueue_t* queue)
    arch_critical_enter(cristate);
 
    /* wake up all task which suspended on wait_queue */
-   while (NULL != (task = os_task_dequeue(&(queue->task_queue))))
+   while (NULL != (task = os_taskqueue_dequeue(&(queue->task_queue))))
    {
       os_blocktimer_destroy(task); /* destroy the tasks timer */
       task->block_code = OS_DESTROYED;
@@ -135,7 +135,7 @@ os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(os_ticks_t timeout_ticks)
       /* clear global 'prepare' flag since we will switch the context */
       wait_queue = waitqueue_current;
       waitqueue_current = NULL;
-      os_block_andswitch(&(wait_queue->task_queue), OS_TASKBLOCK_WAITQUEUE);
+      os_task_block_switch(&(wait_queue->task_queue), OS_TASKBLOCK_WAITQUEUE);
 
       /* cleanup after return, destroy timeout if it was created */
       os_blocktimer_destroy(task_current);
@@ -204,7 +204,7 @@ void os_waitqueue_wakeup_sync(
    {
       /* chose most prioritized task from wait_queue->task_queue (for task with
        * equal priority threat them in FIFO manner) */
-      task = os_task_dequeue(&(queue->task_queue));
+      task = os_taskqueue_dequeue(&(queue->task_queue));
       if (NULL == task)
       {
          /* there will be no more task to wake up, stop spinning */
@@ -248,8 +248,8 @@ static void os_waitqueue_timerclbck(void* param)
    OS_SELFCHECK_ASSERT(TASKSTATE_WAIT == task->state);
 
    /* remove task from task queue (in os_waitqueue_wakeup() the
-    * os_task_dequeue() does the same job */
-   os_task_unlink(task);
+    * os_taskqueue_dequeue() does the same job */
+   os_taskqueue_unlink(task);
    task->block_code = OS_TIMEOUT;
    os_task_makeready(task);
    /* we do not call the os_schedule() here, because this will be done at the

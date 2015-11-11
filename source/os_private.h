@@ -139,15 +139,15 @@ extern volatile os_atomic_t sched_lock;
 extern os_waitqueue_t *waitqueue_current;
 #endif
 
-void OS_HOT os_task_enqueue(os_taskqueue_t* task_queue, os_task_t* task);
-void OS_HOT os_task_unlink(os_task_t* OS_RESTRICT task);
-void OS_HOT os_task_reprio( os_task_t* task, uint_fast8_t new_prio);
-os_task_t* OS_HOT os_task_dequeue(os_taskqueue_t* task_queue);
-os_task_t* OS_HOT os_task_dequeue_prio(os_taskqueue_t* task_queue, uint_fast8_t prio);
-os_task_t* OS_HOT os_task_peekqueue(os_taskqueue_t* OS_RESTRICT task_queue);
+void OS_HOT os_taskqueue_enqueue(os_taskqueue_t* task_queue, os_task_t* task);
+void OS_HOT os_taskqueue_unlink(os_task_t* OS_RESTRICT task);
+void OS_HOT os_taskqueue_reprio( os_task_t* task, uint_fast8_t new_prio);
+os_task_t* OS_HOT os_taskqueue_dequeue(os_taskqueue_t* task_queue);
+os_task_t* OS_HOT os_taskqueue_dequeue_prio(os_taskqueue_t* task_queue, uint_fast8_t prio);
+os_task_t* OS_HOT os_taskqueue_peek(os_taskqueue_t* OS_RESTRICT task_queue);
 void os_taskqueue_init(os_taskqueue_t *task_queue);
 void OS_HOT os_schedule(uint_fast8_t higher_prio);
-void OS_HOT os_block_andswitch(
+void OS_HOT os_task_block_switch(
    os_taskqueue_t* OS_RESTRICT task_queue,
    os_taskblock_t block_type);
 void OS_NORETURN OS_COLD os_task_exit(int retv);
@@ -181,7 +181,7 @@ void arch_idle(void);
 static inline void os_task_makeready(os_task_t *task)
 {
    task->state = TASKSTATE_READY; /* set the task state */
-   os_task_enqueue(&ready_queue, task); /* put task into ready_queue */
+   os_taskqueue_enqueue(&ready_queue, task); /* put task into ready_queue */
 }
 
 static inline void os_task_makewait(
@@ -192,7 +192,7 @@ static inline void os_task_makewait(
     * set during all wakeups */
    task_current->state = TASKSTATE_WAIT;
    task_current->block_type = block_type;
-   os_task_enqueue(task_queue, task_current);
+   os_taskqueue_enqueue(task_queue, task_current);
 }
 
 static inline void os_blocktimer_create(

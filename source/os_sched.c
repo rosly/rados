@@ -139,7 +139,7 @@ void os_start(
       os_task_makeready(task_current); /* task_current == task_idle here */
       /* finally we switch the context to user task, (any user task has higher
        * prio than idle_task) */
-      arch_context_switch(os_task_dequeue(&ready_queue));
+      arch_context_switch(os_taskqueue_dequeue(&ready_queue));
       task_current->state = TASKSTATE_RUNNING; /* we are back again in idle task */
       arch_critical_exit(cristate);
    } while (0);
@@ -175,7 +175,7 @@ void os_task_create(
    arch_task_init(task, stack, stack_size, proc, param);
 
    arch_critical_enter(cristate);
-   os_task_enqueue(&ready_queue, task);
+   os_taskqueue_enqueue(&ready_queue, task);
    /* 1 as a param allows context switch only if created task has higher
     * priority than task_curernt */
    os_schedule(1);
@@ -266,7 +266,7 @@ void OS_COLD os_halt(void)
  * Should be called each time we add task to task_queue since it updates
  * task_queue internals. It also links task with task_queue but does not update
  * the task state! This must be done before call of this function */
-void OS_HOT os_task_enqueue(
+void OS_HOT os_taskqueue_enqueue(
    os_taskqueue_t* task_queue,
    os_task_t* task)
 {
@@ -282,7 +282,7 @@ void OS_HOT os_task_enqueue(
  * Function unlink the task from task_queue
  * Need to be called each time OS wants to dequeue specific task from task_queue
  */
-void OS_HOT os_task_unlink(os_task_t* task)
+void OS_HOT os_taskqueue_unlink(os_task_t* task)
 {
    os_taskqueue_t *task_queue;
    uint_fast8_t prio;
@@ -306,7 +306,7 @@ void OS_HOT os_task_unlink(os_task_t* task)
  * Function changes the effective (prio_current) priority of task
  * The pointed task may be either in WAIT or READY state
  */
-void OS_HOT os_task_reprio(
+void OS_HOT os_taskqueue_reprio(
    os_task_t* task,
    uint_fast8_t new_prio)
 {
@@ -321,17 +321,17 @@ void OS_HOT os_task_reprio(
       /* if task was enqueued on task_queue we need to change the prio bucket */
       if (task_queue)
       {
-         os_task_unlink(task);
+         os_taskqueue_unlink(task);
       }
       task->prio_current = new_prio;
       if (task_queue)
       {
-         os_task_enqueue(task_queue, task);
+         os_taskqueue_enqueue(task_queue, task);
       }
    }
 }
 
-static os_task_t* _os_task_dequeue(
+static os_task_t* os_taskqueue_intdequeue(
    os_taskqueue_t *task_queue,
    uint_fast8_t maxprio)
 {
@@ -356,7 +356,7 @@ static os_task_t* _os_task_dequeue(
  * Function need to be called when OS need to obtain most prioritized task in
  * task_queue
  */
-os_task_t* OS_HOT os_task_dequeue(os_taskqueue_t* task_queue)
+os_task_t* OS_HOT os_taskqueue_dequeue(os_taskqueue_t* task_queue)
 {
    uint_fast8_t maxprio;
 
@@ -368,14 +368,14 @@ os_task_t* OS_HOT os_task_dequeue(os_taskqueue_t* task_queue)
    }
    --maxprio; /* convert to index counted from 0 */
 
-   return _os_task_dequeue(task_queue, maxprio);
+   return os_taskqueue_intdequeue(task_queue, maxprio);
 }
 
 /**
- * Similar to os_task_dequeue() but task is dequeued only if most top prio task
+ * Similar to os_taskqueue_dequeue() but task is dequeued only if most top prio task
  * in task queue has prio higher than this passed by @param prio
  */
-os_task_t* OS_HOT os_task_dequeue_prio(
+os_task_t* OS_HOT os_taskqueue_dequeue_prio(
    os_taskqueue_t* task_queue,
    uint_fast8_t prio)
 {
@@ -393,7 +393,7 @@ os_task_t* OS_HOT os_task_dequeue_prio(
       return NULL;
    }
 
-   return _os_task_dequeue(task_queue, maxprio);
+   return os_taskqueue_intdequeue(task_queue, maxprio);
 }
 
 /**
@@ -403,7 +403,7 @@ os_task_t* OS_HOT os_task_dequeue_prio(
  *  Use this function only when you are interested about some property of most
  *  prioritized task on the queue but you don't want to dequeue this task.
  */
-os_task_t* OS_HOT os_task_peekqueue(os_taskqueue_t* task_queue)
+os_task_t* OS_HOT os_taskqueue_peek(os_taskqueue_t* task_queue)
 {
    uint_fast8_t maxprio;
    list_t *task_list;
@@ -474,8 +474,8 @@ void OS_HOT os_schedule(uint_fast8_t higher_prio)
    if (OS_LIKELY((isr_nesting <= 1) && (0 == sched_lock)))
    {
       /* dequeue another READY task which has priority equal or greater than
-       * task_current (see condition inside os_task_dequeue_prio) */
-      new_task = os_task_dequeue_prio(
+       * task_current (see condition inside os_taskqueue_dequeue_prio) */
+      new_task = os_taskqueue_dequeue_prio(
          &ready_queue, task_current->prio_current + higher_prio);
 
       /* we will get NULL in case all READY tasks have lower priority */
@@ -512,7 +512,7 @@ void OS_HOT os_schedule(uint_fast8_t higher_prio)
  *
  * @warning This function cannot be called from ISR!!
  */
-void OS_HOT os_block_andswitch(
+void OS_HOT os_task_block_switch(
    os_taskqueue_t* task_queue,
    os_taskblock_t block_type)
 {
@@ -520,8 +520,8 @@ void OS_HOT os_block_andswitch(
   os_task_makewait(task_queue, block_type);
 
   /* chose any READY task and switch to it - at least idle task is READY
-   * so we will never get the NULL from os_task_dequeue() */
-  arch_context_switch(os_task_dequeue(&ready_queue));
+   * so we will never get the NULL from os_taskqueue_dequeue() */
+  arch_context_switch(os_taskqueue_dequeue(&ready_queue));
 
   /* we will return to this point after future context switch.
    * After return task state should be again set to TASKSTATE_RUNING, also
@@ -571,7 +571,7 @@ void OS_NORETURN OS_COLD os_task_exit(int retv)
    * state (ready_queue) so we will never get the NULL there
    * Since we not pushing current_task anywhere it will disappear from scheduling
    */
-   arch_context_switch(os_task_dequeue(&ready_queue));
+   arch_context_switch(os_taskqueue_dequeue(&ready_queue));
 
   /* we should never reach this point, there is no chance that scheduler picked
    * up this code again since we dropped the task */

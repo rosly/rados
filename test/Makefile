@@ -80,12 +80,12 @@ vpath %.o $(BUILDDIR)
 vpath %.a $(BUILDDIR)
 DEPEND = $(addprefix $(BUILDDIR)/, $(TESTSOURCE:.c=.d))
 OBJECTS = $(addprefix $(BUILDDIR)/, $(TESTSOURCE:.c=.o))
-TARGETS = $(addprefix $(BUILDDIR)/, $(TESTSOURCE:.c=.elf))
+TARGETS = $(addprefix $(BUILDDIR)/, $(TESTSOURCE:.c=.bin))
 LIBFILE = $(addprefix $(LIBDIR)/lib, $(addsuffix .a, $(LIBS)))
 
 all: $(LIBFILE) $(TARGETS)
 
-$(BUILDDIR)/%.elf: $(BUILDDIR)/%.o $(LIBFILE)
+$(BUILDDIR)/%.bin: $(BUILDDIR)/%.o $(LIBFILE)
 	@$(ECHO) "[LN]\t$@"
 	@$(CC) $< -L$(LIBDIR) -o $@ $(addprefix -l, $(LIBS)) $(CFLAGS) $(LDFLAGS) 
 
@@ -110,11 +110,13 @@ $(BUILDDIR)/%.d: %.c
 
 .PHONY: clean testrun
 
+ifeq ("$(ARCH)", "linux")
 testrun: all
 	@$(addsuffix ;, $(TARGETS))
 
 testloop:
 	@while { for test in $(TARGETS); do if $$test; then true; else break 2; fi; done; }; do echo "All tests OK"; done;
+endif
 
 clean:
 	@$(RM) $(TARGETS); $(ECHO) "[RM]\t$(TARGETS)"

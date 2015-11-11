@@ -67,7 +67,7 @@ LDFLAGS +=
 
 vpath %.c $(SOURCEDIR) $(ARCHDIR)
 vpath %.o $(BUILDDIR)
-vpath %.elf $(BUILDDIR)
+vpath %.bin $(BUILDDIR)
 DEPEND = $(addprefix $(BUILDDIR)/, $(SOURCES:.c=.d))
 OBJECTS = $(addprefix $(BUILDDIR)/, $(SOURCES:.c=.o))
 LISTINGS = $(addprefix $(BUILDDIR)/, $(SOURCES:.c=.lst))

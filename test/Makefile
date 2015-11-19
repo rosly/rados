@@ -110,11 +110,13 @@ $(BUILDDIR)/%.d: %.c
 
 .PHONY: clean testrun
 
+ifeq ("$(ARCH)", "linux")
 testrun: all
 	@$(addsuffix ;, $(TARGETS))
 
 testloop:
 	@while { for test in $(TARGETS); do if $$test; then true; else break 2; fi; done; }; do echo "All tests OK"; done;
+endif
 
 clean:
 	@$(RM) $(TARGETS); $(ECHO) "[RM]\t$(TARGETS)"

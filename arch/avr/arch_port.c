@@ -270,7 +270,7 @@ void arch_idle(void)
 
 uint_fast8_t arch_bitmask_fls(arch_bitmask_t bitfield)
 {
-   static const uint8_t log2lkup[256] = {
+   static const OS_PROGMEM uint8_t log2lkup[256] = {
       0U, 1U, 2U, 2U, 3U, 3U, 3U, 3U, 4U, 4U, 4U, 4U, 4U, 4U, 4U, 4U,
       5U, 5U, 5U, 5U, 5U, 5U, 5U, 5U, 5U, 5U, 5U, 5U, 5U, 5U, 5U, 5U,
       6U, 6U, 6U, 6U, 6U, 6U, 6U, 6U, 6U, 6U, 6U, 6U, 6U, 6U, 6U, 6U,

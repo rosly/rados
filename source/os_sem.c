@@ -86,6 +86,7 @@ os_retcode_t OS_WARN_UNUSEDRET os_sem_down(
    OS_ASSERT(0 == isr_nesting); /* cannot call from ISR */
    OS_ASSERT(task_current != &task_idle); /* idle task cannot call blocking functions (will crash OS) */
    OS_ASSERT(NULL == waitqueue_current); /* cannot call after os_waitqueue_prepare() */
+   OS_ASSERT(true == list_is_empty(&task_current->mtx_list)); /* calling of blocking function while holding mtx will cause priority inversion */
 
    /* critical section needed because: timers, ISR sem_up(), operating on
     * sem->task_queue */

@@ -103,10 +103,6 @@ typedef struct {
      * enqueue/dequeue since we have to modify the also task_queue itself */
     struct os_taskqueue_tag *task_queue;
 
-    /** \TODO not currently used, pointer to object which blocks the task, valid
-     * only when task state == TASKSTATE_WAIT */
-    //void *block_obj;
-
     /** defines on which object type the task is blocked, valid only when task
      * state == TASKSTATE_WAIT */
     os_taskblock_t block_type;

@@ -76,7 +76,9 @@ os_waitqueue_t *waitqueue_current = NULL;
 
 /* --- forward declaration of private functions --- */
 
+#ifdef OS_CONFIG_CHECKSTACK
 static void os_task_check_init(os_task_t *task, void* stack, size_t stack_size);
+#endif
 static void os_task_init(os_task_t* task, uint_fast8_t prio);
 
 /* --- public function implementation --- */
@@ -171,7 +173,9 @@ void os_task_create(
 
    os_task_init(task, prio);
 
+#ifdef OS_CONFIG_CHECKSTACK
    os_task_check_init(task, stack, stack_size);
+#endif
    arch_task_init(task, stack, stack_size, proc, param);
 
    arch_critical_enter(cristate);
@@ -232,15 +236,19 @@ void os_yield(void)
    arch_critical_exit(cristate);
 }
 
+#ifdef OS_CONFIG_CHECKSTACK
 void os_task_check(os_task_t *task)
 {
-#ifdef OS_CONFIG_CHECKSTACK
    if (OS_UNLIKELY(OS_STACK_FILLPATERN != *((uint8_t*)task->stack_end)))
    {
       os_halt();
    }
-#endif
 }
+#else
+void os_task_check(os_task_t* OS_UNUSED(task))
+{
+}
+#endif
 
 void OS_HOT os_tick(void)
 {
@@ -585,12 +593,12 @@ void OS_NORETURN OS_COLD os_task_exit(int retv)
 
 /* --- private function implementation --- */
 
+#ifdef OS_CONFIG_CHECKSTACK
 /**
  * Initialize task checking mechanism
  */
 static void os_task_check_init(os_task_t *task, void* stack, size_t stack_size)
 {
-#ifdef OS_CONFIG_CHECKSTACK
    memset(stack, OS_STACK_FILLPATERN, stack_size);
    task->stack_size = stack_size;
 #ifdef OS_STACK_DESCENDING
@@ -598,8 +606,8 @@ static void os_task_check_init(os_task_t *task, void* stack, size_t stack_size)
 #else
    task->stack_end = (void*)(((uint8_t*)stack) + stack_size - 1);
 #endif
-#endif
 }
+#endif
 
 /**
  * Initialize task structure

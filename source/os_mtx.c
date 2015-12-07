@@ -233,7 +233,10 @@ os_retcode_t OS_WARN_UNUSEDRET os_mtx_lock(os_mtx_t* mtx)
 
 #ifdef OS_CONFIG_MUTEX_PRIO_INHERITANCE
       /* mtx locked/owned by other task, boost the prio of owner if it has lower
-       * prio than current task */
+       * prio than current task. Mtx should never be changed in future into
+       * priority safe/unsafe version, since semaphore should be the only unsafe
+       * locking scheme. Otherwise we will end up in crazy ideas as in VXWorks or
+       * FreeRTOS. */
       os_mtx_lock_prio_boost(mtx);
 #endif
 

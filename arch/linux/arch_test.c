@@ -67,7 +67,6 @@ void test_debug_printf(const char* format, ...)
    va_start(ap, format);
    //printf("%s: ", test_name);
    vprintf(format, ap);
-   printf("\n");
    fflush(stdout);
    va_end(ap);
 }

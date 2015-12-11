@@ -1,24 +1,36 @@
-#there are two defines which influence on code genration
+# This file is a part of RadOs project
+# Copyright (c) 2013, Radoslaw Biernacki <radoslaw.biernacki@gmail.com>
+# All rights reserved.
 #
-#MCU_OPSET is abreviation from Operation Code Set, it is passed to gcc as an
-#-mmcu parameter, by changing this parameter you force gcc to generate diferent
-#opcodes. Chosing wrong opcode set will result in strange behavior, or even if
-#your CPU will seems to do right thing it may crash at random operations
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
 #
-#MCU_TYPE is switch used for definition of __AVR_X__ define for preprocesor. By
-#changing this define you influence on register address map used by standard
-#library and your code. Chosing wrong seting here may result in changing wrong
-#registers in memory map
+# 1) Redistributions of source code must retain the above copyright notice, this
+#    list of conditions and the following disclaimer.
 #
-#at the bottom of this file there is complementary comment with settings which
-#should be chosen for two mentioned settings
+# 2) Redistributions in binary form must reproduce the above copyright notice,
+#    this list of conditions and the following disclaimer in the documentation
+#    and/or other materials provided with the distribution.
+#
+# 3) No personal names or organizations' names associated with the 'RadOs' project
+#    may be used to endorse or promote products derived from this software without
+#    specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE RADOS PROJECT AND CONTRIBUTORS "AS IS" AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#MCU_OPSET = avr4
-#MCU_TYPE  = ATmega8
-MCU_OPSET = avr5
-MCU_TYPE  = ATmega16A
-#MCU_OPSET = avr51
-#MCU_TYPE  = ATmega1284P
+# Set the proper MCU type for your platform. You may find a dump of supported
+# platforms strings at the bottom of this file. Use the second column of that set.
+MCU = atmega328p
+FCPU = 16000000UL
 
 CC       = avr-gcc
 LD       = avr-ld
@@ -37,14 +49,15 @@ CP       = cp -p
 RM       = rm -f
 MV       = mv
 
-CFLAGS   = -mmcu=$(MCU_OPSET) -D__AVR_$(MCU_TYPE)__ -ffunction-sections -fdata-sections # -std=gnu99 commented out cause __flash extension
+CFLAGS   = -mmcu=$(MCU) -DF_CPU=$(FCPU) -D__FILENAME__=$(notdir $<) \
+           -ffunction-sections -fdata-sections # -std=gnu99 commented out cause __flash extension
 ifeq ($(DEBUG),)
-CFLAGS   += -Os
+CFLAGS   += -Os -g
 else
 #for debug buld we use -O0 do not obstruct the generated code
 CFLAGS   += -O0 -g
 endif
-LDFLAGS  =
+LDFLAGS = -mmcu=$(MCU) 
 
 # taken from http://www.nongnu.org/avr-libc/user-manual/using_tools.html
 #avr1    at90s1200       __AVR_AT90S1200__

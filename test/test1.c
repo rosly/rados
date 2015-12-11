@@ -63,7 +63,7 @@ int task1_proc(void* OS_UNUSED(param))
    task1_started = 1;
 
    ret = os_sem_down(&sem1, OS_TIMEOUT_INFINITE);
-   test_debug("fail: od_sem_down returned with code %d", ret);
+   test_debug("fail: od_sem_down ret code %d", ret);
    test_result(-1);
 
    return 0;
@@ -77,7 +77,7 @@ void test_init(void)
 
 int main(void)
 {
-   test_setupmain("Test1");
+   test_setupmain(OS_PROGMEM_STR("Test1"));
    os_start(test_init, test_idle);
    return 0;
 }

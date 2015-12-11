@@ -32,68 +32,142 @@
 #include "os_private.h"
 #include "os_test.h"
 
-#define AVR_CPU_HZ 1000000ul
+#include <stdarg.h>
+#include <stdio.h>
+#include <avr/io.h>
+#include <util/delay.h>
+
+#define BLINK_DELAY_MS 500
 
 static test_tick_clbck_t test_tick_clbck = NULL;
 static int result_store;
 
-/* for documentation check os_test.h */
-void test_debug_printf(const OS_PROGMEM char* OS_UNUSED(format), ...)
+static void uart_init(void)
 {
-  /* missing implementation */
+#define BAUD 115200
+#define BAUD_TOL 5
+#include <util/setbaud.h>
+   UBRR0H = UBRRH_VALUE;
+   UBRR0L = UBRRL_VALUE;
+#if USE_2X
+   UCSR0A |= (1 << U2X0);
+#else
+   UCSR0A &= ~(1 << U2X0);
+#endif
+
+   UCSR0C |= (1 << UCSZ00) | (1 << UCSZ01); // Use 8-bit character sizes
+   UCSR0B |= (1 << RXEN0) | (1 << TXEN0);   // Turn on the transmission and reception circuitry
+   //for IRQ (1 << OS_CONCAT(RXCIE, MAC_USART_NBR)) | (1 << OS_CONCAT(TXCIE, MAC_USART_NBR));
+}
+
+#if 0
+static void uart_tx_progmem(const OS_PROGMEM char* str)
+{
+   unsigned i;
+
+   for (i = 0; pgm_read_byte_near(&str[i]) != '\0'; i++)
+   {
+      while(!(UCSR0A & (1<<UDRE0)));
+      UDR0 = pgm_read_byte_near(&str[i]);
+   }
+}
+#endif
+
+static void uart_tx_rammem(const char* str)
+{
+   unsigned i = 0;
+   char val;
+
+   while ((val = str[i]) != '\0')
+   {
+      while(!(UCSR0A & (1<<UDRE0)));
+      UDR0 = val;
+      i++;
+   }
 }
 
 /* for documentation check os_test.h */
+void test_debug_printf(const OS_PROGMEM char* format, ...)
+{
+   va_list vargs;
+   char buff[OS_STACK_MINSIZE / 2]; /* half of stack size */
+
+   va_start(vargs, format);
+   vsnprintf_P(buff, sizeof(buff) - 1, format, vargs); /* +_P since format is from program memory */
+   buff[sizeof(buff) - 1] = '\0';
+   va_end(vargs);
+
+   uart_tx_rammem(buff);
+}
+
+/* for documentation check os_test.h */
+#define TEST_BLINK
 void test_result(int result)
 {
    result_store = result;
+   unsigned i = 0;
+
    if(0 == result) {
-      test_debug_printf("Test PASSED\n");
+      test_debug("Test PASSED");
    } else {
-      test_debug_printf("Test FAILURE\n");
+      test_debug("Test FAILURE");
    }
 
+#ifndef TEST_BLINK
    arch_halt();
+#else
+   /* instead of arch_halt() blik the led */
+   while (1) {
+
+    PORTB |= _BV(PORTB5);
+    _delay_ms(1000);
+    PORTB &= ~_BV(PORTB5);
+    _delay_ms(1000);
+
+    test_debug("Result loop %u", i++);
+   }
+#endif
 }
 
 /* for documentation check os_test.h */
-void test_setupmain(const OS_PROGMEM char* OS_UNUSED(test_name))
+void test_setupmain(const OS_PROGMEM char* test_name)
 {
-   //test_assert(0); /* missing implementation */
+#ifdef TEST_BLINK
+   /* For Arduino set portB as output */
+   DDRB |= _BV(DDB5);
+   /* switch off the test LED */
+   PORTB &= ~_BV(PORTB5);
+#endif
+
+   uart_init();
+
+   /* below we use %S (capital) since test_name param is OS_PROGMEM */
+   test_debug("Starting test: %S", test_name);
 }
 
 /* for documentation check os_test.h */
 void test_setuptick(test_tick_clbck_t clbck, unsigned long nsec)
 {
-  test_tick_clbck = clbck;
+   test_tick_clbck = clbck;
 
-  /* Set timer 1 compare value for configured system tick with a prescaler of 256 */
-  OCR1A = AVR_CPU_HZ / 256ul * nsec / 1000000000;
+   /* Set timer 1 compare value for configured system tick with a prescaler of 256 */
+   OCR1A = F_CPU / 256ul * nsec / 1000000000;
 
-  /* Set prescaler 256 */
-  TCCR1B = _BV(CS12) | _BV(WGM12);
+   /* Set prescaler 256 */
+   TCCR1B = _BV(CS12) | _BV(WGM12);
 
-  /* Enable compare match 1A interrupt */
+   /* Enable compare match 1A interrupt */
 #ifdef TIMSK
-  TIMSK = _BV(OCIE1A);
+   TIMSK = _BV(OCIE1A);
 #else
-  TIMSK1 = _BV(OCIE1A);
-#endif
-
-
-#if 0
-DDRB = (1 << PB1);  // Imposta il pin PB1 come di uscita
-TCCR1B |= (1 << WGM12); // imposta il Timer1 in modo CTC (su OCR1A)
-OCR1A = 62499;  // carica 62499 nel registro OCR1A
-TIMSK1 = (1 <<  OCIE1A);  // abilita interrupt CTC su    OCR1A
-TCCR1B |= (1 << CS11) | (1 << CS10) ; // abilita prescaler (fc/64)
+   TIMSK1 = _BV(OCIE1A);
 #endif
 }
 
 /* for documentation check os_test.h */
 void test_reqtick(void)
 {
-   test_assert(0); /* missing implementation */
+   test_assert(!"Missing implementation!");
 }
 
 void OS_ISR TIMER1_COMPA_vect(void)

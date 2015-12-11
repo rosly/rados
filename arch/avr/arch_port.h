@@ -40,6 +40,7 @@
 
 #include <avr/builtins.h> /* for __builtin_avr_sei */
 #include <avr/io.h> /* for SREG */
+#include <avr/pgmspace.h> /* for PSTR */
 
 /* Following structure held CPU registers which need to be preserved between
  * context switches. In general (at any ARCH), there are two possible
@@ -76,7 +77,7 @@ typedef uint8_t arch_criticalstate_t; /* size of AVR status register */
 
 /* the largest sane type for bietfield operations on 8bit CPU, we could try extend that */
 typedef uint8_t arch_bitmask_t;
-#define ARCH_BITFIELD_MAX 8
+#define ARCH_BITFIELD_MAX ((size_t)8)
 
 /* for ISR we use:
  * -naked - since we provide own register save-restore macros
@@ -98,10 +99,12 @@ typedef uint8_t arch_bitmask_t;
 #define OS_UNUSED(_x) unused_ ## _x __attribute__((unused))
 #define OS_RESTRICT __restrict__
 #define OS_PROGMEM __flash
+//#define OS_PROGMEM PROGMEM
+#define OS_PROGMEM_STR(_s) PSTR(_s)
 #define OS_TASKSTACK uint8_t
 
 #define OS_STACK_DESCENDING
-#define OS_STACK_MINSIZE ((size_t)35 * 4) /* four times of context dump size */
+#define OS_STACK_MINSIZE ((size_t)(35 * 4)) /* four times of context dump size */
 
 /* AVR does not support direct memory operations (LOAD-STORE architecture)
  * we must disable interrupts to ensure atomicity */

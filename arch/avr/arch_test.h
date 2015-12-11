@@ -1,4 +1,4 @@
-/* 
+/*
  * This file is a part of RadOs project
  * Copyright (c) 2013, Radoslaw Biernacki <radoslaw.biernacki@gmail.com>
  * All rights reserved.
@@ -36,6 +36,7 @@
    do \
    { \
       if( __builtin_expect(!(_cond), 0) ) { \
+         test_debug("Test assert failed: " OS_STR(_cond)); \
          test_result(-1); \
       } \
    }while(0)

@@ -32,8 +32,22 @@
 #ifndef __OS_TEST_
 #define __OS_TEST_
 
+/**
+ * Macro __FILENAME__ should contain the name of the file without directory
+ * path. This macro could be set at makefile target level as part of compiler
+ * argument command line (like following -D__FILENAME__=$(notdir $<). This is a
+ * trick to provide the short file name to the C source because GCC only
+ * provides the full file name (with path) by __FILE__ macro.
+ * This is usefull for embedded platforms where we would like to keep debug
+ * strings short die to flash memory constrains as also due (usualy) slow debug
+ * interface */
+#ifdef __FILENAME__
 #define test_debug(format, ...) \
-  test_debug_printf(__FILE__ ":" OS_STR(__LINE__) " " format, ##__VA_ARGS__)
+  test_debug_printf(OS_PROGMEM_STR(OS_STR(__FILENAME__) ":" OS_STR(__LINE__) " " format "\r\n"), ##__VA_ARGS__)
+#else
+#define test_debug(format, ...) \
+  test_debug_printf(OS_PROGMEM_STR(__FILE__ ":" OS_STR(__LINE__) " " format "\r\n"), ##__VA_ARGS__)
+#endif
 
 typedef void (*test_tick_clbck_t)(void);
 

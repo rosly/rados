@@ -52,24 +52,24 @@ static os_task_t task1;
 static os_task_t task2;
 static OS_TASKSTACK task1_stack[OS_STACK_MINSIZE];
 static OS_TASKSTACK task2_stack[OS_STACK_MINSIZE];
-static volatile uint8_t counter[2] = { 0, 0 };
+static volatile uint8_t cnt1, cnt2;
 
 void test_idle(void)
 {
    /* check if both task was run to the end */
-   test_assert(TEST_CYCLES == counter[0]);
-   test_assert(TEST_CYCLES == counter[1]);
+   test_assert(TEST_CYCLES == cnt1);
+   test_assert(TEST_CYCLES == cnt2);
 
    test_result(0);
 }
 
 int task1_proc(void* OS_UNUSED(param))
 {
-   while ((counter[0]) < TEST_CYCLES)
+   while ((cnt1) < TEST_CYCLES)
    {
-      (counter[0])++;
+      (cnt1)++;
       os_yield();
-      test_assert(counter[0] == counter[1]);
+      test_assert(cnt1 == cnt2);
    }
 
    return 0;
@@ -77,9 +77,9 @@ int task1_proc(void* OS_UNUSED(param))
 
 int task2_proc(void* OS_UNUSED(param))
 {
-   while ((counter[1]) < TEST_CYCLES)
+   while ((cnt2) < TEST_CYCLES)
    {
-      (counter[1])++;
+      (cnt2)++;
       os_yield();
    }
 

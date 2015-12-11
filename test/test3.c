@@ -58,27 +58,30 @@ static os_task_t task2;
 static OS_TASKSTACK task1_stack[OS_STACK_MINSIZE];
 static OS_TASKSTACK task2_stack[OS_STACK_MINSIZE];
 /* keep it small to allow 8bit processor to increment in few cycles */
-static volatile uint8_t counter[2] = { 0, 0 };
+static volatile uint8_t cnt1, cnt2;
 
 void test_idle(void)
 {
    /* check if both task was run to the end */
-   test_assert(TEST_CYCLES == counter[0]);
-   test_assert(TEST_CYCLES == counter[1]);
+   test_assert(TEST_CYCLES == cnt1);
+   test_assert(TEST_CYCLES == cnt2);
 
    test_result(0);
 }
 
-/* this task will progres only if task2 will keep up with task1 */
+/* this task will progres only if task2 will keep up */
 int task1_proc(void* OS_UNUSED(param))
 {
-   while ((counter[0]) < TEST_CYCLES)
+   while ((cnt1) < TEST_CYCLES)
    {
-      if (counter[0] != counter[1])
+      if (cnt1 != cnt2)
       {
+         /* here we will switch to task2 (equal prio) but since task2 does not
+          * call os_yield() than return will be possible only if os_tick() will
+          * kick in */
          os_yield();
       }
-      (counter[0])++;
+      (cnt1)++;
    }
 
    return 0;
@@ -89,11 +92,11 @@ int task1_proc(void* OS_UNUSED(param))
  * task1. There fore we test if preemption from os_tick() is working */
 int task2_proc(void* OS_UNUSED(param))
 {
-   while ((counter[1]) < TEST_CYCLES)
+   while ((cnt2) < TEST_CYCLES)
    {
-      if (counter[1] < counter[0])
+      if (cnt2 < cnt1)
       {
-         (counter[1])++;
+         (cnt2)++;
       }
    }
 
@@ -111,7 +114,7 @@ void test_init(void)
 
 int main(void)
 {
-   test_setupmain("Test3");
+   test_setupmain(OS_PROGMEM_STR("Test3"));
    os_start(test_init, test_idle);
    return 0;
 }

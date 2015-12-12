@@ -104,12 +104,13 @@ int task2_proc(void* OS_UNUSED(param))
 }
 void test_init(void)
 {
-   /* it would be better to use 1ns tick since it can force "tick ISR flood" on any arch
-    * but using 1ms for easier debugging */
-   test_setuptick(NULL, 1000000);
-
    os_task_create(&task1, 1, task1_stack, sizeof(task1_stack), task1_proc, NULL);
    os_task_create(&task2, 1, task2_stack, sizeof(task2_stack), task2_proc, NULL);
+
+   /* frequent ticks help test race conditions.  The best would be to call tick
+    * ISR every instruction, 1ms tick should be optimal */
+   test_setuptick(NULL, 1000000);
+
 }
 
 int main(void)

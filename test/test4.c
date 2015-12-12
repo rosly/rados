@@ -34,8 +34,8 @@
  * /ingroup tests
  *
  * This is forth of basic test to check the port.
- * Two tasks and two semaphores. Both tasks will block on semaphores. The
- * semaphores should be signalized by timer ISR, by driving the timer freq all
+ * Two tasks and two waitqueues. Both tasks will block on waitqueues. The
+ * waitqueues should be signalized by timer ISR, by driving the timer freq all
  * tree types of switching may be tested, interesting case is when timer is
  * generated each CPU cycle (can be used to test the critical sections)
  *
@@ -48,31 +48,37 @@
 #include "os.h"
 #include "os_test.h"
 
-#define TEST_CYCLES ((unsigned)50)
+#define TEST_CYCLES ((unsigned)100)
+#define TEST_TASK_CNT ((uint8_t)3)
 
 typedef struct {
-   os_sem_t sem;
-   unsigned idx;
-} task_data_t;
+   os_task_t task;
+   OS_TASKSTACK stack[OS_STACK_MINSIZE];
+   volatile unsigned cnt;
+} task_def_t;
 
-static os_task_t task1;
-static os_task_t task2;
-static OS_TASKSTACK task1_stack[OS_STACK_MINSIZE];
-static OS_TASKSTACK task2_stack[OS_STACK_MINSIZE];
-static task_data_t task_data[2];
+static task_def_t task_def[TEST_TASK_CNT];
+os_waitqueue_t wq;
+volatile unsigned glob_cnt;
 
 void tick_clbck(void)
 {
-   os_sem_up(&(task_data[0].sem));
-   os_sem_up(&(task_data[1].sem));
+   os_waitqueue_wakeup(&wq, OS_WAITQUEUE_ALL);
 }
 
 void test_idle(void)
 {
-   if((task_data[0].idx < TEST_CYCLES) || (task_data[1].idx < TEST_CYCLES))
+   uint8_t i;
+
+   for (i = 0; i < TEST_TASK_CNT; i++)
    {
-      return; /* this is not the end, continue */
+      if(task_def[i].cnt < TEST_CYCLES)
+      {
+         return; /* this is not the end, continue */
+      }
    }
+   /* if waitqueue critical section properly prevented from race conditions than ... */
+   test_assert(glob_cnt == (TEST_TASK_CNT * TEST_CYCLES));
 
    /* both task reach its ends, finalize test */
    test_result(0);
@@ -81,13 +87,16 @@ void test_idle(void)
 int task_proc(void* param)
 {
    int ret;
-   task_data_t *data = (task_data_t*)param;
+   volatile unsigned *cnt = (volatile unsigned*)param;
 
-   while(data->idx < TEST_CYCLES)
+   while(*cnt < TEST_CYCLES)
    {
-      (data->idx)++;
-      ret = os_sem_down(&(data->sem), OS_TIMEOUT_INFINITE);
+      os_waitqueue_prepare(&wq);
+      /* only ticks that trigger exacly here will wakeup the task */
+      glob_cnt++;
+      ret = os_waitqueue_wait(OS_TIMEOUT_INFINITE);
       test_assert(OS_OK == ret);
+      (*cnt)++;
    }
 
    return 0;
@@ -95,22 +104,24 @@ int task_proc(void* param)
 
 void test_init(void)
 {
-   memset(&task_data[0], 0, sizeof(task_data_t));
-   memset(&task_data[1], 0, sizeof(task_data_t));
-   os_sem_create(&(task_data[0].sem), 0);
-   os_sem_create(&(task_data[1].sem), 0);
-   os_task_create(&task1, 1, task1_stack, sizeof(task1_stack), task_proc, &task_data[0]);
-   os_task_create(&task2, 1, task2_stack, sizeof(task2_stack), task_proc, &task_data[1]);
+   uint8_t i;
+
+   os_waitqueue_create(&wq);
+   for (i = 0; i < TEST_TASK_CNT; i++)
+   {
+      os_task_create(&(task_def[i].task), 1, task_def[i].stack,
+                     sizeof(task_def[i].stack),
+                     task_proc, (void*)(&(task_def[i].cnt)));
+   }
 
    /* frequent ticks help test race conditions.  The best would be to call tick
-    * ISR every instruction, 1ns tick should force almost flood of tick ISR on
-    * any arch, but using 1ms for debugging */
+    * ISR every instruction, 1ms tick should be optimal */
    test_setuptick(tick_clbck, 1000000);
 }
 
 int main(void)
 {
-   test_setupmain("Test4");
+   test_setupmain(OS_PROGMEM_STR("Test4"));
    os_start(test_init, test_idle);
    return 0;
 }

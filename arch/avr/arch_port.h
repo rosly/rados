@@ -48,20 +48,22 @@
  * - store all CPU context sensitive registers in arch_context_t structure
  *   (which is placed at the beginning of os_task_t)
  * - store only stack pointer in arch_context_t structure, while storing CPU
- *  registers on the task stack
+ *   registers on the task stack
  * It is up to programmer (who prepare specific port) to chose the appropriate
  * approach (storing registers in arch_context_t uses more static task memory
  * while storing them on stack requires more stack memory).  Most of others RTOS
  * use the second method. This is mainly because storing registers stack is the
- * fastest way (requires less CPU cycles). */
+ * fastest way (requires less CPU cycles).
+ */
 typedef struct {
     uint16_t sp;
 } arch_context_t;
 
-/* AVR does not support direct memory manipulation since AVR is LOAD-STORE
- * architecure. At least we can read 8bit values without masking interrupts
- * But on the other hand for 8bit increment we need to disable interrupts,
- * to make this operation atomic (load-increment-store) */
+/* AVR does not support direct memory manipulation, since AVR is LOAD-STORE
+ * architecture. At least we can read 8bit values without masking interrupts
+ * But for 8bit increment we need to disable interrupts, to make this operation
+ * atomic (load-increment-store)
+ */
 typedef uint8_t arch_atomic_t;
 #define ARCH_ATOMIC_MAX UINT8_MAX
 
@@ -75,16 +77,18 @@ typedef uint8_t arch_tickshz_t;
 
 typedef uint8_t arch_criticalstate_t; /* size of AVR status register */
 
-/* the largest sane type for bietfield operations on 8bit CPU, we could try extend that */
+/* the largest sane type for bit field operations on 8bit CPU. We could try
+ * extend that */
 typedef uint8_t arch_bitmask_t;
 #define ARCH_BITFIELD_MAX ((size_t)8)
 
-/* for ISR we use:
- * -naked - since we provide own register save-restore macros
- * -signal - seems to be proper attr for ISR, there is also interrupt but from
- *  what I see it is used if we whant ISR to handle nesting fast as possible
- * -used
- * -externally_visible
+/* for ISR we use following attributes:
+ * - naked - since we provide own register save-restore macros
+ * - signal - seems to be proper attr for ISR, there is also interrupt but from
+ *            what I see it is used if we want ISR to handle nesting as fast as
+ *            possible
+ * - used - to not remove the ISR as non referenced code
+ * - externally_visible
  */
 #define OS_ISR __attribute__((naked, signal, used, externally_visible))
 //#define OS_ISR __attribute__((naked, used, externally_visible))
@@ -277,26 +281,6 @@ hi adress
 low address
 */
 
-/* This function has to:
- - if necessary, disable interrupts to block the nesting
- - store all registers (power control bits do not have to be necessarily stored)
- - increment the isr_nesting
- - if isr_nesting is = 1 then
-    - store the context curr_tcb->ctx (may take benefit from already stored registers by storing only the stack pointer)
- - end
-
- - in some near future down in the ISR enable interrupts to support the nesting interrupts
-
- Because ISR was called it means that interrupts were enabled. On some archs (e.g. MSP430) they may be automatically disabled when entering ISR.
- On those architectures interrupts may be enabled when ISR will mask pending interrupt.
- In general, disabling interrupts is usually needed because we touch the task_current (usually need 2 asm instructions) and we cannot be preempted by another interrupt.
- On the other hand enabling the interrupts again as soon as possible is needed for realtime constraints.
- If your code does not need to be realtime constrained, it is not needed to enable the interrupts in ISR, also the nesting interrupt code can be disabled.
-
- The reason why we skip the stack pointer storage in case of nesting is obvious. In case of nesting we were not in a task but in another ISR. So the SP will not be the task SP.
- But we have to store all registers anyway. This is why we store all registers and then optionally store the SP in context of tcb. */
-
-
 #ifdef __AVR_HAVE_RAMPZ__
 # define arch_push_rampz \
         "in r16, __RAMPZ__"      "\n\t" \
@@ -305,15 +289,36 @@ low address
 # define arch_push_rampz
 #endif
 
+/** Interrupt entrance code. This function has to:
+ * - if necessary, disable interrupts to block the nesting
+ * - store all registers (power control bits do not have to be necessarily stored)
+ * - increment the isr_nesting
+ * - if isr_nesting is = 1 then
+ *   - store the context curr_tcb->ctx (may take benefit from already stored
+ *     registers by storing only the stack pointer)
+ * - end
+ *
+ * - in some near future down in the ISR enable interrupts to support the
+ *   nesting interrupts
+ *
+ * For support of nested interrupts, we should enable IE bit as soon as we will
+ * mask the pending interrupt.
+ * For sake of this function, global IE disable is needed because we touch the
+ * task_current (usually need 2 asm instructions) and we cannot be preempted by
+ * another interrupt. Nested interrupts are needed for real-time constraints. If
+ * your code does not need to be real-time constrained, it is not needed to
+ * enable the interrupts in ISR (no nesting interrupts means some of code in
+ * this function can be disabled)
+ */
 #ifndef __AVR_3_BYTE_PC__
 # define arch_contextstore_i(_isrName) \
     __asm__ __volatile__ ( \
         /* store r16 and use it as temporary register */ \
         "push    r16"           "\n\t" \
-        /* on AVR interrupts will be masked when entering ISR \
-           but since we entered ISR it means that they where enabled. \
-           Therefore we need to save the content of SREG as if global interrupt \
-           flag was set. using sbr r16, 0x80 for that */ \
+        /* on AVR interrupts will be masked when entering ISR                   \
+         * but since we entered ISR it means that they where enabled.           \
+         * Therefore we need to save the content of SREG as if global interrupt \
+         * flag was set. using sbr r16, 0x80 for that */ \
         "in      r16, __SREG__" "\n\t" \
         "sbr     r16, 0x80"     "\n\t" \
         "push    r16"           "\n\t" \
@@ -384,20 +389,6 @@ low address
         "push r0"               "\n\t" */
 #endif
 
-/* This function has to:
- - disable IE (in case the architecture allows for nesting)
- - decrement the isr_nesting
- - if isr_nesting = 0 then
-     - restore context from curr_tcb->ctx
- - restore all registers
- - perform actions that will lead to enabling IE after reti
- - return by reti
-
- Please first read the note for arch_context_StoreI. The important point here is why we need to enable the interrupt after reti in both cases (in normal and nested).
- This is because we disabled them for task_current manipulation in first step. But we need to enable them because:
- - in case of not nested they was for sure enabled (need to be enabled because we enter ISR ;) )
- - in case of nested the was also for sure enabled (from the same reason, we enter nested ISR) */
-
 #ifdef __AVR_HAVE_RAMPZ__
 # define arch_pop_rampz \
         "pop r16"               "\n\t" \
@@ -406,6 +397,15 @@ low address
 # define arch_pop_rampz
 #endif
 
+/** Interrupt leave code. This function has to:
+ * - disable IE (in case the architecture allows for nesting)
+ * - decrement the isr_nesting
+ * - if isr_nesting = 0 then
+ *   - restore context from curr_tcb->ctx
+ * - restore all registers
+ * - perform actions that will lead to enabling IE after reti
+ * - return by reti
+ */
 #ifndef __AVR_3_BYTE_PC__
 #define arch_contextrestore_i(_isrName) \
     __asm__ __volatile__ ( \

@@ -31,32 +31,32 @@
 
 #include "os_private.h"
 
-/* format of the context on stack for AVR
-hi address
-    PC - pushed first
-    R0 - stored to gain one free register
-    SREG
-    R1 - R31 - pushed last
+/** format of the context on stack for AVR
+ *  hi address
+ *  PC - pushed first
+ *  R0 - stored to gain one free register
+ *  SREG
+ *  R1 - R31 - pushed last
 low address
 */
 
-/*
-  \note Interrupts will be disabled during execution of below code. They need to
-        be disabled because of preemption (concurrent access to task_current)
-  This function has to:
- - store task context in the same place as arch_contextstore_i (power bits do
-   not have to be necessarily stored, IE have to be stored because we need to
-   atomically disable the interrupts when we will pop this task) - perform
-   task_current = new_task;
- - restore context the same way as in arch_contextrestore
- - perform actions that will lead to sustaining the power enable after popping the
-   SR (task could be stored by ISR so task possibly may have the power bits disabled)
- - perform actions that will lead to restoring (after ret) the IE flag state saved
-   when task context was dumped (we may switch to preempted task so we need to enable
-   IE while IE was disabled when entering arch_context_switch)
- - return by ret
-*/
-
+/**
+ * Architecture dependent context switch function. This function has to:
+ * - store task context in the same place as arch_contextstore_i (power bits do
+ *   not have to be necessarily stored, IE have to be stored because we need to
+ *   atomically disable the interrupts when we will pop this task) - perform
+ *   task_current = new_task;
+ * - restore context the same way as in arch_contextrestore
+ * - perform actions that will lead to sustaining the power enable after popping
+ *   the SR (task could be stored by ISR so task possibly may have the power bits
+ *   disabled)
+ * - perform actions that will lead to restoring (after ret) the IE flag state
+ *   saved when task context was dumped (we may switch to preempted task so we
+ *   need to enable IE while IE was disabled when entering arch_context_switch)
+ * - return by ret
+ * \note Interrupts will be disabled during execution of below code. They need
+ *       to be disabled because of preemption (concurrent access to task_current)
+ */
 #ifndef __AVR_3_BYTE_PC__
 void OS_NAKED OS_HOT arch_context_switch(os_task_t * new_task)
 {
@@ -67,7 +67,7 @@ void OS_NAKED OS_HOT arch_context_switch(os_task_t * new_task)
       /* store dummy cleared SREG (can be clobbered, I bit must be cleared) */ \
       "eor     r16,r16"       "\n\t" \
       "push    r16"           "\n\t" \
-      /* push RAMPZ if present */   \
+      /* push RAMPZ if present */    \
       arch_push_rampz                \
       /* store old frame pointer kept in Y */ \
       "push    r28"           "\n\t" \
@@ -92,27 +92,27 @@ void OS_NAKED OS_HOT arch_context_switch(os_task_t * new_task)
       /* skip  r16 - already stored */ \
       "push    r17"           "\n\t" \
       /* remaining registers r18-r27 and r30-r31 we can skip since they are \
-       * treated by gcc as call-used and we are in ordinary C function */ \
-      "in      r28, __SP_L__" "\n\t" /* load SPL into r28 (means Ya) */ \
-      "in      r29, __SP_H__" "\n\t" /* load SPH into r29 (means Yb) */ \
-      "sbiw    r28, 12"       "\n\t" /* skip 12bytes on stack */ \
+       * treated by gcc as call-used and we are in ordinary C function */   \
+      "in      r28, __SP_L__" "\n\t" /* load SPL into r28 (means Ya) */     \
+      "in      r29, __SP_H__" "\n\t" /* load SPH into r29 (means Yb) */     \
+      "sbiw    r28, 12"       "\n\t" /* skip 12bytes on stack */            \
       /* store SP into task_current->ctx */ \
-      "lds     r30, task_current"  "\n\t"  /* load Z with current_task pointer */ \
+      "lds     r30, task_current"  "\n\t"  /* load Z with current_task pointer */  \
       "lds     r31, task_current+1" "\n\t"  /* load Z with current_task pointer */ \
       "st      Z,   r28"      "\n\t"   /* store SPL into *(task_current) */ \
       "std     Z+1, r29"      "\n\t"   /* store SPH into *(task_current) */ \
       \
       /* switch task_current = new_task */ \
-      "sts     task_current, %A0\n\t" \
-      "sts     task_current+1, %B0\n\t" \
+      "sts     task_current, %A0\n\t"      \
+      "sts     task_current+1, %B0\n\t"    \
       \
       /* restore SP from task_current->ctx */ \
-      "movw    r30, %0"             "\n\t" /* load Z with new_task pointer */
+      "movw    r30, %0"             "\n\t" /* load Z with new_task pointer */  \
       "ld      r28, Z"              "\n\t" /* load SPL from *(task_current) */ \
       "ldd     r29, Z+1"            "\n\t" /* load SPH from *(task_current) */ \
       "out     __SP_L__, r28"      "\n\t" /* restore new SPL */ \
       "out     __SP_H__, r29"      "\n\t" /* restore new SPH */ \
-      /* restore all registers */ \
+      /* restore all registers */         \
       "pop    r31"                 "\n\t" \
       "pop    r30"                 "\n\t" \
       "pop    r27"                 "\n\t" \
@@ -126,7 +126,7 @@ void OS_NAKED OS_HOT arch_context_switch(os_task_t * new_task)
       "pop    r19"                 "\n\t" \
       "pop    r18"                 "\n\t" \
       "pop    r17"                 "\n\t" \
-      /* skip r16 - will pop later */ \
+      /* skip r16 - will pop later */     \
       "pop    r15"                 "\n\t" \
       "pop    r14"                 "\n\t" \
       "pop    r13"                 "\n\t" \
@@ -145,16 +145,16 @@ void OS_NAKED OS_HOT arch_context_switch(os_task_t * new_task)
       "pop    r0"                  "\n\t" \
       "pop    r29"                 "\n\t" \
       "pop    r28"                 "\n\t" \
-      /* pop RAMPZ if present */         \
+      /* pop RAMPZ if present */          \
       arch_pop_rampz                      \
       /* in popped SEG, I bit may be either set or cleared depending if popped \
-       * task had interrupts disabled (was switched out by internal OS call) \
+       * task had interrupts disabled (was switched out by internal OS call)   \
        * or enabled (switched out by os_tick() from interrupt */ \
       "pop    r16"                 "\n\t" \
-      /* check if interrupts should be enabled after return, if not then we \
-       * must use ret instead of reti, cause reti always enables interrupts \
+      /* check if interrupts should be enabled after return, if not then we     \
+       * must use ret instead of reti, cause reti always enables interrupts     \
        * interrupts must stay disabled if picked task to which we are switching \
-       * now was pushed by arch_context_switch from inside of critical section \
+       * now was pushed by arch_context_switch from inside of critical section  \
        * of OS */ \
       "sbrc   r16, 7"              "\n\t" \
       "rjmp   arch_context_switch_enableint_%=\n\t" \
@@ -182,34 +182,39 @@ void OS_NAKED OS_HOT arch_context_switch(os_task_t * new_task)
 #error 3byte PC is not supported yet
 #endif
 
-/* for description look at os_private.h */
+/** Arch dependent os_start() routine, for description look at os_private.h */
 void arch_os_start(void)
 {
    /* nothing to do */
 }
 
+/** Arch dependent trampoline function for task startup */
 void OS_NAKED arch_task_start(os_taskproc_t proc, void* param)
 {
    os_task_exit(proc(param));
 }
 
-/* this function has to:
-- initialize the stack as it will be left after arch_contextstore
-- initialize the arch_context_t in os_task_t as it will be left after arch_contextstore
-- ensure that task will have the interrupts enabled after it enters proc, on some archs this may be also used in arch_task_start
- /param stack pointer to stack end, it will have the same meaning as sp on a particular arch
-*/
-
-
-void arch_task_init(os_task_t * task, void* stack_param,
-                    size_t stack_size, os_taskproc_t proc,
-                    void* param)
+/** Arch dependent task initialization function. This function has to:
+ * - initialize the stack as it will be left after arch_contextstore
+ * - initialize the arch_context_t in os_task_t as it will be left after
+ *   arch_contextstore
+ * - ensure that task will have the interrupts enabled after it enters proc, on
+ *   some archs this may be also used in arch_task_start
+ *
+ * /param stack pointer to stack end, it will have the same meaning as sp on a
+ *        particular arch
+ */
+void arch_task_init(
+   os_task_t * task, void* stack_param,
+   size_t stack_size, os_taskproc_t proc,
+   void* param)
 {
-   uint8_t *stack = ((uint8_t*)stack_param) + stack_size - 1; /* for AVR we have descending stack */
+   /* for AVR we have descending stack */
+   uint8_t *stack = ((uint8_t*)stack_param) + stack_size - 1;
 
-   /* in AVR stack works in postdecrement on push (preincrement on pop) */
+   /* in AVR stack works in post-decrement on push (pre-increment on pop) */
    *(stack--) = (uint8_t)((uint16_t)arch_task_start & 0xFF);
-   *(stack--) = (uint8_t)((uint16_t)arch_task_start >> 8);;
+   *(stack--) = (uint8_t)((uint16_t)arch_task_start >> 8);
    *(stack--) = 0; /* R16 */
    *(stack--) = 1 << SREG_I; /* SFR with interrupts enabled */
 #ifdef __AVR_HAVE_RAMPZ__
@@ -255,7 +260,8 @@ void arch_task_init(os_task_t * task, void* stack_param,
    task->ctx.sp = (uint16_t)stack;
 }
 
-void /* \TODO removed because of missing backstack OS_NORETURN */ OS_COLD arch_halt(void)
+/* \TODO removed OS_NORETURN because of missing backstack */
+void OS_COLD arch_halt(void)
 {
    arch_dint();
    while(1) {
@@ -268,6 +274,7 @@ void arch_idle(void)
   /* \TODO implement power save code */
 }
 
+/** Emulation function for Find Firts Set bit instruction */
 uint_fast8_t arch_bitmask_fls(arch_bitmask_t bitfield)
 {
    static const OS_PROGMEM uint8_t log2lkup[256] = {

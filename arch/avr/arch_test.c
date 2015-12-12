@@ -93,7 +93,8 @@ void test_debug_printf(const OS_PROGMEM char* format, ...)
    char buff[OS_STACK_MINSIZE / 2]; /* half of stack size */
 
    va_start(vargs, format);
-   vsnprintf_P(buff, sizeof(buff) - 1, format, vargs); /* +_P since format is from program memory */
+   /* use +_P version of vsnpintf since format is from program memory */
+   vsnprintf_P(buff, sizeof(buff) - 1, format, vargs);
    buff[sizeof(buff) - 1] = '\0';
    va_end(vargs);
 
@@ -177,7 +178,7 @@ void OS_ISR TIMER1_COMPA_vect(void)
    /* we do not allowing or nested interrupts in this ISR, therefore we do not
     * have to enter the critical section to call os_tick() */
    os_tick();
-   if( NULL != test_tick_clbck )
+   if (test_tick_clbck)
    {
       test_tick_clbck();
    }

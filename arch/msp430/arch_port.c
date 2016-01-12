@@ -120,6 +120,11 @@ void OS_NORETURN OS_COLD arch_halt(void)
    }
 }
 
+void arch_idle(void)
+{
+  /* \TODO implement power save code */
+}
+
 uint_fast8_t arch_bitmask_fls(arch_bitmask_t bitfield)
 {
    static const uint8_t log2lkup[256] = {

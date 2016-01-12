@@ -17,7 +17,12 @@ CP       = cp -p
 RM       = rm -f
 MV       = mv
 
+CFLAGS   = -mmcu=$(MCU) -std=gnu99 
+ifeq ($(DEBUG),)
 #on MSP430 even in DEBUG build -Os is most resonable
-CFLAGS   = -mmcu=$(MCU) -Os -std=gnu99 
+CFLAGS   += -Os -g
+else
+CFLAGS   += -Os -g
+endif
 LDFLAGS  = -mmcu=$(MCU) -mdisable-watchdog
 

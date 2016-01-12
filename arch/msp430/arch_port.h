@@ -65,10 +65,17 @@ typedef struct {
     uint16_t sp;
 } arch_context_t;
 
-typedef uint16_t arch_atomic_t; /* exactly 16 bits. sig_atomic_t should be available from signal.h but on my enviroment signal.h was empty */
+/* exactly 16 bits. sig_atomic_t should be available from signal.h but on my
+ * enviroment signal.h was empty */
+typedef uint16_t arch_atomic_t;
+#define ARCH_ATOMIC_MAX UINT16_MAX
+
 typedef uint16_t arch_ticks_t; /* exactly 16 bits */
 #define ARCH_TICKS_MAX ((arch_ticks_t)UINT16_MAX)
 typedef uint16_t arch_criticalstate_t; /* size of CPU status register */
+
+typedef uint8_t arch_bitmask_t;
+#define ARCH_BITFIELD_MAX ((size_t)((sizeof(arch_bitmask_t) * 8)))
 
 #define OS_ISR __attribute__((naked)) ISR
 #define OS_NAKED __attribute__((naked))
@@ -82,6 +89,7 @@ typedef uint16_t arch_criticalstate_t; /* size of CPU status register */
 #define OS_UNUSED(_x) unused_ ## _x __attribute__((unused))
 #define OS_RESTRICT __restrict__
 #define OS_PROGMEM
+#define OS_PROGMEM_STR(_s) (_s)
 #define OS_TASKSTACK uint8_t __attribute__ ((aligned (2)))
 
 #define OS_STACK_DESCENDING

@@ -80,7 +80,7 @@ typedef uint8_t arch_criticalstate_t; /* size of AVR status register */
 /* the largest sane type for bit field operations on 8bit CPU. We could try
  * extend that */
 typedef uint8_t arch_bitmask_t;
-#define ARCH_BITFIELD_MAX ((size_t)8)
+#define ARCH_BITFIELD_MAX ((size_t)((sizeof(arch_bitmask_t) * 8)))
 
 /* for ISR we use following attributes:
  * - naked - since we provide own register save-restore macros

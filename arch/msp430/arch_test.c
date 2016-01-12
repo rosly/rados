@@ -29,13 +29,15 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <os_test.h>
-#include <os_private.h>
+#include "os_private.h"
+#include "os_test.h"
 
 test_tick_clbck_t test_tick_clbck = NULL;
 
 /* for documentation check os_test.h */
-void test_debug_printf(const char* format, ...)
+void test_debug_printf(
+   const char* OS_UNUSED(format),
+   ...)
 {
 }
 
@@ -45,23 +47,26 @@ void test_result(int result)
    arch_criticalstate_t cristate;
 
    if(0 == result) {
-      test_debug_printf("%s: Test PASSED\n", test_name);
+      test_debug("Test PASSED");
    } else {
-      test_debug_printf("%s: Test FAILURE\n", test_name);
+      test_debug("Test FAILURE");
    }
 
    arch_critical_enter(cristate);
    arch_halt();
+   /* dead code */
+   arch_critical_exit(cristate); /* just to suppress the compiler warning */
 }
 
 /* for documentation check os_test.h */
-void test_setupmain(const char* name)
+void test_setupmain(const char* OS_UNUSED(name))
 {
    test_assert(0); /* missing implementation */
 }
 
 /* for documentation check os_test.h */
-void test_setuptick(test_tick_clbck_t clbck, unsigned long nsec)
+void test_setuptick(test_tick_clbck_t OS_UNUSED(clbck),
+		    unsigned long OS_UNUSED(nsec))
 {
    test_assert(0); /* missing implementation */
 }

@@ -54,16 +54,9 @@
 #endif
 
 #ifdef OS_CONFIG_SELFCHECKING
-/** Macro verify internal OS state which is not directly dependent on API
- * parameters */
-#define OS_SELFCHECK_ASSERT(_cond) \
-   do \
-   { \
-      if( OS_UNLIKELY(!(_cond)) ) \
-      { \
-         os_halt(); \
-      } \
-   }while(0)
+/** Macro verify internal OS conditions or states, which are not directly
+ * dependent on API parameters */
+#define OS_SELFCHECK_ASSERT(_cond) OS_ASSERT(_cond)
 #else
 #define OS_SELFCHECK_ASSERT
 #endif

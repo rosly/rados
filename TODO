@@ -34,6 +34,10 @@ Performance:
                                             - maximal cycles count of critical sections
                                             - cycles for task enqueue (make_ready) 
                                               and top prio task dequeue
+- (generic code) Low      - Optimize code inside timer module, instead of incrementing 
+                            and comparing tick_unsynch to first timer we should 
+                            copy it from first timer, decrement each tick and
+                            compare to 0 (more efficient for most arch) 
 
 Features:
 - (msg_queues)     MEDIUM - lock less message queues in form of library similar
@@ -45,6 +49,16 @@ Features:
 - (MSP430 & AVR)   MEDIUM - CPU sleep states for arch_idle(), best in MCU
                             agnostic way
 - (scheduler)      HIGH   - Proto-threads (task's that share the same stack)
+
+Mics:
+- (various places) LOW    - Code style checking tool integration into makefile
+                            (indent, clang-format, uncrustify)
+                            indent -linux -nut -i3
+- (various places) LOW    - Remove code redundancy
+- (various places) LOW    - move OS_LIKELY/OS_UNLIKELY to os_private.h
+- (various places) LOW    - move test_assert() to generic ???
+- (various places) LOW    - Integration with C++ (extern "C" {} etc.)
+- (various places) LOW    - C++ wrapers for OS API (classes for OS primitives)
 
 New platforms:
 - ARM Cortex M0 and M3

@@ -40,7 +40,7 @@ static void os_sem_timerclbck(void* param);
 void os_sem_create(os_sem_t* sem, os_atomic_t init_value)
 {
    OS_ASSERT(init_value < OS_ATOMIC_MAX);
-   OS_ASSERT(NULL == waitqueue_current); /* cannot call after os_waitqueue_prepare() */
+   OS_ASSERT(!waitqueue_current); /* cannot call after os_waitqueue_prepare() */
 
    memset(sem, 0, sizeof(os_sem_t));
    os_taskqueue_init(&(sem->task_queue));
@@ -53,12 +53,12 @@ void os_sem_destroy(os_sem_t* sem)
    os_task_t *task;
 
    OS_ASSERT(0 == isr_nesting); /* cannot call from ISR */
-   OS_ASSERT(NULL == waitqueue_current); /* cannot call after os_waitqueue_prepare() */
+   OS_ASSERT(!waitqueue_current); /* cannot call after os_waitqueue_prepare() */
 
    arch_critical_enter(cristate);
 
    /* wake up all task which suspended on semaphore */
-   while (NULL != (task = os_taskqueue_dequeue(&(sem->task_queue))))
+   while ((task = os_taskqueue_dequeue(&(sem->task_queue))))
    {
       os_blocktimer_destroy(task); /* destroy the tasks timer */
       task->block_code = OS_DESTROYED;
@@ -85,7 +85,7 @@ os_retcode_t OS_WARN_UNUSEDRET os_sem_down(
 
    OS_ASSERT(0 == isr_nesting); /* cannot call from ISR */
    OS_ASSERT(task_current != &task_idle); /* idle task cannot call blocking functions (will crash OS) */
-   OS_ASSERT(NULL == waitqueue_current); /* cannot call after os_waitqueue_prepare() */
+   OS_ASSERT(!waitqueue_current); /* cannot call after os_waitqueue_prepare() */
    OS_ASSERT(true == list_is_empty(&task_current->mtx_list)); /* calling of blocking function while holding mtx will cause priority inversion */
 
    /* critical section needed because: timers, ISR sem_up(), operating on
@@ -158,7 +158,7 @@ void os_sem_up_sync(os_sem_t* sem, bool sync)
 
    /* sync must be == false in case we are called from ISR */
    OS_ASSERT((isr_nesting == 0) || (sync == false));
-   OS_ASSERT(NULL == waitqueue_current); /* cannot call after os_waitqueue_prepare() */
+   OS_ASSERT(!waitqueue_current); /* cannot call after os_waitqueue_prepare() */
 
    arch_critical_enter(cristate);
 
@@ -167,7 +167,7 @@ void os_sem_up_sync(os_sem_t* sem, bool sync)
 
    /* check if there are some suspended tasks on this sem */
    task = os_taskqueue_dequeue(&(sem->task_queue));
-   if (NULL == task)
+   if (!task)
    {
       /* there was no suspended tasks, in this case just increment the sem value */
       ++(sem->value);

@@ -161,7 +161,7 @@ void OS_HOT os_timer_tick(void)
 
    /* handle the timer list */
    head = list_peekfirst(&timers);
-   if (NULL == head) {
+   if (!head) {
       /* if there is no timers in queue we can safely reset unsynch and no timer
        * actions is needed */
       timer_tick_unsynch = 0;
@@ -246,7 +246,7 @@ static void OS_HOT os_timer_triger(void)
     * We need a temporary list because we keep all timers sorted, and we cannot
     * figure out the position of timers which we auto reload until we finish
     * processing of previous trigger sequence */
-   while (NULL != (itr = list_detachfirst(&list_autoreload)))
+   while ((itr = list_detachfirst(&list_autoreload)))
    {
       itr_timer = os_container_of(itr, os_timer_t, list);
       itr_timer->ticks_rem = itr_timer->ticks_reload;

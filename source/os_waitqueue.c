@@ -42,7 +42,7 @@ static void os_waitqueue_timerclbck(void* param);
 
 void os_waitqueue_create(os_waitqueue_t* queue)
 {
-   OS_ASSERT(NULL == waitqueue_current); /* cannot call after os_waitqueue_prepare() */
+   OS_ASSERT(!waitqueue_current); /* cannot call after os_waitqueue_prepare() */
 
    memset(queue, 0, sizeof(os_waitqueue_t));
    os_taskqueue_init(&(queue->task_queue));
@@ -53,12 +53,12 @@ void os_waitqueue_destroy(os_waitqueue_t* queue)
    arch_criticalstate_t cristate;
    os_task_t *task;
 
-   OS_ASSERT(NULL == waitqueue_current); /* cannot call after os_waitqueue_prepare() */
+   OS_ASSERT(!waitqueue_current); /* cannot call after os_waitqueue_prepare() */
 
    arch_critical_enter(cristate);
 
    /* wake up all task which suspended on wait_queue */
-   while (NULL != (task = os_taskqueue_dequeue(&(queue->task_queue))))
+   while ((task = os_taskqueue_dequeue(&(queue->task_queue))))
    {
       os_blocktimer_destroy(task); /* destroy the tasks timer */
       task->block_code = OS_DESTROYED;
@@ -87,7 +87,7 @@ void os_waitqueue_prepare(os_waitqueue_t *queue)
 
    /* check if task is not already subscribed on other wait_queue
     * currently we do not support waiting on multiple wait queues */
-   OS_ASSERT(NULL == waitqueue_current);
+   OS_ASSERT(!waitqueue_current);
 
    /* mark that we are prepared to suspend on wait_queue
     * some CPU platforms might not have atomic pointer association ops so we use
@@ -165,7 +165,7 @@ void os_waitqueue_wakeup_sync(
     * on wait_queue, with exception to ISR's which can interrupt task_current.
     * In this case waitqueue_current will be in 'prepared' state (we need to
     * handle that case) */
-   OS_ASSERT((isr_nesting > 0) || (NULL == waitqueue_current));
+   OS_ASSERT((isr_nesting > 0) || (!waitqueue_current));
    /* sync must be == false in case we are called from ISR */
    OS_ASSERT((isr_nesting == 0) || (sync == false));
    OS_ASSERT(nbr > 0); /* number of tasks to wake up must be > 0 */
@@ -207,7 +207,7 @@ void os_waitqueue_wakeup_sync(
       /* chose most prioritized task from wait_queue->task_queue (for task with
        * equal priority threat them in FIFO manner) */
       task = os_taskqueue_dequeue(&(queue->task_queue));
-      if (NULL == task)
+      if (!task)
       {
          /* there will be no more task to wake up, stop spinning */
          break;

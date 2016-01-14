@@ -249,7 +249,7 @@ int testcase_isr_wakeup_impl(
                       main ? "main" : "helper");
    os_waitqueue_prepare(waitqueue);
    os_waitqueue_break();
-   test_assert(NULL == task_current->timer);
+   test_assert(!task_current->timer);
 
    return 0;
 }

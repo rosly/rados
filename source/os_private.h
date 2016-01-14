@@ -193,7 +193,7 @@ static inline void os_blocktimer_create(
    timer_proc_t clbck,
    uint_fast16_t timeout_ticks)
 {
-   OS_SELFCHECK_ASSERT(NULL == task_current->timer);
+   OS_SELFCHECK_ASSERT(!task_current->timer);
 
    os_timer_create(timer, clbck, task_current, timeout_ticks, 0);
    task_current->timer = timer;
@@ -202,7 +202,7 @@ static inline void os_blocktimer_create(
 static inline void os_blocktimer_destroy(os_task_t *task)
 {
    /* check if there is a timeout associated with task */
-   if (NULL != task->timer)
+   if (task->timer)
    {
       os_timer_destroy(task->timer);
       task->timer = NULL;

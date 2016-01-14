@@ -154,7 +154,7 @@ static void os_mtx_unlock_prio_reset(void)
 void os_mtx_create(os_mtx_t* mtx)
 {
    OS_ASSERT(0 == isr_nesting); /* cannot operate on mtx from ISR */
-   OS_ASSERT(NULL == waitqueue_current); /* cannot call after os_waitqueue_prepare() */
+   OS_ASSERT(!waitqueue_current); /* cannot call after os_waitqueue_prepare() */
 
    memset(mtx, 0, sizeof(os_mtx_t));
    os_taskqueue_init(&(mtx->task_queue));
@@ -166,12 +166,12 @@ void os_mtx_destroy(os_mtx_t* mtx)
    os_task_t *task;
 
    OS_ASSERT(0 == isr_nesting); /* cannot operate on mtx from ISR */
-   OS_ASSERT(NULL == waitqueue_current); /* cannot call after os_waitqueue_prepare() */
+   OS_ASSERT(!waitqueue_current); /* cannot call after os_waitqueue_prepare() */
 
    arch_critical_enter(cristate);
 
    /* check if mtx is locked */
-   if (NULL != mtx->owner)
+   if (mtx->owner)
    {
       /* in case mutex was locked, than only owner can destroy it */
       OS_ASSERT(mtx->owner == task_current);
@@ -185,7 +185,7 @@ void os_mtx_destroy(os_mtx_t* mtx)
 #endif
 
       /* wake up all tasks from mtx->task_queue */
-      while (NULL != (task = os_taskqueue_dequeue(&(mtx->task_queue))))
+      while ((task = os_taskqueue_dequeue(&(mtx->task_queue))))
       {
          task->block_code = OS_DESTROYED;
          os_task_makeready(task);
@@ -205,7 +205,7 @@ os_retcode_t OS_WARN_UNUSEDRET os_mtx_lock(os_mtx_t* mtx)
 
    OS_ASSERT(0 == isr_nesting); /* cannot operate on mtx from ISR */
    OS_ASSERT(task_current != &task_idle); /* IDLE task cannot call blocking functions (will crash OS) */
-   OS_ASSERT(NULL == waitqueue_current); /* cannot call after os_waitqueue_prepare() */
+   OS_ASSERT(!waitqueue_current); /* cannot call after os_waitqueue_prepare() */
 
    arch_critical_enter(cristate);
    do
@@ -214,7 +214,7 @@ os_retcode_t OS_WARN_UNUSEDRET os_mtx_lock(os_mtx_t* mtx)
         * maybe we should check fo mutex initialization status here and return
         * proper code in this case */
 
-      if (NULL == mtx->owner)
+      if (!mtx->owner)
       {
          /* mutex unlocked, lock and take ownership */
          os_mtx_set_owner(mtx, task_current);
@@ -262,7 +262,7 @@ void os_mtx_unlock(os_mtx_t* mtx)
 
    OS_ASSERT(0 == isr_nesting); /* cannot operate on mtx from ISR */
    OS_ASSERT(mtx->owner == task_current);/* only owner can unlock the mutex */
-   OS_ASSERT(NULL == waitqueue_current); /* cannot call after os_waitqueue_prepare() */
+   OS_ASSERT(!waitqueue_current); /* cannot call after os_waitqueue_prepare() */
 
    arch_critical_enter(cristate);
    do
@@ -284,7 +284,7 @@ void os_mtx_unlock(os_mtx_t* mtx)
       /* since we unlocking the mtx we need to transfer the ownership to top
        * prio task which sleeps on this mtx. See comment 1 */
       task = os_taskqueue_dequeue(&(mtx->task_queue));
-      if (NULL != task)
+      if (task)
       {
          os_mtx_set_owner(mtx, task); /* lock and set ownership */
          task->block_code = OS_OK; /* set the block code to NORMAL WAKEUP */

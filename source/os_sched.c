@@ -87,7 +87,7 @@ static void os_task_init(os_task_t* task, uint_fast8_t prio);
 void os_scheduler_lock(void)
 {
    OS_ASSERT(0 == isr_nesting); /* cannot call from ISR */
-   OS_ASSERT(NULL == waitqueue_current); /* cannot call after os_waitqueue_prepare() */
+   OS_ASSERT(!waitqueue_current); /* cannot call after os_waitqueue_prepare() */
 
    os_scheduler_intlock();
 }
@@ -95,7 +95,7 @@ void os_scheduler_lock(void)
 void os_scheduler_unlock(bool sync)
 {
    OS_ASSERT(0 == isr_nesting); /* cannot call from ISR */
-   OS_ASSERT(NULL == waitqueue_current); /* cannot call after os_waitqueue_prepare() */
+   OS_ASSERT(!waitqueue_current); /* cannot call after os_waitqueue_prepare() */
 
    os_scheduler_intunlock(sync);
 }
@@ -167,9 +167,9 @@ void os_task_create(
    OS_ASSERT(0 == isr_nesting); /* cannot create task from ISR */
    OS_ASSERT(prio < OS_CONFIG_PRIOCNT); /* prio must be less than prio config limit */
    OS_ASSERT(prio > 0); /* only idle task may have the prio 0 */
-   OS_ASSERT(NULL != stack); /* stack must be given */
+   OS_ASSERT(stack); /* stack must be given */
    OS_ASSERT(stack_size >= OS_STACK_MINSIZE); /* minimal size for stack */
-   OS_ASSERT(NULL == waitqueue_current); /* cannot call after os_waitqueue_prepare() */
+   OS_ASSERT(!waitqueue_current); /* cannot call after os_waitqueue_prepare() */
 
    os_task_init(task, prio);
 
@@ -194,10 +194,10 @@ int os_task_join(os_task_t *task)
    OS_ASSERT(0 == isr_nesting); /* cannot join tasks from ISR */
    /* idle task cannot call blocking functions (will crash OS) */
    OS_ASSERT(task_current != &task_idle);
-   OS_ASSERT(NULL == waitqueue_current); /* cannot call after os_waitqueue_prepare() */
+   OS_ASSERT(!waitqueue_current); /* cannot call after os_waitqueue_prepare() */
 
    arch_critical_enter(cristate);
-   OS_ASSERT(NULL == task->join_sem); /* only one task is allowed to wait for particular task */
+   OS_ASSERT(!task->join_sem); /* only one task is allowed to wait for particular task */
    OS_ASSERT(TASKSTATE_INVALID != task->state); /* task can be joined only once */
    /* check if task have finished (does it called os_task_exit()) ? */
    if (task->state < TASKSTATE_DESTROYED)
@@ -227,7 +227,7 @@ void os_yield(void)
 {
    OS_ASSERT(0 == isr_nesting); /* cannot join tasks from ISR */
    OS_ASSERT(task_current != &task_idle); /* idle task cannot call os_yield() */
-   OS_ASSERT(NULL == waitqueue_current); /* cannot call after os_waitqueue_prepare() */
+   OS_ASSERT(!waitqueue_current); /* cannot call after os_waitqueue_prepare() */
 
    arch_criticalstate_t cristate;
 
@@ -487,7 +487,7 @@ void OS_HOT os_schedule(uint_fast8_t higher_prio)
          &ready_queue, task_current->prio_current + higher_prio);
 
       /* we will get NULL in case all READY tasks have lower priority */
-      if (NULL != new_task)
+      if (new_task)
       {
          /* since we have new task, task_current need to be pushed to
           * ready-queue */
@@ -557,7 +557,7 @@ void OS_NORETURN OS_COLD os_task_exit(int retv)
 
    /* if some task is waiting for this task, we signalize the join semaphore.
     * This will wake up the waiting task in os_task_join() */
-   if (NULL != task_current->join_sem)
+   if (task_current->join_sem)
    {
 
       /* since after join, master task will probably remove the current task

@@ -283,8 +283,8 @@ low address
 
 #ifdef __AVR_HAVE_RAMPZ__
 # define arch_push_rampz \
-        "in r16, __RAMPZ__"      "\n\t" \
-        "push r16"               "\n\t"
+        "in r16, __RAMPZ__        \n\t" \
+        "push r16                 \n\t"
 #else
 # define arch_push_rampz
 #endif
@@ -314,85 +314,85 @@ low address
 # define arch_contextstore_i(_isrName) \
     __asm__ __volatile__ ( \
         /* store r16 and use it as temporary register */ \
-        "push    r16"           "\n\t" \
+        "push    r16             \n\t" \
         /* on AVR interrupts will be masked when entering ISR                   \
          * but since we entered ISR it means that they where enabled.           \
          * Therefore we need to save the content of SREG as if global interrupt \
          * flag was set. using sbr r16, 0x80 for that */ \
-        "in      r16, __SREG__" "\n\t" \
-        "sbr     r16, 0x80"     "\n\t" \
-        "push    r16"           "\n\t" \
+        "in      r16, __SREG__   \n\t" \
+        "sbr     r16, 0x80       \n\t" \
+        "push    r16             \n\t" \
         /* push RAMPZ if pressent */   \
         arch_push_rampz                \
         /* store remain registers */   \
         /* gcc uses Y as frame register, it will be easier if we store it \
          * first */ \
-        "push    r28"           "\n\t" \
-        "push    r29"           "\n\t" \
+        "push    r28             \n\t" \
+        "push    r29             \n\t" \
         /* gcc treats r2-r17 as call-saved registers, if we store them first * \
          * then arch_context_switch can be optimized */ \
-        "push    r0"            "\n\t" \
-        "push    r1"            "\n\t" \
-        "push    r2"            "\n\t" \
-        "push    r3"            "\n\t" \
-        "push    r4"            "\n\t" \
-        "push    r5"            "\n\t" \
-        "push    r6"            "\n\t" \
-        "push    r7"            "\n\t" \
-        "push    r8"            "\n\t" \
-        "push    r9"            "\n\t" \
-        "push    r10"           "\n\t" \
-        "push    r11"           "\n\t" \
-        "push    r12"           "\n\t" \
-        "push    r13"           "\n\t" \
-        "push    r14"           "\n\t" \
-        "push    r15"           "\n\t" \
+        "push    r0              \n\t" \
+        "push    r1              \n\t" \
+        "push    r2              \n\t" \
+        "push    r3              \n\t" \
+        "push    r4              \n\t" \
+        "push    r5              \n\t" \
+        "push    r6              \n\t" \
+        "push    r7              \n\t" \
+        "push    r8              \n\t" \
+        "push    r9              \n\t" \
+        "push    r10             \n\t" \
+        "push    r11             \n\t" \
+        "push    r12             \n\t" \
+        "push    r13             \n\t" \
+        "push    r14             \n\t" \
+        "push    r15             \n\t" \
         /* skip  r16 - already saved */ \
-        "push    r17"           "\n\t" \
-        "push    r18"           "\n\t" \
-        "push    r19"           "\n\t" \
-        "push    r20"           "\n\t" \
-        "push    r21"           "\n\t" \
-        "push    r22"           "\n\t" \
-        "push    r23"           "\n\t" \
-        "push    r24"           "\n\t" \
-        "push    r25"           "\n\t" \
-        "push    r26"           "\n\t" \
-        "push    r27"           "\n\t" \
-        "push    r30"           "\n\t" \
-        "push    r31"           "\n\t" \
+        "push    r17             \n\t" \
+        "push    r18             \n\t" \
+        "push    r19             \n\t" \
+        "push    r20             \n\t" \
+        "push    r21             \n\t" \
+        "push    r22             \n\t" \
+        "push    r23             \n\t" \
+        "push    r24             \n\t" \
+        "push    r25             \n\t" \
+        "push    r26             \n\t" \
+        "push    r27             \n\t" \
+        "push    r30             \n\t" \
+        "push    r31             \n\t" \
         /* increment isr_nesting */ \
-        "lds     r16, isr_nesting" "\n\t" \
-        "inc     r16"              "\n\t" \
-        "sts     isr_nesting, r16" "\n\t" \
+        "lds     r16, isr_nesting   \n\t" \
+        "inc     r16                \n\t" \
+        "sts     isr_nesting, r16   \n\t" \
         /* prepare frame pointer for future C code (usual ISR prolog skipped \
          * since OS_ISR was used */ \
-        "in      r28, __SP_L__" "\n\t" /* load SPL into r28 (means Ya) */ \
-        "in      r29, __SP_H__" "\n\t" /* load SPH into r29 (means Yb) */ \
-        "eor     r1, r1"        "\n\t" /* clear r1 */ \
+        "in      r28, __SP_L__   \n\t" /* load SPL into r28 (means Ya) */ \
+        "in      r29, __SP_H__   \n\t" /* load SPH into r29 (means Yb) */ \
+        "eor     r1, r1          \n\t" /* clear r1 */ \
         /* skip SP update if isr_nesting != 1 */ \
-        "cpi     r16, 1"         "\n\t" \
+        "cpi     r16, 1           \n\t" \
         "brne    isr_contextstore_nested_%=\n\t" \
         /* store SP into task_current->ctx */ \
-        "lds     r30, task_current"  "\n\t"  /* load Z with current_task pointer */ \
-        "lds     r31, task_current+1" "\n\t"  /* load Z with current_task pointer */ \
-        "st      Z,   r28"      "\n\t"   /* store SPL into *(task_current) */ \
-        "std     Z+1, r29"      "\n\t"   /* store SPH into *(task_current) */ \
+        "lds     r30, task_current    \n\t"  /* load Z with current_task pointer */ \
+        "lds     r31, task_current+1   \n\t"  /* load Z with current_task pointer */ \
+        "st      Z,   r28        \n\t"   /* store SPL into *(task_current) */ \
+        "std     Z+1, r29        \n\t"   /* store SPH into *(task_current) */ \
      "isr_contextstore_nested_%=:\n\t" \
         :: )
 #else
 #define arch_contextstore_i(_isrName) \
 #error CPUs with extended memory registers are not supported yet
 /*      "in r0,_SFR_IO_ADDR(RAMPZ)\n\t"
-        "push r0"               "\n\t"
+        "push r0                 \n\t"
         "in r0,_SFR_IO_ADDR(EIND)\n\t"
-        "push r0"               "\n\t" */
+        "push r0                 \n\t" */
 #endif
 
 #ifdef __AVR_HAVE_RAMPZ__
 # define arch_pop_rampz \
-        "pop r16"               "\n\t" \
-        "out __RAMPZ__, r16"    "\n\t"
+        "pop r16                 \n\t" \
+        "out __RAMPZ__, r16      \n\t"
 #else
 # define arch_pop_rampz
 #endif
@@ -410,92 +410,92 @@ low address
 #define arch_contextrestore_i(_isrName) \
     __asm__ __volatile__ ( \
         /* disable interrupts in case we add nesting interrupt support */ \
-        "cli"                         "\n\t" \
+        "cli                           \n\t" \
         /* decrement isr_nesting */ \
-        "lds     r16, isr_nesting"    "\n\t" \
-        "dec     r16"                 "\n\t" \
-        "sts     isr_nesting, r16"    "\n\t" \
+        "lds     r16, isr_nesting      \n\t" \
+        "dec     r16                   \n\t" \
+        "sts     isr_nesting, r16      \n\t" \
         /* check isr_nesting and skip restoring of SP if isr_nesting != 0 */ \
         "brne    isr_contextrestore_nested_%=\n\t" \
         /* restore SP from task_current->ctx */ \
-        "lds     r30, task_current"   "\n\t" /* load Z with curent_task pointer */ \
-        "lds     r31, task_current+1" "\n\t" /* load Z with curent_task pointer */ \
-        "ld      r16, Z"              "\n\t" /* load SPL from *(task_current) */ \
-        "ldd     r17, Z+1"            "\n\t" /* load SPH from *(task_current) */ \
-        "out     __SP_L__, r16"       "\n\t" /* save SPL */ \
-        "out     __SP_H__, r17"       "\n\t" /* save SPH */ \
+        "lds     r30, task_current     \n\t" /* load Z with curent_task pointer */ \
+        "lds     r31, task_current+1   \n\t" /* load Z with curent_task pointer */ \
+        "ld      r16, Z                \n\t" /* load SPL from *(task_current) */ \
+        "ldd     r17, Z+1              \n\t" /* load SPH from *(task_current) */ \
+        "out     __SP_L__, r16         \n\t" /* save SPL */ \
+        "out     __SP_H__, r17         \n\t" /* save SPH */ \
      "isr_contextrestore_nested_%=:\n\t" \
         /* restore all register */ \
-        "pop    r31"                 "\n\t" \
-        "pop    r30"                 "\n\t" \
-        "pop    r27"                 "\n\t" \
-        "pop    r26"                 "\n\t" \
-        "pop    r25"                 "\n\t" \
-        "pop    r24"                 "\n\t" \
-        "pop    r23"                 "\n\t" \
-        "pop    r22"                 "\n\t" \
-        "pop    r21"                 "\n\t" \
-        "pop    r20"                 "\n\t" \
-        "pop    r19"                 "\n\t" \
-        "pop    r18"                 "\n\t" \
-        "pop    r17"                 "\n\t" \
+        "pop    r31                   \n\t" \
+        "pop    r30                   \n\t" \
+        "pop    r27                   \n\t" \
+        "pop    r26                   \n\t" \
+        "pop    r25                   \n\t" \
+        "pop    r24                   \n\t" \
+        "pop    r23                   \n\t" \
+        "pop    r22                   \n\t" \
+        "pop    r21                   \n\t" \
+        "pop    r20                   \n\t" \
+        "pop    r19                   \n\t" \
+        "pop    r18                   \n\t" \
+        "pop    r17                   \n\t" \
         /* skip r16 - will pop later */ \
-        "pop    r15"                 "\n\t" \
-        "pop    r14"                 "\n\t" \
-        "pop    r13"                 "\n\t" \
-        "pop    r12"                 "\n\t" \
-        "pop    r11"                 "\n\t" \
-        "pop    r10"                 "\n\t" \
-        "pop    r9"                  "\n\t" \
-        "pop    r8"                  "\n\t" \
-        "pop    r7"                  "\n\t" \
-        "pop    r6"                  "\n\t" \
-        "pop    r5"                  "\n\t" \
-        "pop    r4"                  "\n\t" \
-        "pop    r3"                  "\n\t" \
-        "pop    r2"                  "\n\t" \
-        "pop    r1"                  "\n\t" \
-        "pop    r0"                  "\n\t" \
-        "pop    r29"                 "\n\t" \
-        "pop    r28"                 "\n\t" \
+        "pop    r15                   \n\t" \
+        "pop    r14                   \n\t" \
+        "pop    r13                   \n\t" \
+        "pop    r12                   \n\t" \
+        "pop    r11                   \n\t" \
+        "pop    r10                   \n\t" \
+        "pop    r9                    \n\t" \
+        "pop    r8                    \n\t" \
+        "pop    r7                    \n\t" \
+        "pop    r6                    \n\t" \
+        "pop    r5                    \n\t" \
+        "pop    r4                    \n\t" \
+        "pop    r3                    \n\t" \
+        "pop    r2                    \n\t" \
+        "pop    r1                    \n\t" \
+        "pop    r0                    \n\t" \
+        "pop    r29                   \n\t" \
+        "pop    r28                   \n\t" \
         /* pop RAMPZ if pressent */         \
         arch_pop_rampz                      \
         /* in popped SEG, I bit may be either set or cleared depending if popped \
          * task had interrupts disabled (was switched out by internal OS call) \
          * or enabled (switched out by os_tick() from interrupt */ \
-        "pop    r16"                 "\n\t" \
+        "pop    r16                   \n\t" \
         /* check if interrupts should be enabled after return, if not then we \
          * must use ret instead of reti, cause reti always enables interrupts \
          * interrupts must stay disabled if picked task to which we are switching \
          * now was pushed by arch_context_switch from inside of critical section \
          * of OS */ \
-        "sbrc   r16, 7"              "\n\t" \
+        "sbrc   r16, 7                \n\t" \
         "rjmp   isr_contextrestore_enableint_%=\n\t" \
-        "out    __SREG__, r16"       "\n\t" \
-        "pop    r16"                 "\n\t" \
+        "out    __SREG__, r16         \n\t" \
+        "pop    r16                   \n\t" \
         /* we will not get interrupt here even if we modify SREG and 2 \
          * instruction passed, since we know that I bit in SREG is disabled */ \
-        "ret"                        "\n\t" \
+        "ret                          \n\t" \
      "isr_contextrestore_enableint_%=:\n\t" \
         /* here we know that I bit in SREG is enabled, we must enable interrupts * \
          * after return, but since between updating SREG and return we will have * \
          * more than 2 instructions we need to temporarily disable the I bit and * \
          * enable interrupts by reti */ \
-        "cbr r16, 0x80"              "\n\t" \
-        "out    __SREG__, r16"       "\n\t" \
-        "pop    r16"                 "\n\t" \
+        "cbr r16, 0x80                \n\t" \
+        "out    __SREG__, r16         \n\t" \
+        "pop    r16                   \n\t" \
         /* since we return by reti, always one more instruction is executed \
          * after reti and we can use ISR's to implement OS single stepping \
          * debugger */ \
-        "reti"                       "\n\t" \
+        "reti                         \n\t" \
         :: )
 #else
 #define arch_contextrestore_i(_isrName) \
 #error CPUs with extended memory registers are not supported yet
-/*      "pop r0"                     "\n\t" \
-        "in r0,_SFR_IO_ADDR(EIND)"   "\n\t" \
-        "pop r0"                     "\n\t" \
-        "in r0,_SFR_IO_ADDR(RAMPZ)"  "\n\t" */
+/*      "pop r0                       \n\t" \
+        "in r0,_SFR_IO_ADDR(EIND)     \n\t" \
+        "pop r0                       \n\t" \
+        "in r0,_SFR_IO_ADDR(RAMPZ)    \n\t" */
 #endif
 
 #endif /* __OS_PORT_ */

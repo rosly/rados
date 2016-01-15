@@ -63,10 +63,9 @@ void test_idle(void)
    test_result(0);
 }
 
-int task1_proc(void* OS_UNUSED(param))
+int task1_proc(void *OS_UNUSED(param))
 {
-   while ((cnt1) < TEST_CYCLES)
-   {
+   while ((cnt1) < TEST_CYCLES) {
       (cnt1)++;
       os_yield();
       test_assert(cnt1 == cnt2);
@@ -75,10 +74,9 @@ int task1_proc(void* OS_UNUSED(param))
    return 0;
 }
 
-int task2_proc(void* OS_UNUSED(param))
+int task2_proc(void *OS_UNUSED(param))
 {
-   while ((cnt2) < TEST_CYCLES)
-   {
+   while ((cnt2) < TEST_CYCLES) {
       (cnt2)++;
       os_yield();
    }

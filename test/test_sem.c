@@ -63,7 +63,7 @@ void idle(void)
 /**
  * test procedure for os_sem_down with timeout
  */
-int task_proc(void* param)
+int task_proc(void *param)
 {
    int ret;
    task_data_t *data = (task_data_t*)param;
@@ -85,7 +85,7 @@ int task_proc(void* param)
 /**
  * test procedure for test1 task1
  */
-int test1_task_proc1(void* OS_UNUSED(param))
+int test1_task_proc1(void *OS_UNUSED(param))
 {
    int ret;
 
@@ -98,11 +98,12 @@ int test1_task_proc1(void* OS_UNUSED(param))
 /**
  * test procedure for test1 task2
  */
-int test1_task_proc2(void* OS_UNUSED(param))
+int test1_task_proc2(void *OS_UNUSED(param))
 {
    int ret;
 
-   /* wait until timeout - (if still exist the bug will not update the priomax while wakup by timeout) */
+   /* wait until timeout - (if still exist the bug will not update the priomax
+    * while wakup by timeout) */
    ret = os_sem_down(&(worker_tasks[0].sem), 10);
    test_assert(OS_TIMEOUT == ret);
    /* signalize the same sem to wake up the task1 */
@@ -120,7 +121,7 @@ int testcase_1(void)
    memset(worker_tasks, 0, sizeof(worker_tasks));
 
    /* create tasks */
-   for(i = 0; i < TEST_TASKS; i++) {
+   for (i = 0; i < TEST_TASKS; i++) {
       worker_tasks[i].idx = i + 1;
       os_sem_create(&(worker_tasks[i].sem), 0);
       os_task_create(
@@ -131,7 +132,7 @@ int testcase_1(void)
 
    /* join tasks and collect the results */
    ret = 0;
-   for(i = 0; i < TEST_TASKS; i++) {
+   for (i = 0; i < TEST_TASKS; i++) {
       ret = os_task_join(&(worker_tasks[i].task));
       test_assert(0 == ret);
       ret = worker_tasks[i].result ? 0 : 1;
@@ -166,25 +167,24 @@ int testcase_regresion(void)
 /**
  * The main task for tests manage
  */
-int task_main_proc(void* OS_UNUSED(param))
+int task_main_proc(void *OS_UNUSED(param))
 {
    int ret;
 
-   do
-   {
+   do {
       ret = testcase_1();
-      if(ret) {
+      if (ret) {
          test_debug("Testcase 1 failure");
          break;
       }
 
       ret = testcase_regresion();
-      if(ret) {
+      if (ret) {
          test_debug("Testcase regresion failure");
          break;
       }
 
-   } while(0);
+   } while (0);
 
    test_result(ret);
    return 0;

@@ -45,17 +45,30 @@ static os_sem_t sem2;
 static sig_atomic_t task1_i = 0;
 static sig_atomic_t task2_i = 0;
 
-void sig_alrm(int signum, siginfo_t *siginfo, void *ucontext);
+void sig_alrm(
+   int signum,
+   siginfo_t *siginfo,
+   void *ucontext);
 static timer_t timer;
 
 /* test for OS port
-- test if task_procedure is called and if it can block on semaphore, test if idle procedure will be called (because of task block)
-- create two tasks and two semaphores and test if task can be switched betwen each other while blocking on sem and signalizing the oposite, this will test if context swithichg is working
-- two task with endles loop, add timer ISR and call os_tick inside, task should switch during tiemr ISR
-- create two tasks and two semaphores, tasks should block on sem, the semaphores should be signalized by timer ISR, by driving the timer freq all tree types of switching may be tested, intresting case is when timer is generated eah CPU cycle (can be used to test the critical sections)
-*/
+ *  - test if task_procedure is called and if it can block on semaphore, test if
+ *    idle procedure will be called (because of task block)
+ *  - create two tasks and two semaphores and test if task can be switched
+ *    betwen each other while blocking on sem and signalizing the oposite, this
+ *    will test if context swithichg is working
+ *  - two task with endles loop, add timer ISR and call os_tick inside, task
+ *    should switch during tiemr ISR
+ *  - create two tasks and two semaphores, tasks should block on sem, the
+ *    semaphores should be signalized by timer ISR, by driving the timer freq
+ *    all tree types of switching may be tested, intresting case is when timer
+ *    is generated eah CPU cycle (can be used to test the critical sections)
+ */
 
-void OS_ISR sig_alrm(int OS_UNUSED(signum), siginfo_t * OS_UNUSED(siginfo), void *ucontext)
+void OS_ISR sig_alrm(
+   int OS_UNUSED(signum),
+   siginfo_t *OS_UNUSED(siginfo),
+   void *ucontext)
 {
    arch_contextstore_i(sig_alrm);
    os_sem_up(&sem1);
@@ -69,13 +82,12 @@ void idle(void)
    /* do nothing */
 }
 
-int task1_proc(void* param)
+int task1_proc(void *param)
 {
    os_retcode_t ret;
 
    param = param;
-   while(1)
-   {
+   while (1) {
       task1_i++;
       //os_sem_up(&sem2);
       ret = os_sem_down(&sem1, OS_TIMEOUT_INFINITE);
@@ -83,19 +95,18 @@ int task1_proc(void* param)
    }
 }
 
-int task2_proc(void* param)
+int task2_proc(void *param)
 {
    os_retcode_t ret;
 
    param = param;
-   while(1)
-   {
+   while (1) {
       task2_i++;
       //os_sem_up(&sem1);
       ret = os_sem_down(&sem2, OS_TIMEOUT_INFINITE);
       test_assert(OS_OK == ret);
 
-      if( 0 == (task2_i % 100) )
+      if ( 0 == (task2_i % 100) )
          test_debug("%d %d\n", task1_i, task2_i);
    }
 }
@@ -104,25 +115,30 @@ void init(void)
 {
    int ret;
    struct sigevent sev = {
-      .sigev_notify = SIGEV_SIGNAL,
-      .sigev_signo = SIGALRM,
+      .sigev_notify  = SIGEV_SIGNAL,
+      .sigev_signo   = SIGALRM,
    };
    struct itimerspec its = {
-      .it_interval = {
-         .tv_sec = 0,
-         .tv_nsec = 1,
+      .it_interval   ={
+         .tv_sec     = 0,
+         .tv_nsec    = 1,
       },
-      .it_value = {
-         .tv_sec = 0,
-         .tv_nsec = 1,
+      .it_value      ={
+         .tv_sec     = 0,
+         .tv_nsec    = 1,
       }
    };
    struct sigaction tick_sigaction = {
-      .sa_sigaction = sig_alrm,
-      .sa_mask = { { 0 } }, /* additional (beside the current signal) mask (they will be added to the mask instead of set) */
-      .sa_flags = SA_SIGINFO , /* use sa_sigaction instead of old sa_handler */
-      /* SA_NODEFER could be used if we would like to have the nesting enabled right durring the signal handler enter */
-      /* SA_ONSTACK could be sed if we would like to use the signal stack instead of task stack */
+      .sa_sigaction  = sig_alrm,
+      .sa_mask       = { { 0 } },   /* additional (beside the current signal)
+                                     * mask (they will be added to the mask
+                                     * instead of set) */
+      .sa_flags      = SA_SIGINFO,  /* use sa_sigaction instead of old
+                                     * sa_handler */
+      /* SA_NODEFER could be used if we would like to have the nesting enabled
+       * right durring the signal handler enter */
+      /* SA_ONSTACK could be sed if we would like to use the signal stack
+       * instead of task stack */
    };
 
    os_sem_create(&sem1, 0);

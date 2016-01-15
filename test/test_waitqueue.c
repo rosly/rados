@@ -96,16 +96,17 @@ void idle(void)
    /* nothing to do */
 }
 
-int sleeper_task_proc(void* param)
+int sleeper_task_proc(void *param)
 {
    sleeper_task_param_t *p = (sleeper_task_param_t*)param;
    os_retcode_t ret;
 
    test_verbose_debug("sleeper os_waitqueue_prepare()");
    os_waitqueue_prepare(p->waitqueue);
-   test_verbose_debug("sleeper os_waitqueue_wait(%s)",
-                      p->timeout == OS_TIMEOUT_INFINITE ? "TIMEOUT_INFINITE" :
-                      "some_timeout_val");
+   test_verbose_debug(
+      "sleeper os_waitqueue_wait(%s)",
+      p->timeout == OS_TIMEOUT_INFINITE ? "TIMEOUT_INFINITE" :
+      "some_timeout_val");
    ret = os_waitqueue_wait(p->timeout);
    sleeper_wokenup = true;
    test_assert(ret == (p->timeouted ? OS_TIMEOUT : OS_OK));
@@ -185,7 +186,10 @@ int testcase_task_wakeup(void)
  * timeout guard.
  */
 int testcase_isr_wakeup_impl(
-   bool main, os_waitqueue_t *waitqueue, bool wait, bool timeout)
+   bool main,
+   os_waitqueue_t *waitqueue,
+   bool wait,
+   bool timeout)
 {
    unsigned local_tick_cnt = 0;
    os_retcode_t ret;
@@ -194,15 +198,12 @@ int testcase_isr_wakeup_impl(
 
    os_waitqueue_prepare(waitqueue);
 
-   while(1)
-   {
-      if(local_tick_cnt != global_tick_cnt)
-      {
+   while (1) {
+      if (local_tick_cnt != global_tick_cnt) {
          test_verbose_debug("%s detected tick increase %u != %u",
                             main ? "main" : "helper",
                             local_tick_cnt, global_tick_cnt);
-         if (local_tick_cnt != 0)
-         {
+         if (local_tick_cnt != 0) {
             test_verbose_debug("%s exit from spin on condition",
                                main ? "main" : "helper");
             break; /* break after one tick */
@@ -211,8 +212,7 @@ int testcase_isr_wakeup_impl(
       }
    }
 
-   if (wait)
-   {
+   if (wait) {
       test_verbose_debug("%s calling os_waitqueue_wait()",
                          main ? "main" : "helper");
       ret = os_waitqueue_wait(5);
@@ -229,13 +229,11 @@ int testcase_isr_wakeup_impl(
    /* spin with yield() for some time to be able to test the OS status after
     * test will stabilize (all timeouts will burnoff IRS will wakeup etc) */
    test_verbose_debug("%s yield() loop for verification", main ? "main" : "helper");
-   while(1)
-   {
+   while (1) {
       os_yield();
       if (global_tick_cnt > 10)
          break;
-      if(local_tick_cnt != global_tick_cnt)
-      {
+      if (local_tick_cnt != global_tick_cnt) {
          test_verbose_debug("%s detected tick increase %u != %u",
                             main ? "main" : "helper",
                             local_tick_cnt, global_tick_cnt);
@@ -254,13 +252,17 @@ int testcase_isr_wakeup_impl(
    return 0;
 }
 
-int helper_task_proc(void* param)
+int helper_task_proc(void *param)
 {
    helper_task_param_t *p = (helper_task_param_t*)param;
+
    return testcase_isr_wakeup_impl(false, p->waitqueue, p->wait, p->timeout);
 }
 
-void start_helper_task(os_waitqueue_t *waitqueue, bool wait, bool timeout)
+void start_helper_task(
+   os_waitqueue_t *waitqueue,
+   bool wait,
+   bool timeout)
 {
    static helper_task_param_t param;
 
@@ -373,7 +375,7 @@ int testcase_isr_wakeup(void)
    return 0;
 }
 
-int victim_task_proc(void* param)
+int victim_task_proc(void *param)
 {
    victim_task_param_t *p = (victim_task_param_t*)param;
    os_retcode_t ret;
@@ -404,8 +406,7 @@ int testcase_destroy(void)
    os_sem_create(&sem, 0);
 
    test_verbose_debug("creating victim tasks");
-   for (i = 0; i < 3; i++)
-   {
+   for (i = 0; i < 3; i++) {
       param[i].waitqueue = &waitqueue;
       param[i].idx = i;
       param[i].wokenup = false;
@@ -424,8 +425,7 @@ int testcase_destroy(void)
    os_waitqueue_destroy(&waitqueue);
 
    test_verbose_debug("joining victim tasks");
-   for (i = 0; i < 3; i++)
-   {
+   for (i = 0; i < 3; i++) {
       ret = os_task_join(&task_victim[i]);
       test_assert(0 == ret);
       test_assert(true == param[i].wokenup);
@@ -436,13 +436,12 @@ int testcase_destroy(void)
    return 0;
 }
 
-int hiprio_task_proc(void* param)
+int hiprio_task_proc(void *param)
 {
    victim_task_param_t *p = (victim_task_param_t*)param;
    os_retcode_t ret;
 
-   do
-   {
+   do {
       test_verbose_debug("hiprio[%zu] os_waitqueue_prepare()", p->idx);
       os_waitqueue_prepare(p->waitqueue);
       test_verbose_debug("hiprio[%zu] os_waitqueue_wait(TIMEOUT_INFINITE)", p->idx);
@@ -470,8 +469,7 @@ int testcase_wakeup_hiprio(void)
    os_waitqueue_create(&waitqueue);
 
    test_verbose_debug("creating hiprio tasks");
-   for (i = 0; i < 2; i++)
-   {
+   for (i = 0; i < 2; i++) {
       param[i].waitqueue = &waitqueue;
       param[i].idx = i;
       param[i].wokenup = false;
@@ -486,8 +484,7 @@ int testcase_wakeup_hiprio(void)
    test_verbose_debug("waking up all hiprio");
    os_waitqueue_wakeup_sync(&waitqueue, OS_WAITQUEUE_ALL, false);
 
-   for (i = 0; i < 2; i++)
-   {
+   for (i = 0; i < 2; i++) {
       test_assert(true == param[i].wokenup);
       param[i].repeat = false;
    }
@@ -495,8 +492,7 @@ int testcase_wakeup_hiprio(void)
    os_waitqueue_wakeup_sync(&waitqueue, OS_WAITQUEUE_ALL, false);
 
    test_verbose_debug("joining victim tasks");
-   for (i = 0; i < 2; i++)
-   {
+   for (i = 0; i < 2; i++) {
       ret = os_task_join(&task_victim[i]);
       test_assert(0 == ret);
    }
@@ -512,7 +508,7 @@ int testcase_wakeup_hiprio(void)
 /**
  * The main task for tests manage
  */
-int mastertask_proc(void* OS_UNUSED(param))
+int mastertask_proc(void *OS_UNUSED(param))
 {
    int retv;
 
@@ -535,8 +531,7 @@ void test_tick(void)
 
    global_tick_cnt++;
 
-   if (irq_trigger_waitqueue && (irq_trigger_tick == global_tick_cnt))
-   {
+   if (irq_trigger_waitqueue && (irq_trigger_tick == global_tick_cnt)) {
       /* passing 2 as nbr will wake up main and helper task, but not the sleeper */
       test_verbose_debug("wakeup from ISR!!!");
       os_waitqueue_wakeup(irq_trigger_waitqueue, 2);

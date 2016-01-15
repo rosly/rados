@@ -70,12 +70,10 @@ void test_idle(void)
 }
 
 /* this task will progres only if task2 will keep up */
-int task1_proc(void* OS_UNUSED(param))
+int task1_proc(void *OS_UNUSED(param))
 {
-   while ((cnt1) < TEST_CYCLES)
-   {
-      if (cnt1 != cnt2)
-      {
+   while ((cnt1) < TEST_CYCLES) {
+      if (cnt1 != cnt2) {
          /* here we will switch to task2 (equal prio) but since task2 does not
           * call os_yield() than return will be possible only if os_tick() will
           * kick in */
@@ -88,16 +86,13 @@ int task1_proc(void* OS_UNUSED(param))
 }
 
 /* this task will progress only if it is behind task1 but it will not yield the
- * processor. So we make sure that only preemption can switch the context back to
- * task1. There fore we test if preemption from os_tick() is working */
-int task2_proc(void* OS_UNUSED(param))
+ * processor. So we make sure that only preemption can switch the context back
+ * to task1. There fore we test if preemption from os_tick() is working */
+int task2_proc(void *OS_UNUSED(param))
 {
-   while ((cnt2) < TEST_CYCLES)
-   {
+   while ((cnt2) < TEST_CYCLES) {
       if (cnt2 < cnt1)
-      {
          (cnt2)++;
-      }
    }
 
    return 0;

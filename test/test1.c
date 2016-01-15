@@ -56,7 +56,7 @@ void test_idle(void)
    test_result(task1_started ? 0 : -1);
 }
 
-int task1_proc(void* OS_UNUSED(param))
+int task1_proc(void *OS_UNUSED(param))
 {
    int ret;
 

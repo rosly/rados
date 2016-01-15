@@ -70,27 +70,24 @@ void test_idle(void)
 {
    uint8_t i;
 
-   for (i = 0; i < TEST_TASK_CNT; i++)
-   {
-      if(task_def[i].cnt < TEST_CYCLES)
-      {
-         return; /* this is not the end, continue */
-      }
+   for (i = 0; i < TEST_TASK_CNT; i++) {
+      if (task_def[i].cnt < TEST_CYCLES)
+         return;  /* this is not the end, continue */
    }
-   /* if waitqueue critical section properly prevented from race conditions than ... */
+   /* if waitqueue critical section properly prevented from race conditions than
+    * following has to be true */
    test_assert(glob_cnt == (TEST_TASK_CNT * TEST_CYCLES));
 
    /* both task reach its ends, finalize test */
    test_result(0);
 }
 
-int task_proc(void* param)
+int task_proc(void *param)
 {
    int ret;
    volatile unsigned *cnt = (volatile unsigned*)param;
 
-   while(*cnt < TEST_CYCLES)
-   {
+   while (*cnt < TEST_CYCLES) {
       os_waitqueue_prepare(&wq);
       /* only ticks that trigger exacly here will wakeup the task */
       glob_cnt++;
@@ -107,11 +104,10 @@ void test_init(void)
    uint8_t i;
 
    os_waitqueue_create(&wq);
-   for (i = 0; i < TEST_TASK_CNT; i++)
-   {
+   for (i = 0; i < TEST_TASK_CNT; i++) {
       os_task_create(&(task_def[i].task), 1, task_def[i].stack,
-                     sizeof(task_def[i].stack),
-                     task_proc, (void*)(&(task_def[i].cnt)));
+         sizeof(task_def[i].stack),
+         task_proc, (void*)(&(task_def[i].cnt)));
    }
 
    /* frequent ticks help test race conditions.  The best would be to call tick

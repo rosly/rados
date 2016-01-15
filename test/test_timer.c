@@ -54,11 +54,12 @@ void idle(void)
    /* nothing to do */
 }
 
-static void timer_proc(void* param)
+static void timer_proc(void *param)
 {
    size_t i = (size_t)param;
 
-   test_assert(false == timer_clbck[i]); /* calback cannot be caled twice, this will mean bug */
+   test_assert(false == timer_clbck[i]); /* calback cannot be caled twice, this
+                                          * will mean bug */
    timer_clbck[i] = true;
 }
 
@@ -67,17 +68,16 @@ static void timer_proc(void* param)
  * Check if timers expires at proper timeout, we test that by creating many
  * timers with differrent timeouts
  */
-int task_test1_proc(void* OS_UNUSED(param))
+int task_test1_proc(void *OS_UNUSED(param))
 {
    size_t i, j;
 
-   for(i = 0; i < TEST_TIMER_NBR; i++) {
+   for (i = 0; i < TEST_TIMER_NBR; i++)
       os_timer_create(&timers[i], timer_proc, (void*)i, i + 1, 0);
-   }
 
    /* now each call of test_reqtick (which after tick procedure calls os_tick)
     * should generate single, specific timer callback */
-   for(i = 0; i < TEST_TIMER_NBR; i++) {
+   for (i = 0; i < TEST_TIMER_NBR; i++) {
       /* clean the clbck mark table */
       memset(timer_clbck, 0, sizeof(timer_clbck));
 
@@ -86,14 +86,12 @@ int task_test1_proc(void* OS_UNUSED(param))
 
       /* check if only one paticular (indexed by i) timer was called drring this
        * cycle */
-      for(j = 0; j < TEST_TIMER_NBR; j++) {
+      for (j = 0; j < TEST_TIMER_NBR; j++)
          test_assert(((i == j) ? true : false) == timer_clbck[j]);
-      }
    }
 
-   for(i = 0; i < TEST_TIMER_NBR; i++) {
+   for (i = 0; i < TEST_TIMER_NBR; i++)
       os_timer_destroy(&timers[i]);
-   }
 
    test_debug("subtest 1 OK");
    return 0;
@@ -103,7 +101,7 @@ int task_test1_proc(void* OS_UNUSED(param))
  * Test1 task procedure
  * Regresion test for itimer unsynch algorithm feature
  */
-int task_test1a_proc(void* OS_UNUSED(param))
+int task_test1a_proc(void *OS_UNUSED(param))
 {
    /* clean the clbck mark table */
    memset(timer_clbck, 0, sizeof(timer_clbck));
@@ -138,7 +136,7 @@ int task_test1a_proc(void* OS_UNUSED(param))
  * Test1 task procedure
  * Check if unsynch implementation is able to handle loong timeout periods
  */
-int task_test1b_proc(void* OS_UNUSED(param))
+int task_test1b_proc(void *OS_UNUSED(param))
 {
    size_t i;
 
@@ -149,9 +147,8 @@ int task_test1b_proc(void* OS_UNUSED(param))
    os_timer_create(&timers[0], timer_proc, (void*)0, INT16_MAX, 0);
 
    /* generate INT16_MAX -1  ticks */
-   for(i = 0; i < INT16_MAX - 1; i++) {
-     test_reqtick();
-   }
+   for (i = 0; i < INT16_MAX - 1; i++)
+      test_reqtick();
 
    /* check that this timer did not expired */
    test_assert(false == timer_clbck[0]);
@@ -171,7 +168,7 @@ int task_test1b_proc(void* OS_UNUSED(param))
  * Test1 task procedure
  * Test for timer unsynch algorithm feature during destroy
  */
-int task_test1c_proc(void* OS_UNUSED(param))
+int task_test1c_proc(void *OS_UNUSED(param))
 {
    /* clean the clbck mark table */
    memset(timer_clbck, 0, sizeof(timer_clbck));
@@ -210,40 +207,38 @@ int task_test1c_proc(void* OS_UNUSED(param))
  * We test that by creating many timers and using both timeout and period, then
  * we check if timer expires and it is reloaded at apropriate timestamps
  */
-int task_test2_proc(void* OS_UNUSED(param))
+int task_test2_proc(void *OS_UNUSED(param))
 {
    size_t i, j;
 
    /* create autoreaload timers in i periods */
-   for(i = 1; i < TEST_TIMER_NBR; i++) {
+   for (i = 1; i < TEST_TIMER_NBR; i++)
       os_timer_create(&timers[i], timer_proc, (void*)i, i, i);
-   }
 
    /* now each call of test_reqtick (which after tick procedure calls os_tick)
     * should generate specific timer callbacks (may be more that one since we
     * use autoreload with period equal to timer index) */
-   for(i = 1; i < TEST_TIMER_NBR * 100; i++) {
+   for (i = 1; i < TEST_TIMER_NBR * 100; i++) {
       /* clean the clbck mark table */
       memset(timer_clbck, 0, sizeof(timer_clbck));
 
       /* generate the os_tick */
       test_reqtick();
 
-      /* verify the clbck mark table - each timer have to be called in its period */
-      for(j = 1; j < TEST_TIMER_NBR; j++) {
+      /* verify the clbck mark table - each timer have to be called in its
+       * period */
+      for (j = 1; j < TEST_TIMER_NBR; j++)
          test_assert(((0 == (i % j)) ? true : false) == timer_clbck[j]);
-      }
    }
 
-   for(i = 0; i < TEST_TIMER_NBR; i++) {
+   for (i = 0; i < TEST_TIMER_NBR; i++)
       os_timer_destroy(&timers[i]);
-   }
 
    test_debug("subtest 2 OK");
    return 0;
 }
 
-int task_main_proc(void* OS_UNUSED(param))
+int task_main_proc(void *OS_UNUSED(param))
 {
    task_test1_proc(NULL);
    task_test1a_proc(NULL);
@@ -257,7 +252,7 @@ int task_main_proc(void* OS_UNUSED(param))
 
 void init(void)
 {
-  /* for testing we will need just one task */
+   /* for testing we will need just one task */
    os_task_create(
       &task_main, OS_CONFIG_PRIOCNT - 1,
       task_main_stack, sizeof(task_main_stack),

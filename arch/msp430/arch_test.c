@@ -36,7 +36,7 @@ test_tick_clbck_t test_tick_clbck = NULL;
 
 /* for documentation check os_test.h */
 void test_debug_printf(
-   const char* OS_UNUSED(format),
+   const char *OS_UNUSED(format),
    ...)
 {
 }
@@ -46,11 +46,10 @@ void test_result(int result)
 {
    arch_criticalstate_t cristate;
 
-   if(0 == result) {
+   if (0 == result)
       test_debug("Test PASSED");
-   } else {
+   else
       test_debug("Test FAILURE");
-   }
 
    arch_critical_enter(cristate);
    arch_halt();
@@ -59,14 +58,15 @@ void test_result(int result)
 }
 
 /* for documentation check os_test.h */
-void test_setupmain(const char* OS_UNUSED(name))
+void test_setupmain(const char *OS_UNUSED(name))
 {
    test_assert(0); /* missing implementation */
 }
 
 /* for documentation check os_test.h */
-void test_setuptick(test_tick_clbck_t OS_UNUSED(clbck),
-		    unsigned long OS_UNUSED(nsec))
+void test_setuptick(
+   test_tick_clbck_t OS_UNUSED(clbck),
+   unsigned long OS_UNUSED(nsec))
 {
    test_assert(0); /* missing implementation */
 }

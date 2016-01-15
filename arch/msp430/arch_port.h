@@ -32,18 +32,22 @@
 #ifndef __OS_PORT_
 #define __OS_PORT_
 
-//#define __CC430F6137__ similar deffine should be automaticly added by compiler when it will read the -mcu=cc430f6137, this define is required for legacymsp430.h
+/* #define __CC430F6137__ similar deffine should be automaticly added by
+ * compiler
+ * when it will read the -mcu=cc430f6137, this define is required for
+ * legacymsp430.h */
 
 #include <legacymsp430.h>
-#include <stdint.h> /* for patform specific types definitions like uint16_t */
-#include <limits.h> /* for UINT_MAX etc */
+#include <stdint.h>  /* for patform specific types definitions like uint16_t */
+#include <limits.h>  /* for UINT_MAX etc */
 #include <stddef.h>
-#include <string.h> /* for memcpy */
+#include <string.h>  /* for memcpy */
 
 /* missing stdbool.h for this platform */
 typedef uint8_t bool;
 #define false ((uint8_t)0)
-#define true  ((uint8_t)1) /* considered also !false but finaly decided to be more strict */
+/* I also considered also !false but finaly decided to be more strict */
+#define true  ((uint8_t)1)
 
 /* Within an interrupt handler, set the given bits in the value of SR
  * that will be popped off the stack on return */
@@ -62,7 +66,7 @@ typedef uint8_t bool;
  * use the second method. This is mainly because storing registers stack is the
  * fastest way (require less CPU cycles). */
 typedef struct {
-    uint16_t sp;
+   uint16_t sp;
 } arch_context_t;
 
 /* exactly 16 bits. sig_atomic_t should be available from signal.h but on my
@@ -70,7 +74,7 @@ typedef struct {
 typedef uint16_t arch_atomic_t;
 #define ARCH_ATOMIC_MAX UINT16_MAX
 
-typedef uint16_t arch_ticks_t; /* exactly 16 bits */
+typedef uint16_t arch_ticks_t;         /* exactly 16 bits */
 #define ARCH_TICKS_MAX ((arch_ticks_t)UINT16_MAX)
 typedef uint16_t arch_criticalstate_t; /* size of CPU status register */
 
@@ -90,20 +94,20 @@ typedef uint8_t arch_bitmask_t;
 #define OS_RESTRICT __restrict__
 #define OS_PROGMEM
 #define OS_PROGMEM_STR(_s) (_s)
-#define OS_TASKSTACK uint8_t __attribute__ ((aligned (2)))
+#define OS_TASKSTACK uint8_t __attribute__ ((aligned(2)))
 
 #define OS_STACK_DESCENDING
 #define OS_STACK_MINSIZE ((size_t)28 * 4) /* four times of context dump size */
 
 #define os_atomic_inc(_atomic) \
-    __asm__ __volatile__ ( \
-        "inc %[atomic]\n\t" \
-            ::  [atomic] "m" (_atomic))
+   __asm__ __volatile__ ( \
+      "inc %[atomic]\n\t" \
+      ::  [atomic] "m" (_atomic))
 
 #define os_atomic_dec(_atomic) \
-    __asm__ __volatile__ ( \
-        "dec %[atomic]\n\t" \
-            ::  [atomic] "m" (_atomic))
+   __asm__ __volatile__ ( \
+      "dec %[atomic]\n\t" \
+      ::  [atomic] "m" (_atomic))
 
 /* all pointers in MSP430 are size of CPU register, no need to read or write
  * with any concurent handling */
@@ -112,19 +116,20 @@ typedef uint8_t arch_bitmask_t;
 #define os_atomicptr_xchnge(_ptr, _val) (OS_ASSERT(!"not implemented"))
 
 #define arch_ticks_atomiccpy(_dst, _src) \
-  do { \
-      *(_dst) = *(_src); /* we can copy as rval since MSP430 is 16bit arch and arch_ticks_t is 16bit*/ \
-  }while(0)
+   do { \
+      /* we can copy as val since MSP430 is 16bit */ \
+      *(_dst) = *(_src); \
+   } while (0)
 
 #define arch_bitmask_set(_bitfield, _bit) \
    do { \
       (_bitfield) |= 1 << (_bit); \
-   } while(0);
+   } while (0);
 
 #define arch_bitmask_clear(_bitfield, _bit) \
    do { \
       (_bitfield) &= ~(1 << (_bit)); \
-   } while(0);
+   } while (0);
 
 uint_fast8_t arch_bitmask_fls(arch_bitmask_t bitfield);
 
@@ -132,89 +137,117 @@ uint_fast8_t arch_bitmask_fls(arch_bitmask_t bitfield);
    do { \
       (_critical_state) = __read_status_register(); \
       arch_dint(); \
-   }while(0)
+   } while (0)
 
 #define arch_critical_exit(_critical_state) \
    do { \
-      /* __bis_status_register(GIE & (_critical_state)); modify only the IE flag, while remain rest untouched */ \
-      __write_status_register(_critical_state); /* overwrite all flags, since previously we run proram then power bits were set (no risk) */ \
-   }while(0)
+      /* __bis_status_register(GIE & (_critical_state)); modify only the IE \
+       * flag, while remain rest untouched */ \
+      /* overwrite all flags, since previously we run proram then power bits \
+       * were set (no risk) */ \
+      __write_status_register(_critical_state); \
+   } while (0)
 
 #define arch_dint() dint()
 #define arch_eint() eint()
 
 /* format of the context pushed on stack for MSP430 port
-low adress
-    PC - pushed frst
-    R3(SR) - pushed automaticly on ISR enter (manualy durring schedule form user)
-    R4 - R15 - pusched last
-hi address
-*/
+ * low adress
+ *   PC - pushed frst
+ *   R3(SR) - pushed automaticly on ISR enter
+ *            (manualy durring schedule form user)
+ *   R4 - R15 - pusched last
+ *  hi address
+ */
 
 /* This function have to:
- - if neecessary, disable interrupts to block the neesting
- - store all registers (power control bits does not have to be necessarly stored)
- - increment the isr_nesting
- - if isr_nesting is = 1 then
-    - store the context curr_tcb->ctx (may take benfit from already stored registers by storing only the stack pointer)
- - end
-
- - in some near future down in the ISR enable interrupts to support the nesting interrupts
-
- because ISR was called it means that interrupts was enabled. On some arch like MPS430 they may be automaticly disabled durring the enter to ISR
- On those architectures interrupts may be enabled when ISR will mask pending interrupt.
- In general disabling interrupt is usualy needed because we touch the task_current (usualy need 2 asm instructions) and we cannot be preempted by another interrupt.
- From other hand enabling the interrupts again as soon as possible is needed for realtime constrains.
- If your code does not need to be realtime constrained, it is not needed to enable the interrupts in ISR, also the nesting interrupt code can be disabled
-
- The reason why we skip the stack pointer storage in case of nesing is obvous. In case of nesting we was not in task but in other ISR. So the SP will not be the task SP.
- But we have to store all registers anyway. This is why we store all registers and then optionaly store the SP in context of tcb */
+ *  - if neecessary, disable interrupts to block the neesting
+ *  - store all registers (power control bits does not have to be necessarly
+ * stored)
+ *  - increment the isr_nesting
+ *  - if isr_nesting is = 1 then
+ *   - store the context curr_tcb->ctx (may take benfit from already stored
+ *     registers by storing only the stack pointer)
+ *  - end
+ *
+ *  - in some near future down in the ISR enable interrupts to support the
+ *    nesting interrupts
+ *
+ * Because ISR was called it means that interrupts was enabled. On some arch
+ * like MPS430 they may be automaticly disabled durring the enter to ISR
+ * On those architectures interrupts may be enabled when ISR will mask pending
+ * interrupt.
+ * In general disabling interrupt is usualy needed because we touch the
+ * task_current (usualy need 2 asm instructions) and we cannot be preempted by
+ * another interrupt.
+ * From other hand enabling the interrupts again as soon as possible is needed
+ * for realtime constrains.
+ * If your code does not need to be realtime constrained, it is not needed to
+ * enable the interrupts in ISR, also the nesting interrupt code can be disabled
+ *
+ * The reason why we skip the stack pointer storage in case of nesing is
+ * obvous. In case of nesting we was not in task but in other ISR. So the SP
+ * will not be the task SP.
+ * But we have to store all registers anyway. This is why we store all
+ * registers and then optionaly store the SP in context of tcb */
 #define arch_contextstore_i(_isrName) \
-    __asm__ __volatile__ ( \
-        /* on MSP430 interrupts are disabled when entering ISR */ \
-        "inc %[isr_nesting]\n\t" /* increment isr_nesting, here we destroy orginal SR but it already lay on stack*/ \
-        "pushm 12,r15\n\t" /* pushing R4 -R15 */ \
-        "cmp #1, %[isr_nesting]\n\t" /* check isr_nesting */ \
-        "jne "#_isrName "_contextStoreIsr_Nested\n\t" \
-        "mov %[ctx], r15\n\t" \
-        "mov r1, @r15\n\t" \
-#_isrName "_contextStoreIsr_Nested:\n\t" \
-            ::  [ctx] "m" (task_current), \
-                [isr_nesting] "m" (isr_nesting))
+   __asm__ __volatile__ ( \
+      /* on MSP430 interrupts are disabled when entering ISR */ \
+      /* increment isr_nesting, here we destroy *orginal SR but it already lay \
+       * on stack*/ \
+      "inc %[isr_nesting]\n\t" \
+      "pushm 12,r15\n\t"            /* pushing R4 -R15 */ \
+      "cmp #1, %[isr_nesting]\n\t"  /* check isr_nesting */ \
+      "jne " # _isrName "_contextStoreIsr_Nested\n\t" \
+                        "mov %[ctx], r15\n\t" \
+                        "mov r1, @r15\n\t" \
+      # _isrName "_contextStoreIsr_Nested:\n\t" \
+      ::  [ctx] "m" (task_current), \
+      [isr_nesting] "m" (isr_nesting))
 
-/* This function have to:
- - disable IE (in case we achritecture allows for nesting)
- - decrement the isr_nesting
- - if isr_nesting = 0 then
-     - restore context from curr_tcb->ctx
- - restore all registers
- - perform actions that will lead to enable IE after reti
- - return by reti
-
- Please first read the note for arch_context_StoreI. The important point here is why we need to enable the interrupt after reti in both cases (in normal and nested).
- This is because we disabled them for task_current manipulation in first step. But we need to enable them because:
- - in case of not nested they was for sure enabled (need to be enabled because we enter ISR ;) )
- - in case of nested the was also for sure enabled (from the same reason, we enter nested ISR) */
+/**
+ * This function have to:
+ *  - disable IE (in case we achritecture allows for nesting)
+ *  - decrement the isr_nesting
+ *  - if isr_nesting = 0 then
+ *    - restore context from curr_tcb->ctx
+ *  - restore all registers
+ *  - perform actions that will lead to enable IE after reti
+ *  - return by reti
+ *
+ * Please first read the note for arch_context_StoreI. The important point here
+ * is why we need to enable the interrupt after reti in both cases (in normal
+ * and nested).
+ * This is because we disabled them for task_current manipulation in first
+ * step. But we need to enable them because:
+ *  - in case of not nested they was for sure enabled (need to be enabled
+ *    because we enter ISR ;) )
+ *  - in case of nested the was also for sure enabled (from the same reason, we
+ *    enter nested ISR) */
 #define arch_contextrestore_i(_isrName) \
-    __asm__ __volatile__ ( \
-        "dint\n\t" /* disable interrupts in case some ISR will implement nesting interrupt handling */ \
-        "dec %[isr_nesting]\n\t" \
-        "jnz "#_isrName "_contexRestoreIsr_Nested\n\t" \
-        "mov %[ctx], r1\n\t" \
-        "mov @r1, r1\n\t" \
-        "popm 12,r15\n\t" /* poping R4 -R15 */ \
-        "bic %[powerbits], @r1 \n\t" /* enable full power mode in SR that will be poped */ \
-        "jmp "#_isrName "_contexRestoreIsr_Done\n\t" \
-#_isrName "_contexRestoreIsr_Nested:\n\t" \
-        "mov.b   #0x80,  &0x0a20\n\t" \
-        "popm 12,r15\n\t" /* poping R4 -R15 */ \
-#_isrName "_contexRestoreIsr_Done:\n\t" \
-        "bis %[iebits], @r1 \n\t" /* enable interrupts in SR that will be poped */ \
-        "reti\n\t" \
-            ::  [ctx] "m" (task_current), \
-                [isr_nesting] "m" (isr_nesting), \
-                [iebits] "i" (GIE), \
-                [powerbits] "i" (SCG1+SCG0+OSCOFF+CPUOFF))
+   __asm__ __volatile__ ( \
+      /* disable interrupts in case some ISR will implement nesting interrupt \
+       * handling */ \
+      "dint\n\t" \
+      "dec %[isr_nesting]\n\t" \
+      "jnz " # _isrName "_contexRestoreIsr_Nested\n\t" \
+                        "mov %[ctx], r1\n\t" \
+                        "mov @r1, r1\n\t" \
+                        "popm 12,r15\n\t"             /* poping R4 -R15 */ \
+      /* enable full power mode in SR that will be poped */ \
+                        "bic %[powerbits], @r1 \n\t" \
+                        "jmp " # _isrName "_contexRestoreIsr_Done\n\t" \
+      # _isrName "_contexRestoreIsr_Nested:\n\t" \
+                 "mov.b   #0x80,  &0x0a20\n\t" \
+                 "popm 12,r15\n\t"           /* poping R4 -R15 */ \
+      # _isrName "_contexRestoreIsr_Done:\n\t" \
+      /* enable interrupts in SR that will be poped */ \
+                 "bis %[iebits], @r1 \n\t" \
+                 "reti\n\t" \
+      ::  [ctx] "m" (task_current), \
+      [isr_nesting] "m" (isr_nesting), \
+      [iebits] "i" (GIE), \
+      [powerbits] "i" (SCG1 + SCG0 + OSCOFF + CPUOFF))
 
 #endif /* __OS_PORT_ */
 

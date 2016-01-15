@@ -37,30 +37,36 @@
 #include "os_private.h"
 #include "os_test.h"
 
-static timer_t timer; /**< linux POSIX timer used as an emulation of tick */
-static test_tick_clbck_t test_tick_clbck = NULL; /**< additional callback for emulated tick */
-static const char* test_name = NULL;
+/** linux POSIX timer used as an emulation of tick */
+static timer_t timer;
+/** additional callback for emulated tick */
+static test_tick_clbck_t test_tick_clbck = NULL;
+static const char *test_name = NULL;
 
-/** Linux architecture dependend. Signal handler function for timer tick
+/**
+ * Linux architecture dependend. Signal handler function for timer tick
  * emulation
  */
-static void OS_ISR sig_alrm(int OS_UNUSED(signum), siginfo_t * OS_UNUSED(siginfo), void *ucontext)
+static void OS_ISR sig_alrm(
+   int OS_UNUSED(signum),
+   siginfo_t *OS_UNUSED(siginfo),
+   void *ucontext)
 {
    arch_contextstore_i(sig_alrm);
 
    /* we do not allowing or nested interrupts in this ISR, therefore we do not
     * have to enter the critical section to call os_tick() */
    os_tick();
-   if( test_tick_clbck )
-   {
+   if ( test_tick_clbck )
       test_tick_clbck();
-   }
 
    arch_contextrestore_i(sig_alrm);
 }
 
 /* for documentation check os_test.h */
-void test_debug_printf(const char* format, ...)
+void test_debug_printf(
+   const char *format,
+   ...)
 {
    va_list ap;
 
@@ -74,26 +80,30 @@ void test_debug_printf(const char* format, ...)
 /* for documentation check os_test.h */
 void test_result(int result)
 {
-   if(0 == result) {
+   if (0 == result)
       test_debug_printf("%s: Test PASSED\n", test_name);
-   } else {
+   else
       test_debug_printf("%s: Test FAILURE\n", test_name);
-   }
 
    arch_dint();
    exit(result);
 }
 
 /* for documentation check os_test.h */
-void test_setupmain(const char* name)
+void test_setupmain(const char *name)
 {
    int ret;
    struct sigaction tick_sigaction = {
-      .sa_sigaction = sig_alrm,
-      .sa_mask = { { 0 } }, /* additional (beside the current signal) mask (they will be added to the mask instead of set) */
-      .sa_flags = SA_SIGINFO , /* use sa_sigaction instead of old sa_handler */
-      /* SA_NODEFER could be used if we would like to have the nesting enabled right durring the signal handler enter */
-      /* SA_ONSTACK could be sed if we would like to use the signal stack instead of thread stack */
+      .sa_sigaction  = sig_alrm,
+      .sa_mask       = { { 0 } },   /* additional (beside the current signal)
+                                     * mask (they will be added to the mask
+                                     * instead of set) */
+      .sa_flags      = SA_SIGINFO,  /* use sa_sigaction instead of old
+                                     * sa_handler */
+      /* SA_NODEFER could be used if we would like to have the nesting enabled
+       * right durring the signal handler enter */
+      /* SA_ONSTACK could be sed if we would like to use the signal stack
+       * instead of thread stack */
    };
 
    ret = sigaction(SIGALRM, &tick_sigaction, NULL);
@@ -102,26 +112,28 @@ void test_setupmain(const char* name)
 }
 
 /* for documentation check os_test.h */
-void test_setuptick(test_tick_clbck_t clbck, unsigned long nsec)
+void test_setuptick(
+   test_tick_clbck_t clbck,
+   unsigned long nsec)
 {
    int ret;
    struct sigevent sev = {
-      .sigev_notify = SIGEV_SIGNAL,
-      .sigev_signo = SIGALRM,
+      .sigev_notify  = SIGEV_SIGNAL,
+      .sigev_signo   = SIGALRM,
    };
    struct itimerspec its = {
-      .it_interval = {
-         .tv_sec = 0,
-         .tv_nsec = nsec,
+      .it_interval   = {
+         .tv_sec     = 0,
+         .tv_nsec    = nsec,
       },
-      .it_value = {
-         .tv_sec = 0,
-         .tv_nsec = nsec,
+      .it_value      = {
+         .tv_sec     = 0,
+         .tv_nsec    = nsec,
       }
    };
 
    /* create and start the kernel periodic timer
-      assign the SIGALRM signal to the timer */
+    *  assign the SIGALRM signal to the timer */
 
    test_assert(nsec > 0); /* nsec must be greater than 0 for linux timer API */
    test_tick_clbck = clbck;

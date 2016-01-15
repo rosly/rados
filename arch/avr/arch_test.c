@@ -55,39 +55,42 @@ static void uart_init(void)
    UCSR0A &= ~(1 << U2X0);
 #endif
 
-   UCSR0C |= (1 << UCSZ00) | (1 << UCSZ01); // Use 8-bit character sizes
-   UCSR0B |= (1 << RXEN0) | (1 << TXEN0);   // Turn on the transmission and reception circuitry
-   //for IRQ (1 << OS_CONCAT(RXCIE, MAC_USART_NBR)) | (1 << OS_CONCAT(TXCIE, MAC_USART_NBR));
+   UCSR0C |= (1 << UCSZ00) | (1 << UCSZ01);  /* Use 8-bit character sizes */
+   UCSR0B |= (1 << RXEN0) | (1 << TXEN0);    /* Turn on the transmission and
+                                              * reception circuitry */
+   /* for IRQ we cound use
+    * (1 << OS_CONCAT(RXCIE, MAC_USART_NBR)) |
+    * (1 << OS_CONCAT(TXCIE, MAC_USART_NBR)); */
 }
 
 #if 0
-static void uart_tx_progmem(const OS_PROGMEM char* str)
+static void uart_tx_progmem(const OS_PROGMEM char *str)
 {
    unsigned i;
 
-   for (i = 0; pgm_read_byte_near(&str[i]) != '\0'; i++)
-   {
-      while(!(UCSR0A & (1<<UDRE0)));
+   for (i = 0; pgm_read_byte_near(&str[i]) != '\0'; i++) {
+      while (!(UCSR0A & (1 << UDRE0))) ;
       UDR0 = pgm_read_byte_near(&str[i]);
    }
 }
 #endif
 
-static void uart_tx_rammem(const char* str)
+static void uart_tx_rammem(const char *str)
 {
    unsigned i = 0;
    char val;
 
-   while ((val = str[i]) != '\0')
-   {
-      while(!(UCSR0A & (1<<UDRE0)));
+   while ((val = str[i]) != '\0') {
+      while (!(UCSR0A & (1 << UDRE0))) ;
       UDR0 = val;
       i++;
    }
 }
 
 /* for documentation check os_test.h */
-void test_debug_printf(const OS_PROGMEM char* format, ...)
+void test_debug_printf(
+   const OS_PROGMEM char *format,
+   ...)
 {
    va_list vargs;
    char buff[OS_STACK_MINSIZE / 2]; /* half of stack size */
@@ -108,11 +111,10 @@ void test_result(int result)
    result_store = result;
    unsigned i = 0;
 
-   if(0 == result) {
+   if (0 == result)
       test_debug("Test PASSED");
-   } else {
+   else
       test_debug("Test FAILURE");
-   }
 
 #ifndef TEST_BLINK
    arch_halt();
@@ -120,18 +122,18 @@ void test_result(int result)
    /* instead of arch_halt() blik the led */
    while (1) {
 
-    PORTB |= _BV(PORTB5);
-    _delay_ms(1000);
-    PORTB &= ~_BV(PORTB5);
-    _delay_ms(1000);
+      PORTB |= _BV(PORTB5);
+      _delay_ms(1000);
+      PORTB &= ~_BV(PORTB5);
+      _delay_ms(1000);
 
-    test_debug("Result loop %u", i++);
+      test_debug("Result loop %u", i++);
    }
 #endif
 }
 
 /* for documentation check os_test.h */
-void test_setupmain(const OS_PROGMEM char* test_name)
+void test_setupmain(const OS_PROGMEM char *test_name)
 {
 #ifdef TEST_BLINK
    /* For Arduino set portB as output */
@@ -147,11 +149,14 @@ void test_setupmain(const OS_PROGMEM char* test_name)
 }
 
 /* for documentation check os_test.h */
-void test_setuptick(test_tick_clbck_t clbck, unsigned long nsec)
+void test_setuptick(
+   test_tick_clbck_t clbck,
+   unsigned long nsec)
 {
    test_tick_clbck = clbck;
 
-   /* Set timer 1 compare value for configured system tick with a prescaler of 256 */
+   /* Set timer 1 compare value for configured system tick with a prescaler of
+    * 256 */
    OCR1A = F_CPU / 256ul * nsec / 1000000000;
 
    /* Set prescaler 256 */
@@ -179,9 +184,7 @@ void OS_ISR TIMER1_COMPA_vect(void)
     * have to enter the critical section to call os_tick() */
    os_tick();
    if (test_tick_clbck)
-   {
       test_tick_clbck();
-   }
 
    arch_contextrestore_i(tick);
 }

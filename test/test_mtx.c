@@ -40,10 +40,7 @@
 
 #include "os.h"
 #include "os_test.h"
-
-#define container_of(_ptr, _type, _member) ({ \
-   const typeof( ((_type *)0)->_member ) *_mptr = (_ptr); \
-   (_type *)( (char *)_mptr - offsetof(_type,_member) );})
+#include "os_private.h" /* for container_of() */
 
 #define TEST_LOOPS ((unsigned)1000)
 

@@ -38,12 +38,7 @@
 
 #include "os.h"
 #include "os_test.h"
-
-#define min(_x, _y) ({ \
-   typeof(_x) _min1 = (_x); \
-   typeof(_y) _min2 = (_y); \
-   (void) (&_min1 == &_min2); \
-   _min1 < _min2 ? _min1 : _min2; })
+#include "os_private.h" /* for os_min() */
 
 #define TEST_TASKS ((unsigned)10)
 #define TEST_CYCLES ((os_atomic_t)1000)
@@ -129,7 +124,7 @@ int testcase_1(void)
       worker_tasks[i].idx = i + 1;
       os_sem_create(&(worker_tasks[i].sem), 0);
       os_task_create(
-         &(worker_tasks[i].task), min(i + 1, OS_CONFIG_PRIOCNT - 1),
+         &(worker_tasks[i].task), os_min(i + 1, OS_CONFIG_PRIOCNT - 1),
          worker_tasks[i].task1_stack, sizeof(worker_tasks[i].task1_stack),
          task_proc, &(worker_tasks[i]));
    }

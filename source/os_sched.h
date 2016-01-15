@@ -54,10 +54,10 @@ typedef enum {
 /** Definition of task blocking root cause. Used only if TCB state is
  * TASKSTATE_WAIT */
 typedef enum {
-   OS_TASKBLOCK_INVALID = 0, /**< Invalid placeholder */
-   OS_TASKBLOCK_SEM,         /**< Task blocked on semaphore */
-   OS_TASKBLOCK_MTX,         /**< Task blocked on mutex */
-   OS_TASKBLOCK_WAITQUEUE    /**< Task blocked on wait_queue */
+   OS_TASKBLOCK_INVALID = 0,  /**< Invalid placeholder */
+   OS_TASKBLOCK_SEM,          /**< Task blocked on semaphore */
+   OS_TASKBLOCK_MTX,          /**< Task blocked on mutex */
+   OS_TASKBLOCK_WAITQUEUE     /**< Task blocked on wait_queue */
 } os_taskblock_t;
 
 /** Return codes for OS API functions */
@@ -76,66 +76,66 @@ struct os_waitqueue_tag;
 
 /** Definition of Task Structure - Task Control Block - TCB */
 typedef struct {
-  /** need to be the first field for easy access to it from ASM ctx switch code
-   * for more info about the context store see arch_context_t */
-  arch_context_t ctx;
+   /** need to be the first field for easy access to it from ASM ctx switch code
+    * for more info about the context store see arch_context_t */
+   arch_context_t ctx;
 
-  /** list link, allows to place the task on various lists */
-  list_t list;
+   /** list link, allows to place the task on various lists */
+   list_t list;
 
-  /** the base priority, constant for whole life cycle of the task, decided to
-   * use fast8 type since we need at least uint8 while we don't want to have
-   * access time penalties from memory aliment issues of specific ARCH/CPU */
-  uint_fast8_t prio_base;
+   /** the base priority, constant for whole life cycle of the task, decided to
+    * use fast8 type since we need at least uint8 while we don't want to have
+    * access time penalties from memory aliment issues of specific ARCH/CPU */
+   uint_fast8_t prio_base;
 
-  /** current priority of the task, namely the effective priority, it may be
-   * changed by priority inheritance code */
-  uint_fast8_t prio_current;
+   /** current priority of the task, namely the effective priority, it may be
+    * changed by priority inheritance code */
+   uint_fast8_t prio_current;
 
-  /** state of task - common meaning as in other RTOS'es */
-  os_taskstate_t state;
+   /** state of task - common meaning as in other RTOS'es */
+   os_taskstate_t state;
 
-  /** following struct is used only when task is in TASKSTATE_WAIT or
-   * TASKSTATE_READY */
-  struct {
-    /** task_queue to which the task belongs, this can be ready_queue or any
-     * task_queue of blocking object like sem or mtx. Pointer used during task
-     * enqueue/dequeue since we have to modify the also task_queue itself */
-    struct os_taskqueue_tag *task_queue;
+   /** following struct is used only when task is in TASKSTATE_WAIT or
+    * TASKSTATE_READY */
+   struct {
+      /** task_queue to which the task belongs, this can be ready_queue or any
+       * task_queue of blocking object like sem or mtx. Pointer used during task
+       * enqueue/dequeue since we have to modify the also task_queue itself */
+      struct os_taskqueue_tag *task_queue;
 
-    /** defines on which object type the task is blocked, valid only when task
-     * state == TASKSTATE_WAIT */
-    os_taskblock_t block_type;
+      /** defines on which object type the task is blocked, valid only when task
+       * state == TASKSTATE_WAIT */
+      os_taskblock_t block_type;
 
-    /** associated timer while waiting on resource with timeout guard, valid
-     * only if task state = TASKSTATE_WAIT */
-    os_timer_t *timer;
-  };
+      /** associated timer while waiting on resource with timeout guard, valid
+       * only if task state = TASKSTATE_WAIT */
+      os_timer_t *timer;
+   };
 
-  /** list of mutexes owned by task, this list is required to calculate new
-   * prio_current during mutex unlock, extensive explanation of this can be
-   * found in os_mtx_unlock. This list may be either empty or occupied either
-   * during task_state READY and WAIT, it just means that task locked some
-   * mutexes */
-  list_t mtx_list;
+   /** list of mutexes owned by task, this list is required to calculate new
+    * prio_current during mutex unlock, extensive explanation of this can be
+    * found in os_mtx_unlock. This list may be either empty or occupied either
+    * during task_state READY and WAIT, it just means that task locked some
+    * mutexes */
+   list_t mtx_list;
 
-  /** pointer to semaphore from os_task_join(), it is provided by task which
-   * would like to join this task and waits until this task will finish. Tis is
-   * quite cheap solution to join() operation since here we kept only the
-   * pointer while semaphore itself is stored on stack of task which will wait
-   * for join() */
-  struct os_sem_tag *join_sem;
+   /** pointer to semaphore from os_task_join(), it is provided by task which
+    * would like to join this task and waits until this task will finish. Tis is
+    * quite cheap solution to join() operation since here we kept only the
+    * pointer while semaphore itself is stored on stack of task which will wait
+    * for join() */
+   struct os_sem_tag *join_sem;
 
-  /** union is used to save memory for variables used during self excluding
-   * scenarios */
-  union {
-    /** value which can be returned by task before it will be destroyed */
-    int ret_value;
+   /** union is used to save memory for variables used during self excluding
+    * scenarios */
+   union {
+      /** value which can be returned by task before it will be destroyed */
+      int ret_value;
 
-    /** return code returned from blocking function, used for communication
-     * between owner and task which wake it up */
-    os_retcode_t block_code;
-  };
+      /** return code returned from blocking function, used for communication
+       * between owner and task which wake it up */
+      os_retcode_t block_code;
+   };
 
 #ifdef OS_CONFIG_CHECKSTACK
    /** Pointer to stack end used for verification if it was not overflowed */
@@ -162,7 +162,7 @@ extern os_task_t task_idle;
 
 /* --- forward declarations --- */
 typedef void (*os_initproc_t)(void);
-typedef int (*os_taskproc_t)(void* param);
+typedef int (*os_taskproc_t)(void *param);
 
 /**
  * Function disables the scheduling.
@@ -252,7 +252,8 @@ void os_start(
  * @param stack pointer to stack memory. Each task has to have at least minimal
  *        stack size which will allow for execution of designed nested level of
  *        interrupt without overflow of the stack. SW can verify if task stack
- *        was not overflowed by calling os_task_check() (see OS_CONFIG_CHECKSTACK)
+ *        was not overflowed by calling os_task_check() (see
+ *        OS_CONFIG_CHECKSTACK)
  * @param stack_size size of the given stack
  * @param entry point function of the task
  * @param user defined parameter given to entry point function
@@ -270,7 +271,7 @@ void os_task_create(
    void *stack,
    size_t stack_size,
    os_taskproc_t proc,
-   void* param);
+   void *param);
 
 /**
  * By calling the function one task can wait until task given by parameter
@@ -293,10 +294,10 @@ void os_task_create(
 int os_task_join(os_task_t *task);
 
 /**
- * Function allows to give back the processor to other task READY task with the same
- * priority. Context switch will be made if only some other task with the same
- * priority is in READY state. Therefore idle task will not be scheduled() by
- * this function.
+ * Function allows to give back the processor to other task READY task with the
+ * same priority. Context switch will be made if only some other task with the
+ * same priority is in READY state. Therefore idle task will not be scheduled()
+ * by this function.
  *
  * @pre this function cannot be called from ISR
  * @pre this function cannot be called from idle task

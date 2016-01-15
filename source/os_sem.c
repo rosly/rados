@@ -32,12 +32,14 @@
 #include "os_private.h"
 
 /* private function forward declarations */
-static void os_sem_timerclbck(void* param);
+static void os_sem_timerclbck(void *param);
 
 /* --- public functions --- */
 /* all public functions are documented in os_sem.h file */
 
-void os_sem_create(os_sem_t* sem, os_atomic_t init_value)
+void os_sem_create(
+   os_sem_t *sem,
+   os_atomic_t init_value)
 {
    OS_ASSERT(init_value < OS_ATOMIC_MAX);
    OS_ASSERT(!waitqueue_current); /* cannot call after os_waitqueue_prepare() */
@@ -47,19 +49,18 @@ void os_sem_create(os_sem_t* sem, os_atomic_t init_value)
    sem->value = init_value;
 }
 
-void os_sem_destroy(os_sem_t* sem)
+void os_sem_destroy(os_sem_t *sem)
 {
    arch_criticalstate_t cristate;
    os_task_t *task;
 
-   OS_ASSERT(0 == isr_nesting); /* cannot call from ISR */
-   OS_ASSERT(!waitqueue_current); /* cannot call after os_waitqueue_prepare() */
+   OS_ASSERT(0 == isr_nesting);     /* cannot call from ISR */
+   OS_ASSERT(!waitqueue_current);   /* cannot call after os_waitqueue_prepare() */
 
    arch_critical_enter(cristate);
 
    /* wake up all task which suspended on semaphore */
-   while ((task = os_taskqueue_dequeue(&(sem->task_queue))))
-   {
+   while ((task = os_taskqueue_dequeue(&(sem->task_queue)))) {
       os_blocktimer_destroy(task); /* destroy the tasks timer */
       task->block_code = OS_DESTROYED;
       os_task_makeready(task);
@@ -76,7 +77,7 @@ void os_sem_destroy(os_sem_t* sem)
 }
 
 os_retcode_t OS_WARN_UNUSEDRET os_sem_down(
-   os_sem_t* sem,
+   os_sem_t *sem,
    uint_fast16_t timeout_ticks)
 {
    os_retcode_t ret;
@@ -84,17 +85,15 @@ os_retcode_t OS_WARN_UNUSEDRET os_sem_down(
    arch_criticalstate_t cristate;
 
    OS_ASSERT(0 == isr_nesting); /* cannot call from ISR */
-   OS_ASSERT(task_current != &task_idle); /* idle task cannot call blocking functions (will crash OS) */
+   OS_ASSERT(task_current != &task_idle); /* idle task cannot block */
    OS_ASSERT(!waitqueue_current); /* cannot call after os_waitqueue_prepare() */
    OS_ASSERT(true == list_is_empty(&task_current->mtx_list)); /* calling of blocking function while holding mtx will cause priority inversion */
 
    /* critical section needed because: timers, ISR sem_up(), operating on
     * sem->task_queue */
    arch_critical_enter(cristate);
-   do
-   {
-      if (sem->value > 0)
-      {
+   do {
+      if (sem->value > 0) {
          /* in case sem->value is not zero, we do not have to block, just to
           * consume one from sem->value */
          /* /TODO in future try to implement the "condition and decrement" as a
@@ -106,16 +105,14 @@ os_retcode_t OS_WARN_UNUSEDRET os_sem_down(
       }
 
       /* sem->value == 0, need to block the calling task */
-      if (OS_TIMEOUT_TRY == timeout_ticks)
-      {
+      if (OS_TIMEOUT_TRY == timeout_ticks) {
          /* task request to bail out in case operation would block */
          ret = OS_WOULDBLOCK;
          break;
       }
 
       /* does task request timeout guard for operation? */
-      if (OS_TIMEOUT_INFINITE != timeout_ticks)
-      {
+      if (OS_TIMEOUT_INFINITE != timeout_ticks) {
          /* we will get callback to os_sem_timerclbck() in case of timeout */
          os_blocktimer_create(&timer, os_sem_timerclbck, timeout_ticks);
       }
@@ -145,7 +142,9 @@ os_retcode_t OS_WARN_UNUSEDRET os_sem_down(
  * for preemption and possibly the same task will return to suspend point and
  * consume next signal, or system should wakeup multiple task simultaneously and
  * then allow for preemption the signaling task. */
-void os_sem_up_sync(os_sem_t* sem, bool sync)
+void os_sem_up_sync(
+   os_sem_t *sem,
+   bool sync)
 {
    arch_criticalstate_t cristate;
    os_task_t *task;
@@ -167,8 +166,7 @@ void os_sem_up_sync(os_sem_t* sem, bool sync)
 
    /* check if there are some suspended tasks on this sem */
    task = os_taskqueue_dequeue(&(sem->task_queue));
-   if (!task)
-   {
+   if (!task) {
       /* there was no suspended tasks, in this case just increment the sem value */
       ++(sem->value);
    } else {
@@ -184,8 +182,7 @@ void os_sem_up_sync(os_sem_t* sem, bool sync)
        * User code may call some other OS function right away which will trigger
        * the os_schedule(). Parameter 'sync' is used for such optimization
        * request */
-      if (!sync)
-      {
+      if (!sync) {
          /* switch to more prioritized READY task, if there is such (1 as param
           * in os_schedule() means just that */
          os_schedule(1);
@@ -200,9 +197,10 @@ void os_sem_up_sync(os_sem_t* sem, bool sync)
  * Function called by timers module. Used for timeout of os_sem_down().
  * Callback to this function are done from contxt of os_timer_tick().
  */
-static void os_sem_timerclbck(void* param)
+static void os_sem_timerclbck(void *param)
 {
-   /* single timer has param in os_blocktimer_create() as pointer to task structure */
+   /* single timer has param in os_blocktimer_create() as pointer to task
+    * structure */
    os_task_t *task = (os_task_t*)param;
 
    OS_SELFCHECK_ASSERT(TASKSTATE_WAIT == task->state);

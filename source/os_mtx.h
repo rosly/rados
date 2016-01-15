@@ -39,8 +39,9 @@
  *   while semaphore can have multiple values (works as a counter)
  * - mutex cannot be used from ISR
  * - mutex has concept of ownership. The locked mutex can be unlocked only by
- *   the owner (task which recently lock it up), unlocking from another task will
- *   result in assertion, this may be seen as error checking feature of the mutex
+ *   the owner (task which recently lock it up), unlocking from another task
+ *   will result in assertion, this may be seen as error checking feature of the
+ *   mutex
  *   but it will assert only when OS_CONFIG_APICHECK is defined
  * - mutex prevents from priority inversion problem while semaphores does not.
  *   Priority inheritance will boost the priority of task that holds the mutex
@@ -85,7 +86,7 @@ typedef struct {
  *
  * @param pointer to mutex
  */
-void os_mtx_create(os_mtx_t* mtx);
+void os_mtx_create(os_mtx_t *mtx);
 
 /**
  * Function destroys the mutex
@@ -116,7 +117,7 @@ void os_mtx_create(os_mtx_t* mtx);
  *       suspended on mutex (possibly with higher priority than calling
  *       task)
  */
-void os_mtx_destroy(os_mtx_t* mtx);
+void os_mtx_destroy(os_mtx_t *mtx);
 
 /**
  * Function locks the mutex. If the mutex is already locked the calling task
@@ -134,7 +135,7 @@ void os_mtx_destroy(os_mtx_t* mtx);
  *         suspended on the lock operation
  * @note user code should always check the return code of os_mtx_lock()
  */
-os_retcode_t OS_WARN_UNUSEDRET os_mtx_lock(os_mtx_t* mtx);
+os_retcode_t OS_WARN_UNUSEDRET os_mtx_lock(os_mtx_t *mtx);
 
 /**
  * Function unlock the mutex. Only owner task can call this function.
@@ -146,7 +147,7 @@ os_retcode_t OS_WARN_UNUSEDRET os_mtx_lock(os_mtx_t* mtx);
  * @post this function may cause preemption since it can wake up task with
  *       higher priority than caller task
  */
-void os_mtx_unlock(os_mtx_t* mtx);
+void os_mtx_unlock(os_mtx_t *mtx);
 
 #endif
 

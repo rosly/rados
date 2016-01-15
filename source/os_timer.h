@@ -35,14 +35,14 @@
 #define OS_TIMEOUT_INFINITE (OS_TICKS_MAX)
 #define OS_TIMEOUT_TRY ((os_ticks_t)0)
 
-typedef void (*timer_proc_t)(void* param);
+typedef void (*timer_proc_t)(void *param);
 
 typedef struct {
    list_t list;
-   os_ticks_t ticks_rem; /**< remaining ticks before burn off */
-   os_ticks_t ticks_reload; /**< reload value in case of auto reload */
+   os_ticks_t ticks_rem;      /**< remaining ticks before burn off */
+   os_ticks_t ticks_reload;   /**< reload value in case of auto reload */
    timer_proc_t clbck;
-   void* param;
+   void *param;
 #ifdef OS_CONFIG_APICHECK
    uint_fast16_t magic; /**< use case sanitization checking mark */
 #endif
@@ -52,20 +52,22 @@ typedef struct {
 extern os_ticks_t os_ticks_cnt;
 
 void os_timer_create(
-   os_timer_t* timer,
+   os_timer_t *timer,
    timer_proc_t clbck,
-   void* param,
+   void *param,
    os_ticks_t timeout_ticks,
    os_ticks_t reload_ticks);
 
-void os_timer_destroy(os_timer_t* timer);
+void os_timer_destroy(os_timer_t *timer);
 
 static inline void os_ticks_now(os_ticks_t *ticks)
 {
    arch_ticks_atomiccpy(ticks, &os_ticks_cnt);
 }
 
-os_ticks_t os_ticks_diff(os_ticks_t ticks_start, os_ticks_t ticks_now);
+os_ticks_t os_ticks_diff(
+   os_ticks_t ticks_start,
+   os_ticks_t ticks_now);
 
 #endif
 

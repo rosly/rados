@@ -78,9 +78,12 @@ typedef struct os_sem_tag {
  * kind)
  *
  * @param sem pointer to semaphore
- * @param init_value initial value of semaphore, must be >= 0 and < * OS_ATOMIC_MAX
+ * @param init_value initial value of semaphore
+ *        must be >= 0 and < OS_ATOMIC_MAX
  */
-void os_sem_create(os_sem_t* sem, os_atomic_t init_value);
+void os_sem_create(
+   os_sem_t *sem,
+   os_atomic_t init_value);
 
 /**
  * Function destroys the semaphore
@@ -92,7 +95,7 @@ void os_sem_create(os_sem_t* sem, os_atomic_t init_value);
  *
  * @pre semaphore must be initialized prior call of this function
  * @pre this function cannot be called from ISR
-
+ *
  * @post semaphore will be uninitialized after this call. Such semaphore cannot
  *       be used by any other function until it will be initialized again. If
  *       semaphore is also used from ISR (like for signaling) calling of
@@ -106,7 +109,7 @@ void os_sem_create(os_sem_t* sem, os_atomic_t init_value);
  *       suspended on semaphore (possibly with higher priority than calling
  *       task)
  */
-void os_sem_destroy(os_sem_t* sem);
+void os_sem_destroy(os_sem_t *sem);
 
 /**
  * Function consumes the single signal from semaphore. In case semaphore value
@@ -116,15 +119,15 @@ void os_sem_destroy(os_sem_t* sem);
  *
  * @param sem pointer to semaphore
  * @param timeout_ticks number of jiffies (os_tick() call count) before
- *        operation will time out. If user would like to not use of timeout, than
- *        @param timeout should be OS_TIMEOUT_INFINITE.
+ *        operation will time out. If user would like to not use of timeout,
+ *        than @param timeout should be OS_TIMEOUT_INFINITE.
  *        If user would like to perform TRY operation (which will return instead
  *        of suspending the task) than @param timeout should be
  *        OS_TIMEOUT_TRY. In this scenario function return code will be
  *        OS_WOULDBLOCK.
  *
- * @pre semaphore must be initialized prior call of this function (please look at
- *      description of possible race conditions with os_sem_destroy()
+ * @pre semaphore must be initialized prior call of this function (please look
+ *      at description of possible race conditions with os_sem_destroy()
  * @pre this function cannot be used from ISR nor idle task
  *
  * @return OS_OK in case signal was consumed from semaphore.
@@ -138,7 +141,7 @@ void os_sem_destroy(os_sem_t* sem);
  * @note user code should always check the return code of os_sem_down()
  */
 os_retcode_t OS_WARN_UNUSEDRET os_sem_down(
-   os_sem_t* sem,
+   os_sem_t *sem,
    uint_fast16_t timeout_ticks);
 
 /**
@@ -162,7 +165,9 @@ os_retcode_t OS_WARN_UNUSEDRET os_sem_down(
  * @post in case sync parameter is 'false', this function may cause preemption
  *       since it can wake up task with higher priority than caller task
  */
-void os_sem_up_sync(os_sem_t* sem, bool sync);
+void os_sem_up_sync(
+   os_sem_t *sem,
+   bool sync);
 
 /**
  * Function signalizes the semaphore
@@ -177,7 +182,7 @@ void os_sem_up_sync(os_sem_t* sem, bool sync);
  * @post this function may cause preemption since it can wake up task with
  *       higher priority than caller task
  */
-static inline void os_sem_up(os_sem_t* sem)
+static inline void os_sem_up(os_sem_t *sem)
 {
    os_sem_up_sync(sem, false);
 }

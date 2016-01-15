@@ -44,11 +44,11 @@
 #define OS_ASSERT(_cond) \
    do \
    { \
-      if( OS_UNLIKELY(!(_cond)) ) \
+      if ( OS_UNLIKELY(!(_cond)) ) \
       { \
          os_halt(); \
       } \
-   }while(0)
+   } while (0)
 #else
 #define OS_ASSERT
 #endif
@@ -132,12 +132,18 @@ extern volatile os_atomic_t sched_lock;
 extern os_waitqueue_t *waitqueue_current;
 #endif
 
-void OS_HOT os_taskqueue_enqueue(os_taskqueue_t* task_queue, os_task_t* task);
+void OS_HOT os_taskqueue_enqueue(
+   os_taskqueue_t *task_queue,
+   os_task_t *task);
 void OS_HOT os_taskqueue_unlink(os_task_t* OS_RESTRICT task);
-void OS_HOT os_taskqueue_reprio( os_task_t* task, uint_fast8_t new_prio);
-os_task_t* OS_HOT os_taskqueue_dequeue(os_taskqueue_t* task_queue);
-os_task_t* OS_HOT os_taskqueue_dequeue_prio(os_taskqueue_t* task_queue, uint_fast8_t prio);
-os_task_t* OS_HOT os_taskqueue_peek(os_taskqueue_t* OS_RESTRICT task_queue);
+void OS_HOT os_taskqueue_reprio(
+   os_task_t *task,
+   uint_fast8_t new_prio);
+os_task_t*OS_HOT os_taskqueue_dequeue(os_taskqueue_t *task_queue);
+os_task_t*OS_HOT os_taskqueue_dequeue_prio(
+   os_taskqueue_t *task_queue,
+   uint_fast8_t prio);
+os_task_t*OS_HOT os_taskqueue_peek(os_taskqueue_t* OS_RESTRICT task_queue);
 void os_taskqueue_init(os_taskqueue_t *task_queue);
 void OS_HOT os_schedule(uint_fast8_t higher_prio);
 void OS_HOT os_task_block_switch(
@@ -163,17 +169,23 @@ void OS_NORETURN OS_COLD os_task_exit(int retv);
  */
 void arch_os_start(void);
 
-/* \note we don't mark arch_context_switch() as OS_NAKED since not all arch use that */
+/* \note we don't mark arch_context_switch() as OS_NAKED since not all arch use
+ *       that */
 void /* OS_NAKED */ OS_HOT arch_context_switch(os_task_t *new_task);
 void OS_NORETURN OS_COLD arch_halt(void);
-void arch_task_init(os_task_t *tcb, void* stack, size_t stack_size, os_taskproc_t proc, void* param);
+void arch_task_init(
+   os_task_t *tcb,
+   void *stack,
+   size_t stack_size,
+   os_taskproc_t proc,
+   void *param);
 void arch_idle(void);
 
 /* --- OS private inline functions --- */
 
 static inline void os_task_makeready(os_task_t *task)
 {
-   task->state = TASKSTATE_READY; /* set the task state */
+   task->state = TASKSTATE_READY;            /* set the task state */
    os_taskqueue_enqueue(&ready_queue, task); /* put task into ready_queue */
 }
 
@@ -202,8 +214,7 @@ static inline void os_blocktimer_create(
 static inline void os_blocktimer_destroy(os_task_t *task)
 {
    /* check if there is a timeout associated with task */
-   if (task->timer)
-   {
+   if (task->timer) {
       os_timer_destroy(task->timer);
       task->timer = NULL;
    }
@@ -218,8 +229,7 @@ static inline void os_scheduler_intunlock(bool sync)
 {
    os_atomic_dec(sched_lock);
 
-   if (!sync)
-   {
+   if (!sync) {
       /* switch to more prioritized READY task, if there is such (1 as param
        * in os_schedule() means just that */
       os_schedule(1);

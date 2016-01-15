@@ -35,12 +35,12 @@
 #ifdef OS_CONFIG_WAITQUEUE
 
 /* private function forward declarations */
-static void os_waitqueue_timerclbck(void* param);
+static void os_waitqueue_timerclbck(void *param);
 
 /* --- public functions --- */
 /* all public functions are documented in os_waitqueue.h file */
 
-void os_waitqueue_create(os_waitqueue_t* queue)
+void os_waitqueue_create(os_waitqueue_t *queue)
 {
    OS_ASSERT(!waitqueue_current); /* cannot call after os_waitqueue_prepare() */
 
@@ -48,7 +48,7 @@ void os_waitqueue_create(os_waitqueue_t* queue)
    os_taskqueue_init(&(queue->task_queue));
 }
 
-void os_waitqueue_destroy(os_waitqueue_t* queue)
+void os_waitqueue_destroy(os_waitqueue_t *queue)
 {
    arch_criticalstate_t cristate;
    os_task_t *task;
@@ -58,8 +58,7 @@ void os_waitqueue_destroy(os_waitqueue_t* queue)
    arch_critical_enter(cristate);
 
    /* wake up all task which suspended on wait_queue */
-   while ((task = os_taskqueue_dequeue(&(queue->task_queue))))
-   {
+   while ((task = os_taskqueue_dequeue(&(queue->task_queue)))) {
       os_blocktimer_destroy(task); /* destroy the tasks timer */
       task->block_code = OS_DESTROYED;
       os_task_makeready(task);
@@ -69,8 +68,8 @@ void os_waitqueue_destroy(os_waitqueue_t* queue)
     * was also used from interrupt context (feel warned) */
    memset(queue, 0, sizeof(os_waitqueue_t));
 
-   /* schedule to make context switch in case os_waitqueue_destroy() was called by
-    * lower priority task than tasks which we just woken up */
+   /* schedule to make context switch in case os_waitqueue_destroy() was called
+    * by lower priority task than tasks which we just woken up */
    os_schedule(1);
 
    arch_critical_exit(cristate);
@@ -79,7 +78,7 @@ void os_waitqueue_destroy(os_waitqueue_t* queue)
 void os_waitqueue_prepare(os_waitqueue_t *queue)
 {
    OS_ASSERT(0 == isr_nesting); /* cannot call from ISR */
-   OS_ASSERT(task_current != &task_idle); /* idle task cannot call blocking functions (will crash OS) */
+   OS_ASSERT(task_current != &task_idle); /* IDLE task cannot block */
    OS_ASSERT(true == list_is_empty(&task_current->mtx_list)); /* calling of blocking function while holding mtx will cause priority inversion */
 
    /* disable preemption */
@@ -113,7 +112,7 @@ os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(os_ticks_t timeout_ticks)
    arch_criticalstate_t cristate;
 
    OS_ASSERT(0 == isr_nesting); /* cannot call form ISR */
-   OS_ASSERT(task_current != &task_idle); /* idle task cannot call blocking functions (will crash OS) */
+   OS_ASSERT(task_current != &task_idle); /* IDLE task cannot block */
    OS_ASSERT(timeout_ticks > OS_TIMEOUT_TRY); /* timeout must be either specific or infinite */
    OS_ASSERT(true == list_is_empty(&task_current->mtx_list)); /* calling of blocking function while holding mtx will cause priority inversion */
 
@@ -123,14 +122,14 @@ os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(os_ticks_t timeout_ticks)
     * slow patch function (task decided to suspend) */
    arch_critical_enter(cristate);
 
-   os_scheduler_intunlock(true); /* true = sync, unlock scheduler but do not schedule() yet */
+   os_scheduler_intunlock(true); /* true = sync, unlock scheduler but do not
+                                  * schedule() yet */
 
    /* check if we are still in 'prepared' state
     * if not than it means that we were woken up by ISR in the mean time */
-   if (waitqueue_current)
-   {
-      if (OS_TIMEOUT_INFINITE != timeout_ticks)
-      {
+   if (waitqueue_current) {
+
+      if (OS_TIMEOUT_INFINITE != timeout_ticks) {
          os_blocktimer_create(&timer, os_waitqueue_timerclbck, timeout_ticks);
       }
 
@@ -172,10 +171,9 @@ void os_waitqueue_wakeup_sync(
 
    arch_critical_enter(cristate);
 
-   /* check if we are in ISR but we interrupted the task which is prepared to suspend
-    * on the same wait_queue which we will signalize */
-   if ((isr_nesting > 0) && (waitqueue_current == queue))
-   {
+   /* check if we are in ISR but we interrupted the task which is prepared to
+    * suspend on the same wait_queue which we will signalize */
+   if ((isr_nesting > 0) && (waitqueue_current == queue)) {
       /* We are trying to wake up the task_current from ISR.
        * task_current is in 'prepared' state and it is not pushed to any
        * task_queue. The only action which we need to do is communicate with
@@ -186,9 +184,7 @@ void os_waitqueue_wakeup_sync(
       /* since we theoretically prevented from sleep one task, now we have one
        * task less to wake up */
       if (OS_WAITQUEUE_ALL != nbr)
-      {
-        --nbr;
-      }
+         --nbr;
 
       /* \TODO \FIXME consider that task_current may be less prioritized than
        * tasks in wait_queue->task_queue, so preventing it from sleep is not
@@ -202,13 +198,11 @@ void os_waitqueue_wakeup_sync(
        * and wakeup the most prioritized one */
    }
 
-   while ((OS_WAITQUEUE_ALL == nbr) || ((nbr--) > 0))
-   {
+   while ((OS_WAITQUEUE_ALL == nbr) || ((nbr--) > 0)) {
       /* chose most prioritized task from wait_queue->task_queue (for task with
        * equal priority threat them in FIFO manner) */
       task = os_taskqueue_dequeue(&(queue->task_queue));
-      if (!task)
-      {
+      if (!task) {
          /* there will be no more task to wake up, stop spinning */
          break;
       }
@@ -221,13 +215,12 @@ void os_waitqueue_wakeup_sync(
       os_task_makeready(task);
    }
 
-   /* to wake up all task exactly once, we have to schedule() out of wakeup loop.
-    * But do not call schedule() if user requested sync mode.
+   /* To wake up all task exactly once, we have to schedule() out of wakeup
+    * loop. But do not call schedule() if user requested sync mode.
     * User code may call some other OS function right away which will trigger
     * the os_schedule(). Parameter 'sync' is used for such optimization
     * request */
-   if (!sync)
-   {
+   if (!sync) {
       /* switch to more prioritized READY task, if there is such (1 as param
        * in os_schedule() means just that */
       os_schedule(1);
@@ -242,9 +235,10 @@ void os_waitqueue_wakeup_sync(
  * Function called by timers module. Used for timeout of os_waitqueue_wait()
  * Callback to this function are done from context of os_timer_tick().
  */
-static void os_waitqueue_timerclbck(void* param)
+static void os_waitqueue_timerclbck(void *param)
 {
-   /* single timer has param in os_blocktimer_create() as pointer to task structure */
+   /* single timer has param in os_blocktimer_create() as pointer to task
+    * structure */
    os_task_t *task = (os_task_t*)param;
 
    OS_SELFCHECK_ASSERT(TASKSTATE_WAIT == task->state);

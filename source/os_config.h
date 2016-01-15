@@ -34,9 +34,9 @@
 
 /** Define OS_CONFIG_CHECKSTACK if you would like to check the tasks stack
  * integrity. This requires a few additional resources (memory in os_task_t
- * structure and CU at each stack check operation (may be quite expensive)), this
- * define should be used during development while disabled for production if
- * you are sure that your tasks does not exceed assigned stacks */
+ * structure and CU at each stack check operation (may be quite expensive)),
+ * this define should be used during development while disabled for production
+ * if you are sure that your tasks does not exceed assigned stacks */
 #define OS_CONFIG_CHECKSTACK (1)
 
 /** Define OS_CONFIG_APICHECK if you would like to check the API call parameters

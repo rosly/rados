@@ -60,7 +60,9 @@ typedef void (*test_tick_clbck_t)(void);
  * This function is setup and architecture dependent and should pass the
  * verbose debug output to console like interface (for instance serial port)
  */
-void test_debug_printf(const OS_PROGMEM char* format, ...);
+void test_debug_printf(
+   const OS_PROGMEM char *format,
+   ...);
 
 /**
  * Function notifies Human User Interface about test result
@@ -80,14 +82,16 @@ void test_result(int result);
  * create the tick timer. This allows tests to handle the manual tick requests
  * (if needed) but also can be used for periodic tick setup (which is more
  * usual case). For periodic tick setup test should call test_setuptick */
-void test_setupmain(const OS_PROGMEM char* test_name);
+void test_setupmain(const OS_PROGMEM char *test_name);
 
 /**
  * Function starts the periodic timer
  *
  * @precondition test_setupmain was called beforehand
  */
-void test_setuptick(test_tick_clbck_t clbck, unsigned long nsec);
+void test_setuptick(
+   test_tick_clbck_t clbck,
+   unsigned long nsec);
 
 /**
  * Function forces manual tick

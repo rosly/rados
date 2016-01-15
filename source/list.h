@@ -47,8 +47,8 @@
  * this element as a field. Also some publicly accessible list header need to be
  * created.
  *
- * Empty list does not contain elements and its next and prev pointer are set the
- * head of the list (the same element).
+ * Empty list does not contain elements and its next and prev pointer are set
+ * the head of the list (the same element).
  * List with one element will contain list head linked with contained element
  * (two elements at total)
  */
@@ -76,7 +76,9 @@ typedef struct _listprio_t {
  * Internal function.
  */
 static inline void __list_put_in_between(
-   list_t *elem, list_t *left, list_t *right)
+   list_t *elem,
+   list_t *left,
+   list_t *right)
 {
    right->prev = elem;
    elem->next = right;
@@ -88,7 +90,9 @@ static inline void __list_put_in_between(
  * Connect two elements together, thus removing all elements in between.
  * Internal function.
  */
-static inline void __list_connect_together(list_t *left, list_t *right)
+static inline void __list_connect_together(
+   list_t *left,
+   list_t *right)
 {
    right->prev = left;
    left->next = right;
@@ -109,7 +113,9 @@ static inline void list_init(list_t *l)
 /**
  * Insert an element at the begin of the list. O(1) operation.
  */
-static inline void list_prepend(list_t *l, list_t *elem)
+static inline void list_prepend(
+   list_t *l,
+   list_t *elem)
 {
    __list_put_in_between(elem, l, l->next);
 }
@@ -117,7 +123,9 @@ static inline void list_prepend(list_t *l, list_t *elem)
 /**
  * Insert an element at the end of the list. O(1) operation/
  */
-static inline void list_append(list_t *l, list_t *elem)
+static inline void list_append(
+   list_t *l,
+   list_t *elem)
 {
    __list_put_in_between(elem, l->prev, l);
 }
@@ -125,7 +133,9 @@ static inline void list_append(list_t *l, list_t *elem)
 /**
  * Insert an @param ele element after @param irt iterator. O(1) operation.
  */
-static inline void list_put_after(list_t *itr, list_t *ele)
+static inline void list_put_after(
+   list_t *itr,
+   list_t *ele)
 {
    __list_put_in_between(ele, itr, itr->next);
 }
@@ -133,7 +143,9 @@ static inline void list_put_after(list_t *itr, list_t *ele)
 /**
  * Insert an @param ele element before @param irt iterator. O(1) operation.
  */
-static inline void list_put_before(list_t *itr, list_t *ele)
+static inline void list_put_before(
+   list_t *itr,
+   list_t *ele)
 {
    __list_put_in_between(ele, itr->prev, itr);
 }
@@ -172,7 +184,9 @@ static inline list_t *list_itr_begin(const list_t *l)
 /**
  * Returns true if iterator is at the end of the list, false otherwise
  */
-static inline bool list_itr_end(const list_t *l, const list_t *itr)
+static inline bool list_itr_end(
+   const list_t *l,
+   const list_t *itr)
 {
    return l == itr;
 }
@@ -183,11 +197,9 @@ static inline bool list_itr_end(const list_t *l, const list_t *itr)
 static inline list_t *list_peekfirst(const list_t *l)
 {
    if (l->next == l)
-   {
       return NULL;
-   } else {
+   else
       return l->next;
-   }
 }
 
 /*
@@ -196,10 +208,9 @@ static inline list_t *list_peekfirst(const list_t *l)
 static inline list_t *list_detachfirst(const list_t *l)
 {
    list_t *elem = l->next;
+
    if (elem == l)
-   {
-      return NULL; /* means list is empty */
-   }
+      return NULL;  /* means list is empty */
    __list_connect_together(elem->prev, elem->next);
    list_init(elem);
    return elem;
@@ -212,26 +223,26 @@ static inline list_t *list_detachfirst(const list_t *l)
 static inline list_t *list_peeklast(const list_t *l)
 {
    if (l->prev == l)
-   {
       return NULL;
-   } else {
+   else
       return l->prev;
-   }
 }
 
 /**
  * Adds the element to the priority list in proper place which will sustain the
- * sorting order. In case of multiple elements with the same priority, it will be
- * added at the end of the block of those elements.
+ * sorting order. In case of multiple elements with the same priority, it will
+ * be added at the end of the block of those elements.
  *
  * @note important this is O(n) operation
  */
-static inline void listprio_append(listprio_t *h, listprio_t *elem)
+static inline void listprio_append(
+   listprio_t *h,
+   listprio_t *elem)
 {
    listprio_t *l = h;
    listprio_t *r = (listprio_t*)(l->list.next);
-   while((r != h) && (elem->prio <= r->prio))
-   {
+
+   while ((r != h) && (elem->prio <= r->prio)) {
       l = r;
       r = (listprio_t*)(r->list.next);
    }
@@ -245,10 +256,9 @@ static inline void listprio_append(listprio_t *h, listprio_t *elem)
 static inline listprio_t *listprio_detachfirst(const listprio_t *l)
 {
    list_t *elem = l->list.next;
+
    if (elem == (list_t*)l)
-   {
-      return NULL; /* means list is empty */
-   }
+      return NULL;  /* means list is empty */
    __list_connect_together(elem->prev, elem->next);
    list_init(elem);
    return (listprio_t*)elem; /* list_t list is at begin of listprio_t */

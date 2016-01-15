@@ -118,7 +118,7 @@
  *     asynchronous wakeup event. Also using of semaphore or message box is not
  *     a feasible solution because either of communication scheme, wakeup
  *     preemption of notifier or data passing/acquisition requirements.
-
+ *
  */
 
 /**
@@ -143,7 +143,7 @@ typedef struct os_waitqueue_tag {
  *
  * @param queue pointer to wait_queue
  */
-void os_waitqueue_create(os_waitqueue_t* queue);
+void os_waitqueue_create(os_waitqueue_t *queue);
 
 /**
  * Function destroys the wait_queue
@@ -155,11 +155,11 @@ void os_waitqueue_create(os_waitqueue_t* queue);
  *
  * @pre wait_queue must be initialized prior call of this function
  * @pre this function cannot be called from ISR
-
- * @post wait_queue will be uninitialized after this call. Such wait_queue cannot
- *       be used by any other function until it will be initialized again. If
- *       wait_queue is also used from ISR (like for signaling) calling of
- *       os_waitqueue_destroy() may create race conditions. User must design
+ *
+ * @post wait_queue will be uninitialized after this call. Such wait_queue
+ *       cannot be used by any other function until it will be initialized
+ *       again. If wait_queue is also used from ISR (like for signaling) calling
+ *       of os_waitqueue_destroy() may create race conditions. User must design
  *       application in a way which will prevent such cases to be possible (use
  *       after destroy). Tasks which was suspended on wait_queue prior call of
  *       os_waitqueue_destroy() will be released with OS_DESTROYED as return
@@ -169,7 +169,7 @@ void os_waitqueue_create(os_waitqueue_t* queue);
  *       suspended on wait_queue (possibly with higher priority than calling
  *       task)
  */
-void os_waitqueue_destroy(os_waitqueue_t* queue);
+void os_waitqueue_destroy(os_waitqueue_t *queue);
 
 /**
  * function prepares the task for suspend on wait_queue. After return from this
@@ -255,8 +255,8 @@ os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(os_ticks_t timeout_ticks);
  * @param nbr number of task to wakeup. Must be > 0. To wake all task suspended
  *        on given queue nbr should be given as OS_WAITQUEUE_ALL.
  * @param sync by passing 'true' in this parameter, user application will force
- *        signaling of wait_queue in synchronized mode. It means that there will be
- *        no context switches during os_waitqueue_wakeup_sync() call even if
+ *        signaling of wait_queue in synchronized mode. It means that there will
+ *        be no context switches during os_waitqueue_wakeup_sync() call even if
  *        some higher priority task would be woken up. By passing 'false' in
  *        this parameter application specifies that after waking up of suspended
  *        tasks, context switches are allowed. This feature can be used in
@@ -293,9 +293,11 @@ void os_waitqueue_wakeup_sync(
  * @post this function may cause preemption since it can wake up task with
  *       higher priority than caller task
  */
-static inline void os_waitqueue_wakeup(os_waitqueue_t *queue, uint_fast8_t nbr)
+static inline void os_waitqueue_wakeup(
+   os_waitqueue_t *queue,
+   uint_fast8_t nbr)
 {
-  os_waitqueue_wakeup_sync(queue, nbr, false);
+   os_waitqueue_wakeup_sync(queue, nbr, false);
 }
 
 #endif

@@ -47,10 +47,11 @@
 #define OS_CONCAT(a, b) OS_XCONCAT(a, b)
 
 #define OS_STATIC_ASSERT(_e) \
-  enum { OS_CONCAT(static_assert_, __LINE__) = 1/(!!(_e)) }
+   enum { OS_CONCAT(static_assert_, __LINE__) = 1 / (!!(_e)) }
 //char OS_CONCAT(static_assert_, __LINE__)[0 - 1*!(_e)];
 
-/** Definition of system atomic value, it need to at least 8bits wide, unsigned */
+/** Definition of system atomic value, it need to at least 8bits wide, unsigned
+ **/
 typedef volatile arch_atomic_t os_atomic_t;
 OS_STATIC_ASSERT(ARCH_ATOMIC_MAX >= (UINT8_MAX - 1));
 #define OS_ATOMIC_MAX ARCH_ATOMIC_MAX

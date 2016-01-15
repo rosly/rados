@@ -35,7 +35,7 @@
 #define test_assert(_cond) \
    do \
    { \
-      if ( __builtin_expect(!(_cond), 0) ) { \
+      if (__builtin_expect(!(_cond), 0)) { \
          test_result(-1); \
       } \
    } while (0)

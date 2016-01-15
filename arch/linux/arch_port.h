@@ -205,7 +205,7 @@ static inline uint_fast8_t arch_bitmask_fls(arch_bitmask_t bitfield)
    do { \
       /* context of the task is already saved on stack by linux kernel, so we \
        * can freely use C here (we wont destroy any regs) */ \
-      if ( 1 >= (++isr_nesting) ) { \
+      if (1 >= (++isr_nesting)) { \
          /* here we copy the context prepared by linux kernel on current stack \
           * to preserve it for later task restoration */  \
          task_current->ctx.context = *(ucontext_t*)ucontext; \
@@ -234,7 +234,7 @@ static inline uint_fast8_t arch_bitmask_fls(arch_bitmask_t bitfield)
 #define arch_contextrestore_i(_isrName) \
    do { \
       arch_dint(); \
-      if ( 0 == (--isr_nesting) ) { \
+      if (0 == (--isr_nesting)) { \
          memcpy(&(((ucontext_t*)ucontext)->uc_stack), \
             &(task_current->ctx.context.uc_stack), \
             sizeof(task_current->ctx.context.uc_stack)); \

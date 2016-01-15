@@ -106,7 +106,7 @@ int task2_proc(void *param)
       ret = os_sem_down(&sem2, OS_TIMEOUT_INFINITE);
       test_assert(OS_OK == ret);
 
-      if ( 0 == (task2_i % 100) )
+      if (0 == (task2_i % 100))
          test_debug("%d %d\n", task1_i, task2_i);
    }
 }
@@ -119,11 +119,11 @@ void init(void)
       .sigev_signo   = SIGALRM,
    };
    struct itimerspec its = {
-      .it_interval   ={
+      .it_interval   = {
          .tv_sec     = 0,
          .tv_nsec    = 1,
       },
-      .it_value      ={
+      .it_value      = {
          .tv_sec     = 0,
          .tv_nsec    = 1,
       }

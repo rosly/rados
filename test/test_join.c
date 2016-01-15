@@ -72,7 +72,7 @@ void idle(void)
 /**
  * test procedure for task which we will join
  */
-int task_proc_worker1(void *OS_UNUSED( param))
+int task_proc_worker1(void *OS_UNUSED(param))
 {
    return 100;
 }
@@ -80,7 +80,7 @@ int task_proc_worker1(void *OS_UNUSED( param))
 /**
  * test procedure for task which we will join
  */
-int task_proc_worker2(void *OS_UNUSED( param))
+int task_proc_worker2(void *OS_UNUSED(param))
 {
    int ret;
 
@@ -92,7 +92,7 @@ int task_proc_worker2(void *OS_UNUSED( param))
 /**
  * test procedure for task which we will use to wait for join
  */
-int task_proc_join(void *OS_UNUSED( param))
+int task_proc_join(void *OS_UNUSED(param))
 {
    int ret;
 

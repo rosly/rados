@@ -57,7 +57,7 @@ static void OS_ISR sig_alrm(
    /* we do not allowing or nested interrupts in this ISR, therefore we do not
     * have to enter the critical section to call os_tick() */
    os_tick();
-   if ( test_tick_clbck )
+   if (test_tick_clbck)
       test_tick_clbck();
 
    arch_contextrestore_i(sig_alrm);

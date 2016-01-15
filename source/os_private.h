@@ -44,7 +44,7 @@
 #define OS_ASSERT(_cond) \
    do \
    { \
-      if ( OS_UNLIKELY(!(_cond)) ) \
+      if (OS_UNLIKELY(!(_cond))) \
       { \
          os_halt(); \
       } \

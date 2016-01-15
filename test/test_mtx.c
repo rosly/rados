@@ -94,7 +94,7 @@ int test_scen1_worker(void *param)
       os_mtx_unlock(&test_mtx[0]);
 
       /* add randomness to test, force task switch with 50% of probability */
-      if ( 0 == (rand() % 2) ) test_reqtick();
+      if (0 == (rand() % 2)) test_reqtick();
    }
 
    return 0;

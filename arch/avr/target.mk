@@ -45,9 +45,6 @@ STRIP    = avr-strip
 SIZE     = avr-size
 READELF  = avr-readelf
 #MAKETXT  = srec_cat
-CP       = cp -p
-RM       = rm -f
-MV       = mv
 
 CFLAGS   = -mmcu=$(MCU) -DF_CPU=$(FCPU) -D__FILENAME__=$(notdir $<) \
            -ffunction-sections -fdata-sections # -std=gnu99 commented out cause __flash extension

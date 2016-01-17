@@ -29,8 +29,6 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-ECHO = /bin/echo -e
-
 #by defining ARCH enviroment variable, user can compile for different architectures
 ifeq ($(ARCH),)
 $(error ARCH is not defined, check your enviroment ARCH variable)
@@ -40,6 +38,8 @@ endif
 ifeq ($(CONFIGDIR),)
 export CONFIGDIR = $(CURDIR)/..
 endif
+#there are common tools used in build system
+include $(CONFIGDIR)/tools.mk
 #each architecture have its own target.mk file where CC, CFLAGS variables are defined
 include $(CONFIGDIR)/arch/$(ARCH)/target.mk
 #ARCHSOURCES are defined separately
@@ -78,6 +78,7 @@ LDFLAGS +=
 vpath %.c $(SOURCEDIR)
 vpath %.o $(BUILDDIR)
 vpath %.a $(BUILDDIR)
+STYLESOURCES = $(addprefix $(SOURCEDIR)/, $(TESTSOURCE:.c=.c))
 DEPEND = $(addprefix $(BUILDDIR)/, $(TESTSOURCE:.c=.d))
 OBJECTS = $(addprefix $(BUILDDIR)/, $(TESTSOURCE:.c=.o))
 TARGETS = $(addprefix $(BUILDDIR)/, $(TESTSOURCE:.c=.elf))
@@ -119,8 +120,11 @@ testloop:
 endif
 
 clean:
-	@$(RM) $(TARGETS); $(ECHO) "[RM]\t$(TARGETS)"
-	@$(RM) $(OBJECTS); $(ECHO) "[RM]\t$(OBJECTS)"
-	@$(RM) $(DEPEND); $(ECHO) "[RM]\t$(DEPEND)"
-	@$(RM) $(BUILDDIR)/*.s $(BUILDDIR)/*i; $(ECHO) "[RM]\t[temps]"
+	@$(ECHO) "[RM]\t$(TARGETS)"; $(RM) $(TARGETS)
+	@$(ECHO) "[RM]\t$(OBJECTS)"; $(RM) $(OBJECTS)
+	@$(ECHO) "[RM]\t$(DEPEND)"; $(RM) $(DEPEND)
+	@$(ECHO) "[RM]\t[temps]"; $(RM) $(BUILDDIR)/*.s $(BUILDDIR)/*i
+
+style:
+	@$(STYLE) -c ../uncrustify.cfg $(STYLESOURCES)
 

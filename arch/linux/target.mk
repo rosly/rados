@@ -11,9 +11,6 @@ STRIP    = strip
 SIZE     = size
 READELF  = readelf
 #MAKETXT  = srec_cat
-CP       = cp -p
-RM       = rm -f
-MV       = mv
 
 ifeq ($(DEBUG),)
 CFLAGS   = -O3

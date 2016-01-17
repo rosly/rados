@@ -28,8 +28,6 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 
-ECHO = /bin/echo -e
-
 #by defining ARCH enviroment variable, user can compile for different architectures
 ifeq ($(ARCH),)
 $(error ARCH is not defined, check your enviroment ARCH variable)
@@ -39,21 +37,25 @@ endif
 ifeq ($(CONFIGDIR),)
 export CONFIGDIR = $(CURDIR)
 endif
+#there are common tools used in build system
+include $(CONFIGDIR)/tools.mk
 #each architecture have its own target.mk file where CC, CFLAGS variables are defined
 include $(CONFIGDIR)/arch/$(ARCH)/target.mk
 #ARCHSOURCES are defined separately
 include arch/$(ARCH)/source.mk
 
-SOURCEDIR = source
+KERNELSOURCEDIR = source
 BUILDDIR ?= build/$(ARCH)
 ARCHDIR = arch/$(ARCH)
-INCLUDEDIR = $(ARCHDIR) $(SOURCEDIR)
-SOURCES = \
+INCLUDEDIR = $(ARCHDIR) $(KERNELSOURCEDIR)
+KERNELSOURCES = \
 	os_sched.c \
 	os_sem.c \
 	os_mtx.c \
 	os_waitqueue.c \
-	os_timer.c \
+	os_timer.c
+SOURCES = \
+   $(KERNELSOURCES) \
 	$(ARCHSOURCES)
 
 #in target.mk for each source the optimal optimization level (CFLAGS = -Ox) is defined
@@ -65,9 +67,14 @@ endif
 CFLAGS += -Wall -Wextra -Werror
 LDFLAGS +=
 
-vpath %.c $(SOURCEDIR) $(ARCHDIR)
+vpath %.c $(KERNELSOURCEDIR) $(ARCHDIR)
 vpath %.o $(BUILDDIR)
 vpath %.elf $(BUILDDIR)
+STYLESOURCES = \
+   $(addprefix $(KERNELSOURCEDIR)/, $(KERNELSOURCES:.c=.c)) \
+   $(addprefix $(KERNELSOURCEDIR)/, $(KERNELSOURCES:.c=.h)) \
+   $(addprefix $(ARCHDIR)/, $(ARCHSOURCES:.c=.c)) \
+   $(addprefix $(ARCHDIR)/, $(ARCHSOURCES:.c=.h)) 
 DEPEND = $(addprefix $(BUILDDIR)/, $(SOURCES:.c=.d))
 OBJECTS = $(addprefix $(BUILDDIR)/, $(SOURCES:.c=.o))
 LISTINGS = $(addprefix $(BUILDDIR)/, $(SOURCES:.c=.lst))
@@ -83,7 +90,7 @@ $(BUILDTARGET): $(OBJECTS)
 
 $(BUILDDIR)/%.o: %.c
 	@$(ECHO) "[CC]\t$<"
-	$(CC) -save-temps=obj -c $(CFLAGS) -o $@ $(addprefix -I, $(INCLUDEDIR)) $<
+	@$(CC) -save-temps=obj -c $(CFLAGS) -o $@ $(addprefix -I, $(INCLUDEDIR)) $<
 
 $(BUILDDIR)/%.lst: %.o
 	@$(ECHO) "[LST]\t$<"
@@ -105,11 +112,11 @@ $(BUILDDIR)/%.d: %.c
 .PHONY: clean test testrun testloop lst size
 
 clean:
-	@$(RM) $(BUILDTARGET); $(ECHO) "[RM]\t$(BUILDTARGET)"
-	@$(RM) $(OBJECTS); $(ECHO) "[RM]\t$(OBJECTS)"
-	@$(RM) $(DEPEND); $(ECHO) "[RM]\t$(DEPEND)"
-	@$(RM) $(LISTINGS); $(ECHO) "[RM]\t$(LISTINGS)"
-	@$(RM) $(BUILDDIR)/*.s $(BUILDDIR)/*i; $(ECHO) "[RM]\t[temps]"
+	@$(ECHO) "[RM]\t$(BUILDTARGET)"; $(RM) $(BUILDTARGET)
+	@$(ECHO) "[RM]\t$(OBJECTS)"; $(RM) $(OBJECTS)
+	@$(ECHO) "[RM]\t$(DEPEND)"; $(RM) $(DEPEND)
+	@$(ECHO) "[RM]\t$(LISTINGS)"; $(RM) $(LISTINGS)
+	@$(ECHO) "[RM]\t[temps]"; $(RM) $(BUILDDIR)/*.s $(BUILDDIR)/*i
 	@$(MAKE) --no-print-directory -C test clean
 
 test: $(BUILDTARGET)
@@ -120,4 +127,8 @@ testrun: test
 
 testloop: test
 	@$(MAKE) --no-print-directory -C test testloop
+
+style:
+	@$(STYLE) -c uncrustify.cfg $(STYLESOURCES)
+	@$(MAKE) --no-print-directory -C test style
 

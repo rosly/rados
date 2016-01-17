@@ -40,7 +40,7 @@ Performance:
                             compare to 0 (more efficient for most arch) 
 
 Features:
-- (msg_queues)     MEDIUM - lock less message queues in form of library similar
+- (msg_queues)     MEDIUM - lock-free message queues in form of library similar
                             to work done on wip_message_box branch
 - (scheduler)      LOW    - more modular os_start(). There should be two
                             functions; os_init() and os_start(), in best without
@@ -51,10 +51,8 @@ Features:
 - (scheduler)      HIGH   - Proto-threads (task's that share the same stack)
 
 Mics:
-- (various places) LOW    - Code style checking tool integration into makefile
-                            (indent, clang-format, uncrustify)
-                            indent -linux -nut -i3
-- (various places) LOW    - Remove code redundancy
+- (various places) LOW    - Remove code redundancy (double deffinition of macros
+                            etc)
 - (various places) LOW    - move OS_LIKELY/OS_UNLIKELY to os_private.h
 - (various places) LOW    - move test_assert() to generic ???
 - (various places) LOW    - Integration with C++ (extern "C" {} etc.)

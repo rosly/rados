@@ -13,9 +13,6 @@ STRIP    = msp430-strip
 SIZE     = msp430-size
 READELF  = msp430-readelf
 #MAKETXT  = srec_cat
-CP       = cp -p
-RM       = rm -f
-MV       = mv
 
 CFLAGS   = -mmcu=$(MCU) -std=gnu99 
 ifeq ($(DEBUG),)

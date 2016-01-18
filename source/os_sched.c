@@ -131,6 +131,8 @@ void os_init(void)
 
 void OS_NORETURN os_start(os_idleproc_t app_idle)
 {
+   arch_criticalstate_t cristate;
+
    /* should be called from the same context as os_init() */
    OS_ASSERT(task_current == &task_idle);
 
@@ -139,22 +141,12 @@ void OS_NORETURN os_start(os_idleproc_t app_idle)
    os_scheduler_intunlock(true);
    arch_eint();
 
-   /* after all initialization actions, force first context switch,
-    * \TODO instead of following nasty code we can just use os_schedule(0) */
-   do {
-      arch_criticalstate_t cristate;
+   /* perform first context switch (if possible) form task_idle to user task */
+   arch_critical_enter(cristate);
+   os_schedule(0);
+   arch_critical_exit(cristate);
 
-      /* enter critical section since we will schedule */
-      arch_critical_enter(cristate);
-      os_task_makeready(task_current); /* task_current == task_idle here */
-      /* finally we switch the context to user task, (any user task has higher
-       * prio than idle_task) */
-      arch_context_switch(os_taskqueue_dequeue(&ready_queue));
-      task_current->state = TASKSTATE_RUNNING; /* we are back again in idle task */
-      arch_critical_exit(cristate);
-   } while (0);
-
-   /* idle task will spin in following idle loop */
+   /* idle task will spin in following idle loop (forever) */
    while (1) {
       app_idle();    /* user supplied idle function */
       arch_idle();   /* arch dependent relax function */

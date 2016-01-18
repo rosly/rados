@@ -64,7 +64,7 @@ void OS_ISR sig_alrm(
    arch_contextrestore_i(sig_alrm);
 }
 
-void idle(void)
+void test_idle(void)
 {
    /* no actions */
 }
@@ -119,7 +119,7 @@ int task_proc_join(void *OS_UNUSED(param))
    return 0;
 }
 
-void init(void)
+void test_init(void)
 {
    test_setuptick(NULL, 1);
 
@@ -142,8 +142,11 @@ void init(void)
 
 int main(void)
 {
+   os_init();
    test_setupmain("Test_Join");
-   os_start(init, idle);
+   test_init();
+   os_start(test_idle);
+
    return 0;
 }
 

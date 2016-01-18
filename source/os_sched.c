@@ -106,9 +106,7 @@ void os_scheduler_unlock(bool sync)
    os_scheduler_intunlock(sync);
 }
 
-void os_start(
-   os_initproc_t app_init,
-   os_initproc_t app_idle)
+void os_init(void)
 {
    /* disable the interrupts, needed to make critical section */
    arch_dint();
@@ -117,28 +115,31 @@ void os_start(
    os_taskqueue_init(&ready_queue);
    os_timers_init();
 
-   /* create and switch to idle task, and perform the app_init */
-   os_task_init(&task_idle, 0);
-   task_idle.state = TASKSTATE_RUNNING;
-   task_current = &task_idle;
-   /* from this point we can perform context switching because we have at least
-    * task_idle in ready_queue, but for fast app_init we disable the scheduler
-    * until we will be fully ready */
-
    /* architecture dependent initialization */
    arch_os_start();
 
-   /* we need to lock the scheduler since must prevent context switch to tasks
-    * which will be created while app_init() */
-   os_scheduler_intlock();
+   /* create and switch to idle task */
+   os_task_init(&task_idle, 0);
+   task_idle.state = TASKSTATE_RUNNING;
+   task_current = &task_idle;
 
-   /* user supplied function should initialize interrupts (tick and others) */
-   app_init();
-   os_scheduler_intunlock(true); /* sync = true, do not schedule() yet */
-   /* we are ready for scheduling actions, enable the all interrupts */
+   /* lock the scheduler to prevent context switch to newly created tasks by
+    * application. After return, user code should initialize system interrupts
+    * (tick and others). Therefore we keep interrupts dissabled. */
+   os_scheduler_intlock();
+}
+
+void OS_NORETURN os_start(os_idleproc_t app_idle)
+{
+   /* should be called from the same context as os_init() */
+   OS_ASSERT(task_current == &task_idle);
+
+   /* we are ready for scheduling actions, enable the all interrupts, enable
+    * scheduler but do not schedule yet (use sync == true) */
+   os_scheduler_intunlock(true);
    arch_eint();
 
-   /* after all initialization actions, force first schedule (context switch)
+   /* after all initialization actions, force first context switch,
     * \TODO instead of following nasty code we can just use os_schedule(0) */
    do {
       arch_criticalstate_t cristate;

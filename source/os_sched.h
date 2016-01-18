@@ -161,7 +161,7 @@ typedef struct os_taskqueue_tag {
 extern os_task_t task_idle;
 
 /* --- forward declarations --- */
-typedef void (*os_initproc_t)(void);
+typedef void (*os_idleproc_t)(void);
 typedef int (*os_taskproc_t)(void *param);
 
 /**
@@ -214,29 +214,70 @@ void os_scheduler_unlock(bool sync);
 /**
  * Function initializes OS internals.
  *
- * Function should be called form user code main() function. It does not return.
+ * Function should be called form user code main() function before any other OS
+ * functions. It initializes the internal structures of the operating system,
+ * allowing the user to utilize the OS API afterwards. After return, OS will be
+ * in state that represent the idle_task execution.
  *
- * @param app_init Function callback which initializes architecture dependent HW
- *        and SW components from context of OS idle task (for example creation
- *        of global  mutexes or semaphores, creation of other OS tasks, starting
- *        of tick timer and all SW components which would need to call OS
- *        functions
+ * Before calling this function, initialization of C environment and essential
+ * HW resources is a must be performed. At least initialization of .bss and
+ * .data sections, stack and frame pointer initialization are required. All of
+ * this is usually done before main() by linking of proper platform code. Stack
+ * should be initialized in a way which assumes task_idle execution after return
+ * from this function (effectively OS after return from this function leaves the
+ * CPU in state that represent task_idle execution). OS does not use dynamic
+ * memory nor any libc functions.  Required HW resources may include (but not
+ * limited to) CPU clock and voltage subsystems (anything what is required for
+ * stable code execution).
+ *
+ * After return from this function, user may call any of OS API functions, such
+ * as creation of tasks and synchronization primitives (mutex, semaphore). But
+ * keep in mind that no scheduling action will be taken during those OS API
+ * calls, until user will call os_start(). OS also leave the interrupts disabled
+ * after return from os_init().
+ *
+ * @pre any other OS API function call prior calling of this function are
+ *      forbidden
+ * @pre prior this function call, all architecture depended HW and SW setup must
+ *      be finished. This includes .bss and .data sections initialization, stack
+ *      and frame pointer initialization, watchdog and interrupts disabling etc)
+ * @pre Interrupts might be disabled prior call of this function, but this is
+ *      not "a hard requirement"
+ * @pre after return from this function CPU is in state that represent
+ *      task_idle execution. Therefore, stack pointer prior call to this
+ *      function should point to memory which should be a task_idle stack
+ * @post after return from this function, interrupts will be disabled
+ * @post scheduler will remain blocked after return from this function
+ * @post after return from this function, user code may call any of OS API
+ *       functions (this includes creating OS additional tasks)
+ * @post after return from this function, user code should initialize remaining
+ *       HW resources, which may (but not limited to) require enabling
+ *       interrupts. Interrupts will be disabled after return from this
+ *       function.  User may enable them, but should keep in mind that
+ *       interrupts will not cause context switch since scheduler is disabled.
+ * @post User should leave scheduler as disabled. Call os_start() to start
+ *       scheduling.
+ */
+void os_init(void);
+
+/**
+ * Function starts the scheduling.
+ *
+ * Function should be called form user code main() function, after all HW and
+ * user application resource initialization will be finished. The main purpose
+ * of this function is to start the scheduling. This function should be called
+ * from the same context as os_stat()
+ *
  * @param app_idle Function callback which is called by OS in each turn of idle
  *        task. This callback can be used to perform user actions from context
  *        of idle task, but keep in mind that it cannot call any OS blocking
  *        functions.
  *
- * @pre prior this function call, all architecture depended HW and SW setup must
- *      be finished. This includes .bss and .data sections initialization, stack
- *      and frame pointer initialization, watchdog and interrupts disabling etc)
- * @pre It is important that prior this function call, interrupts must be
- *      disabled
- *
- * @note It is guarantied that app_init will be called before app_idle
+ * @pre os_start() call is needed prior this function call
+ * @post this function does not return. It is used as starting point for
+ *       task_idle
  */
-void os_start(
-   os_initproc_t app_init,
-   os_initproc_t app_idle);
+void OS_NORETURN os_start(os_idleproc_t app_idle);
 
 /**
  * Function creates user tasks

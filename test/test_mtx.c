@@ -53,7 +53,7 @@ static os_sem_t test_sem[3];
 
 static volatile sig_atomic_t test_atomic[2];
 
-void idle(void)
+void test_idle(void)
 {
    /* nothing to do */
 }
@@ -852,7 +852,7 @@ int test_coordinator(void *OS_UNUSED(param))
    return 0;
 }
 
-void init(void)
+void test_init(void)
 {
    os_task_create(
       &task_coordinator, OS_CONFIG_PRIOCNT - 1,
@@ -862,8 +862,11 @@ void init(void)
 
 int main(void)
 {
+   os_init();
    test_setupmain("Test_Mtx");
-   os_start(init, idle);
+   test_init();
+   os_start(test_idle);
+
    return 0;
 }
 

@@ -91,7 +91,7 @@ typedef struct {
    bool repeat;
 } victim_task_param_t;
 
-void idle(void)
+void test_idle(void)
 {
    /* nothing to do */
 }
@@ -538,7 +538,7 @@ void test_tick(void)
    }
 }
 
-void init(void)
+void test_init(void)
 {
    test_setuptick(test_tick, 50000000);
 
@@ -550,8 +550,11 @@ void init(void)
 
 int main(void)
 {
+   os_init();
    test_setupmain("Test_Waitqueue");
-   os_start(init, idle);
+   test_init();
+   os_start(test_idle);
+
    return 0;
 }
 

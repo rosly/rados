@@ -46,6 +46,7 @@ include $(CONFIGDIR)/arch/$(ARCH)/target.mk
 include ../arch/$(ARCH)/source.mk
 
 TESTSOURCE = \
+	test0.c \
 	test1.c \
 	test11.c \
 	test2.c \

@@ -55,7 +55,7 @@ static os_task_t task_main;
 static OS_TASKSTACK task_main_stack[OS_STACK_MINSIZE];
 static task_data_t worker_tasks[TEST_TASKS];
 
-void idle(void)
+void test_idle(void)
 {
    /* nothing to do */
 }
@@ -190,7 +190,7 @@ int task_main_proc(void *OS_UNUSED(param))
    return 0;
 }
 
-void init(void)
+void test_init(void)
 {
    test_setuptick(NULL, 300000000);
 
@@ -202,8 +202,11 @@ void init(void)
 
 int main(void)
 {
+   os_init();
    test_setupmain("Test_Sem");
-   os_start(init, idle);
+   test_init();
+   os_start(test_idle);
+
    return 0;
 }
 

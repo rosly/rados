@@ -92,8 +92,11 @@ void test_init(void)
 
 int main(void)
 {
+   os_init();
    test_setupmain(OS_PROGMEM_STR("Test1.1"));
-   os_start(test_init, test_idle);
+   test_init();
+   os_start(test_idle);
+
    return 0;
 }
 

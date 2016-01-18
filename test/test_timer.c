@@ -49,7 +49,7 @@ static OS_TASKSTACK task_main_stack[OS_STACK_MINSIZE];
 static os_timer_t timers[TEST_TIMER_NBR];
 static bool timer_clbck[TEST_TIMER_NBR];
 
-void idle(void)
+void test_idle(void)
 {
    /* nothing to do */
 }
@@ -250,7 +250,7 @@ int task_main_proc(void *OS_UNUSED(param))
    return 0;
 }
 
-void init(void)
+void test_init(void)
 {
    /* for testing we will need just one task */
    os_task_create(
@@ -261,8 +261,11 @@ void init(void)
 
 int main(void)
 {
+   os_init();
    test_setupmain("Test_Timer");
-   os_start(init, idle);
+   test_init();
+   os_start(test_idle);
+
    return 0;
 }
 

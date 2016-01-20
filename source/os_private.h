@@ -236,11 +236,10 @@ static inline void os_scheduler_intunlock(bool sync)
    }
 }
 
-/* --- Timers protected types --- */
+/* --- Timers protected types and functions --- */
 
 /* protected function from timer module */
 void os_timers_init(void);
-void OS_HOT os_timer_tick(void);
 
 #endif
 

@@ -51,6 +51,8 @@ typedef struct {
 /** monotonic ticks counter, incremented each tick */
 extern os_ticks_t os_ticks_cnt;
 
+/* \note timer_proc_clbck cannot call the os_sched, this will be done at the end
+ * of os_tick(), (which calls the os_timer_tick()) */
 void os_timer_create(
    os_timer_t *timer,
    timer_proc_t clbck,
@@ -58,6 +60,8 @@ void os_timer_create(
    os_ticks_t timeout_ticks,
    os_ticks_t reload_ticks);
 
+/* \note this function is designed in way, that as long as the memory for timer
+ * is valid it allows for multiple destroy operations on the same timer */
 void os_timer_destroy(os_timer_t *timer);
 
 static inline void os_ticks_now(os_ticks_t *ticks)

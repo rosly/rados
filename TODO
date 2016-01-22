@@ -22,19 +22,20 @@ Performance:
                             (if possible). At least some slicing could be done
                             in some places to minimize the timespan in which the
                             interrupts are kept disabled.
-- (AVR)            HIGH   - improve the ISR entry and leave code and
+- (AVR)            HARD   - improve the ISR entry and leave code and
                             arch_context_switch() so not all register would need
                             to be stored on ISR entry. Use the CallSaved and
                             CallUsed ABI sets for that purpose.
                             (https://gcc.gnu.org/wiki/avr-gcc)
-- (AVR and MSP430) LOW    - Use Harley's or Goryavsky algorithm for
+- (AVR and MSP430) EASY    - Use Harley's or Goryavsky algorithm for
                             arch_bitmask_fls() for platforms without HW CLZ
                             operation
 - (all platforms) MEDIUM  - Calculation of: - cycles of each OS functions
                                             - maximal cycles count of critical sections
                                             - cycles for task enqueue (make_ready) 
                                               and top prio task dequeue
-- (generic code) Low      - Optimize code inside timer module, instead of incrementing 
+- (generic code)     EASY - Use single linked list for timers (decrease code size)
+- (generic code)     EASY - Optimize code inside timer module, instead of incrementing 
                             and comparing tick_unsynch to first timer we should 
                             copy it from first timer, decrement each tick and
                             compare to 0 (more efficient for most arch) 
@@ -44,15 +45,17 @@ Features:
                             to work done on wip_message_box branch
 - (MSP430 & AVR)   MEDIUM - CPU sleep states for arch_idle(), best in MCU
                             agnostic way
-- (scheduler)      HIGH   - Proto-threads (task's that share the same stack)
+- (scheduler)      HARD   - Proto-threads (task's that share the same stack)
 
 Mics:
-- (various places) LOW    - Remove code redundancy (double deffinition of macros
+- (timer)          MEDIUM - Add missing docs for timer module
+- (various places) HARD   - Fix TODO's in code
+- (various places) EASY   - Remove code redundancy (double deffinition of macros
                             etc)
-- (various places) LOW    - move OS_LIKELY/OS_UNLIKELY to os_private.h
-- (various places) LOW    - move test_assert() to generic ???
-- (various places) LOW    - Integration with C++ (extern "C" {} etc.)
-- (various places) LOW    - C++ wrapers for OS API (classes for OS primitives)
+- (various places) EASY   - move OS_LIKELY/OS_UNLIKELY to os_private.h
+- (various places) EASY   - move test_assert() to generic ???
+- (various places) EASY   - Integration with C++ (extern "C" {} etc.)
+- (various places) MEDIUM - C++ wrapers for OS API (classes for OS primitives)
 
 New platforms:
 - ARM Cortex M0 and M3

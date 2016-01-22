@@ -357,18 +357,6 @@ void os_yield(void);
 void os_task_check(os_task_t *task);
 
 /**
- * System tick function (system timer interrupt)
- *
- * This function need to be called from ISR. It kicks the timer subsystem and
- * also triggers the preemption mechanism. The frequency of os_tick() call is
- * user defined and it defined a jiffy. All timeouts for time guarded OS
- * blocking functions are measured in jiffies.
- *
- * @pre can be called only from ISR
- */
-void OS_HOT os_tick(void);
-
-/**
  * Function halt the system
  *
  * The main purpose of this function is to lock the execution in case of

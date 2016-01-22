@@ -97,6 +97,7 @@ typedef uint8_t arch_bitmask_t;
 #define OS_PURE __attribute__ ((pure))
 #define OS_HOT __attribute__ ((hot))
 #define OS_COLD __attribute__ ((cold))
+#define OS_NOINLINE __attribute__ ((noinline))
 #define OS_WARN_UNUSEDRET __attribute__ ((warn_unused_result))
 #define OS_LIKELY(_cond) __builtin_expect(!!(_cond), 1)
 #define OS_UNLIKELY(_cond) __builtin_expect(!!(_cond), 0)

@@ -51,14 +51,14 @@ TESTSOURCE = \
 	test11.c \
 	test2.c \
 	test3.c \
-	test4.c
+	test4.c \
+	test_timer.c
 ifeq ("$(ARCH)", "linux")
 TESTSOURCE += \
 	test_join.c \
 	test_sem.c \
 	test_mtx.c \
-	test_waitqueue.c \
-	test_timer.c
+	test_waitqueue.c
 endif
 
 SOURCEDIR = .

@@ -36,13 +36,10 @@
  * /{
  */
 
-#include <stdlib.h>
-#include <time.h>
-
 #include "os.h"
 #include "os_test.h"
 
-#define TEST_TIMER_NBR ((size_t)512)
+#define TEST_TIMER_NBR ((size_t)256)
 
 static os_task_t task_main;
 static OS_TASKSTACK task_main_stack[OS_STACK_MINSIZE];
@@ -182,8 +179,8 @@ int task_test1c_proc(void *OS_UNUSED(param))
    /* create timer with 2 tick timeout */
    os_timer_create(&timers[1], timer_proc, (void*)1, 2, 0);
 
-   /* destroy timer[0] so unsynch should be synced in order to represend valid
-    * value aginst timer[1] which was moved forward */
+   /* destroy timer[0] so unsynch should be handled properly in order to
+    * represend valid value aginst timer[1] */
    os_timer_destroy(&timers[0]);
 
    /* generate 1 tick, timer[1] should not expire */

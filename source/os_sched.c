@@ -245,16 +245,6 @@ void os_task_check(os_task_t *OS_UNUSED(task))
 }
 #endif
 
-void OS_HOT os_tick(void)
-{
-   OS_ASSERT(isr_nesting > 0);   /* this function may be called only form ISR */
-
-   os_timer_tick();              /* call the timer module mechanism */
-   /* switch to other READY task which has the same or greater priority (0 as
-    * param of os_schedule() means just that) */
-   os_schedule(0);
-}
-
 void OS_COLD os_halt(void)
 {
    os_scheduler_intlock();

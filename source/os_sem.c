@@ -195,7 +195,7 @@ void os_sem_up_sync(
 
 /**
  * Function called by timers module. Used for timeout of os_sem_down().
- * Callback to this function are done from contxt of os_timer_tick().
+ * Callback to this function are done from contxt of timer_trigger().
  */
 static void os_sem_timerclbck(void *param)
 {
@@ -211,8 +211,7 @@ static void os_sem_timerclbck(void *param)
    task->block_code = OS_TIMEOUT;
    os_task_makeready(task);
    /* we do not call the os_schedule() here, because this will be done at the
-    * end of os_tick() (which calls the os_timer_tick() which then calls this
-    * callback function) */
+    * end of timer_trigger() */
 
    /* we do not destroy timer here since this timer was created on stack of
     * os_sem_down(), there is proper cleanup code in that function */

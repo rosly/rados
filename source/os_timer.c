@@ -44,11 +44,11 @@
 #define OS_TIMER_MAGIC1 ((uint_fast16_t)0xAABB)
 #define OS_TIMER_MAGIC2 ((uint_fast16_t)0xCCDD)
 
-/** Monotonic ticks counter, incremented each tick */
-os_ticks_t os_ticks_cnt = 0;
+/** Global monotonic counter of system ticks */
+os_ticks_t ticks_cnt = 0;
 
-/** Sorted list of all tracked timer in the system. Timers are sorted by
- * remaining burn off time */
+/** Global list of all timers. Timers are sorted by time which remain until
+ *  burnoff */
 static list_t timer_list;
 
 /** Number of "quickly" handled ticks.
@@ -153,7 +153,7 @@ void os_timer_create(
    OS_ASSERT(timeout_ticks > 0);
    /* and cannot be to high, or it will create problems with unsynch ticks */
    OS_ASSERT(timeout_ticks < OS_TIMER_TICKSREM_MAX);
-   /* prevent from double usage of initialized timer */
+   /* prevent from double usage of already initialized timer */
    OS_ASSERT(timer->magic != OS_TIMER_MAGIC1);
 
    /* currently I assume that timers may be created from ISR, but I'm not sure
@@ -229,7 +229,7 @@ void OS_HOT os_tick(void)
    /* Increment system global monotonic ticks counter.
     * Overflow scenario for this counter are handled by usage os_ticks_now()
     * and os_ticks_diff() */
-   ++os_ticks_cnt;
+   ++ticks_cnt;
 
    if (!list_is_empty(&timer_list)) {
 
@@ -254,26 +254,26 @@ void OS_HOT os_tick(void)
    os_schedule(0);
 }
 
-/* \TODO unit test missing */
-os_ticks_t os_ticks_diff(
-   os_ticks_t ticks_start,
-   os_ticks_t ticks_now)
-{
-   os_ticks_t ret;
-
-   if (ticks_start > ticks_now)
-      ret = OS_TICKS_MAX - ticks_start + 1 + ticks_now;
-   else
-      ret = ticks_now - ticks_start;
-
-   return ret;
-}
-
 os_ticks_t os_ticks_now(void)
 {
    os_ticks_t ticks;
 
-   arch_ticks_atomiccpy(&ticks, &os_ticks_cnt);
+   arch_ticks_atomiccpy(&ticks, &ticks_cnt);
    return ticks;
+}
+
+/* \TODO unit test missing */
+os_ticks_t os_ticks_diff(
+   os_ticks_t ticks_start,
+   os_ticks_t ticks_end)
+{
+   os_ticks_t ret;
+
+   if (ticks_start > ticks_end)
+      ret = OS_TICKS_MAX - ticks_start + 1 + ticks_end;
+   else
+      ret = ticks_end - ticks_start;
+
+   return ret;
 }
 

@@ -48,7 +48,7 @@ Features:
 - (scheduler)      HARD   - Proto-threads (task's that share the same stack)
 
 Mics:
-- (timer)          MEDIUM - Add missing docs for timer module
+- (various places) HARD   - Full support for Doxygen
 - (various places) HARD   - Fix TODO's in code
 - (various places) EASY   - Remove code redundancy (double deffinition of macros
                             etc)
@@ -56,6 +56,8 @@ Mics:
 - (various places) EASY   - move test_assert() to generic ???
 - (various places) EASY   - Integration with C++ (extern "C" {} etc.)
 - (various places) MEDIUM - C++ wrapers for OS API (classes for OS primitives)
+- (integation)     MEDIUM - Intergation with Arduino IDE for easy use by less
+                            expirenced users
 
 New platforms:
 - ARM Cortex M0 and M3

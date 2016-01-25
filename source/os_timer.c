@@ -71,7 +71,7 @@ static void timer_add(os_timer_t *add_timer)
    os_timer_t *itr_timer;
 
    itr = list_itr_begin(&timer_list);
-   while (false == list_itr_end(&timer_list, itr)) {
+   while (!list_itr_end(&timer_list, itr)) {
       itr_timer = os_container_of(itr, os_timer_t, list);
       if (itr_timer->ticks_rem > add_timer->ticks_rem)
          break;
@@ -94,29 +94,28 @@ static void OS_NOINLINE timer_trigger(void)
    /* for auto reloaded timers use temporary list */
    list_init(&list_autoreload);
    itr = list_itr_begin(&timer_list);
-   while (false == list_itr_end(&timer_list, itr)) {
+   while (!list_itr_end(&timer_list, itr)) {
       itr_timer = os_container_of(itr, os_timer_t, list);
       /* the list will be modified, calculate  pointer the next element */
       itr = itr->next;
       if ((itr_timer->ticks_rem -= timer_tick_unsynch) > 0) {
-         /* current timer does not burn off yet, following timers wont trigger
-          * either but we continue since w have to synchronize all of the timers
-          **/
+         /* This timer did not timeout (this means that following will not
+          * either). From now on we will hit this condition and only update the
+          * ticks_rem of all remaining timers on the list */
          continue;
       }
 
-      /* in any case (auto reload or single shot) remove timer from active list */
+      /* this timer has timed out, remove timer from list of active timers */
       list_unlink(&(itr_timer->list));
 
-      /* call the timer callback, from this callback it is allowed to call the
-       * os_timer_destroy() */
+      /* call the timer callback. Keep in mind that from this callback it is
+       * allowed to call the os_timer_destroy() */
       itr_timer->clbck(itr_timer->param);
 
-      /* check if it is marked as auto reload.
-       * timer callback might destroy the timer but in tis case tick_reload will
-       * be 0 */
       if (itr_timer->ticks_reload > 0) {
-         /* timer is auto reload, put the timer to temporary auto reload list */
+         /* seems that timer callback does not destroyed the timer and it is
+          * (still) marked as auto-reload. We cannot imidiatelly add this timer
+          * back on to timer list. We need to use temporary list */
          list_append(&list_autoreload, &(itr_timer->list));
       }
    }
@@ -126,7 +125,7 @@ static void OS_NOINLINE timer_trigger(void)
    /* Now re-add all auto reload timers from temporary list.
     * We need a temporary list because we keep all timers sorted, and we cannot
     * figure out the position of timers which we auto reload until we finish
-    * processing of previous trigger sequence */
+    * processing of timer list */
    while ((itr = list_detachfirst(&list_autoreload))) {
       itr_timer = os_container_of(itr, os_timer_t, list);
       itr_timer->ticks_rem = itr_timer->ticks_reload;

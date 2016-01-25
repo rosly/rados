@@ -34,6 +34,7 @@
 
 #include "arch_port.h"
 #include "list.h"
+#include "slist.h"
 #include "os_config.h"
 #include "os_protected.h"
 #include "os_timer.h"

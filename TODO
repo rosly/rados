@@ -35,10 +35,6 @@ Performance:
                                             - cycles for task enqueue (make_ready) 
                                               and top prio task dequeue
 - (generic code)     EASY - Use single linked list for timers (decrease code size)
-- (generic code)     EASY - Optimize code inside timer module, instead of incrementing 
-                            and comparing tick_unsynch to first timer we should 
-                            copy it from first timer, decrement each tick and
-                            compare to 0 (more efficient for most arch) 
 
 Features:
 - (msg_queues)     MEDIUM - lock-free message queues in form of library similar
@@ -48,7 +44,7 @@ Features:
 - (scheduler)      HARD   - Proto-threads (task's that share the same stack)
 
 Mics:
-- (timer)          MEDIUM - Add missing docs for timer module
+- (various places) HARD   - Full support for Doxygen
 - (various places) HARD   - Fix TODO's in code
 - (various places) EASY   - Remove code redundancy (double deffinition of macros
                             etc)
@@ -56,6 +52,8 @@ Mics:
 - (various places) EASY   - move test_assert() to generic ???
 - (various places) EASY   - Integration with C++ (extern "C" {} etc.)
 - (various places) MEDIUM - C++ wrapers for OS API (classes for OS primitives)
+- (integation)     MEDIUM - Intergation with Arduino IDE for easy use by less
+                            expirenced users
 
 New platforms:
 - ARM Cortex M0 and M3

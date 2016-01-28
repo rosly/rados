@@ -164,11 +164,11 @@ void os_task_create(
    arch_criticalstate_t cristate;
 
    OS_ASSERT(0 == isr_nesting); /* cannot create task from ISR */
+   OS_ASSERT(!waitqueue_current); /* cannot call after os_waitqueue_prepare() */
    OS_ASSERT(prio < OS_CONFIG_PRIOCNT); /* prio must be less than prio config limit */
    OS_ASSERT(prio > 0); /* only idle task may have the prio 0 */
    OS_ASSERT(stack); /* stack must be given */
    OS_ASSERT(stack_size >= OS_STACK_MINSIZE); /* minimal size for stack */
-   OS_ASSERT(!waitqueue_current); /* cannot call after os_waitqueue_prepare() */
 
    os_task_init(task, prio);
 

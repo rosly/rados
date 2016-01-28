@@ -38,7 +38,7 @@
 #include "os_test.h"
 
 /** linux POSIX timer used as an emulation of tick */
-static timer_t timer;
+static timer_t test_timer;
 /** additional callback for emulated tick */
 static test_tick_clbck_t test_tick_clbck = NULL;
 static const char *test_name = NULL;
@@ -132,16 +132,23 @@ void test_setuptick(
       }
    };
 
-   /* create and start the kernel periodic timer
-    *  assign the SIGALRM signal to the timer */
+   /* destroy previous timer if exist */
+   if (test_timer) {
+      ret = timer_delete(test_timer);
+      test_assert(0 == ret);
+   }
 
-   test_assert(nsec > 0); /* nsec must be greater than 0 for linux timer API */
+   /* callback called each timer tick */
    test_tick_clbck = clbck;
 
-   ret = timer_create(CLOCK_PROCESS_CPUTIME_ID, &sev, &timer);
-   test_assert(0 == ret);
-   ret = timer_settime(timer, 0, &its, NULL);
-   test_assert(0 == ret);
+   if (nsec > 0) {
+      /* create and start the kernel periodic timer
+       *  assign the SIGALRM signal to the timer */
+      ret = timer_create(CLOCK_PROCESS_CPUTIME_ID, &sev, &test_timer);
+      test_assert(0 == ret);
+      ret = timer_settime(test_timer, 0, &its, NULL);
+      test_assert(0 == ret);
+   }
 }
 
 /* for documentation check os_test.h */

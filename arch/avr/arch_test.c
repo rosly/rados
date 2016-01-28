@@ -153,21 +153,31 @@ void test_setuptick(
    test_tick_clbck_t clbck,
    unsigned long nsec)
 {
+   /* stop compare match 1A interrupt */
+#ifdef TIMSK
+   TIMSK = 0;
+#else
+   TIMSK1 = 0;
+#endif
+
+   /* callback called each timer tick */
    test_tick_clbck = clbck;
 
-   /* Set timer 1 compare value for configured system tick with a prescaler of
-    * 256 */
-   OCR1A = F_CPU / 256ul * nsec / 1000000000;
+   if (nsec > 0) {
+      /* Set timer 1 compare value for configured system tick with a prescaler
+       * of 256 */
+      OCR1A = F_CPU / 256ul * nsec / 1000000000;
 
-   /* Set prescaler 256 */
-   TCCR1B = _BV(CS12) | _BV(WGM12);
+      /* Set prescaler 256 */
+      TCCR1B = _BV(CS12) | _BV(WGM12);
 
-   /* Enable compare match 1A interrupt */
+      /* Enable compare match 1A interrupt */
 #ifdef TIMSK
-   TIMSK = _BV(OCIE1A);
+      TIMSK = _BV(OCIE1A);
 #else
-   TIMSK1 = _BV(OCIE1A);
+      TIMSK1 = _BV(OCIE1A);
 #endif
+   }
 }
 
 /* for documentation check os_test.h */

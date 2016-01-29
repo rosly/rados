@@ -167,58 +167,62 @@ do { \
 } while (0)
 #endif
 
+/* typical atomic buildins are not available for avr-gcc, we have to implement
+ * them by macros */
+
 /* on AVR there is no instruction to load whole X, Y, or whole Z at once, we
- * need to disable interrupts if we whant to do it atomically */
-#define os_atomicptr_read(_ptr) \
+ * need to disable interrupts if we want to do it atomically */
+#define os_atomicptr_load(_ptr) \
    ({ \
-       typeof(_ptr)_tmp_widereg; \
+       typeof(*(_ptr)) _tmp_widereg; \
        arch_criticalstate_t cristate; \
        arch_critical_enter(cristate); \
-       _tmp_widereg = (_ptr); \
+       _tmp_widereg = *(_ptr); \
        arch_critical_exit(cristate); \
        _tmp_widereg; /* return loaded value */ \
     })
 
-#if 0
-{ ( \
-     uint16_t _tmp_widereg; \
-     __asm__ __volatile__ ( \
-        "in __tmp_reg__, __SREG__\n\t" \
-        "cli\n\t" \
-        "ld %a0, %[ptr]+\n\t" \
-        "ld %b0, %[ptr]\n\t" \
-        "out __SREG__, __tmp_reg__\n\t" \
-        : "=&r" (_tmp_widereg) \
-        : "[ptr] e" (_ptr) \
-        : ); \
-     _tmp_widereg; /* return loaded value */ \
-     ) }
-#endif
-
-/* on AVR there is no instruction to store whole X, Y, or whole Z at once, we
- * need to disable interrupts if we whant to do it atomicaly */
-#define os_atomicptr_write(_ptr, _val) \
+#define os_atomicptr_store(_ptr, _val) \
    do { \
       arch_criticalstate_t cristate; \
       arch_critical_enter(cristate); \
-      (_ptr) = (_val); \
+      *(_ptr) = (_val); \
       arch_critical_exit(cristate); \
    } while (0)
 
-#if 0
-do { \
-   __asm__ __volatile__ ( \
-      "in __tmp_reg__, __SREG__\n\t" \
-      "cli\n\t" \
-      "st %[ptr]+,%a1n\t" \
-      "ld %[ptr],%b1\n\t" \
-      "out __SREG__, __tmp_reg__\n\t" \
-      : : "[ptr] e" (_ptr), [_val] "e" (_val) \
-      : "0" (_ptr) );        /* clobering ptr */ \
-} while (0)
-#endif
+#define os_atomicptr_exch(_ptr, _val) \
+   ({ \
+      typeof(_ptr) __ptr = (_ptr); \
+      typeof(*__ptr) _tmp_widereg; \
+      arch_criticalstate_t cristate; \
+      arch_critical_enter(cristate); \
+      _tmp_widereg = *__ptr; \
+      *__ptr = (_val); \
+      arch_critical_exit(cristate); \
+      _tmp_widereg; /* return value */ \
+    })
 
-#define os_atomicptr_xchnge(_ptr, _val) (OS_ASSERT(!"not implemented"))
+#define os_atomicptr_cmp_exch(_ptr, _exp_ref, _val) \
+   ({ \
+      typeof(_ptr) __ptr = (_ptr); \
+      typeof(*__ptr) _tmp_widereg; \
+      typeof(_exp_ref) __exp_ref = (_exp_ref); \
+      (void) (&__exp_ref == &__ptr); \
+      bool success; \
+      arch_criticalstate_t cristate; \
+      arch_critical_enter(cristate); \
+      _tmp_widereg = *__ptr; \
+      if (_tmp_widereg == *__exp_ref) { \
+         *__ptr = (_val); \
+         success = true; \
+      } else { \
+         *__exp_ref = _tmp_widereg; \
+         success = false; \
+      } \
+      arch_critical_exit(cristate); \
+      !success; /* return value */ \
+    })
+
 #define arch_ticks_atomiccpy(_dst, _src) \
    do { \
       arch_criticalstate_t cristate; \

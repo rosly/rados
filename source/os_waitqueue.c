@@ -84,20 +84,21 @@ void os_waitqueue_prepare(os_waitqueue_t *queue)
    os_scheduler_intlock();
 
    /* check if task is not already subscribed on other wait_queue
-    * currently we do not support waiting on multiple wait queues */
+    * currently we do not support waiting on multiple wait queues
+    * Warning: only test, due race condition this may not always work */
    OS_ASSERT(!waitqueue_current);
 
    /* mark that we are prepared to suspend on wait_queue
     * some CPU platforms might not have atomic pointer association ops so we use
     * platform macro */
-   os_atomicptr_write(waitqueue_current, queue);
+   os_atomicptr_store(&waitqueue_current, queue);
 }
 
 void os_waitqueue_break(void)
 {
    OS_ASSERT(0 == isr_nesting); /* cannot call os_waitqueue_finish() from ISR */
 
-   os_atomicptr_write(waitqueue_current, NULL);
+   os_atomicptr_store(&waitqueue_current, NULL);
    os_scheduler_intunlock(false); /* false = nosync, unlock scheduler and
                                    * schedule() to higher prio READY task
                                    * immediately */

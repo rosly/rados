@@ -110,11 +110,73 @@ typedef uint8_t arch_bitmask_t;
       "dec %[atomic]\n\t" \
       ::  [atomic] "m" (_atomic))
 
-/* all pointers in MSP430 are size of CPU register, no need to read or write
- * with any concurent handling */
-#define os_atomicptr_read(_ptr) (_ptr)
-#define os_atomicptr_write(_ptr, _val) ((_ptr) = (_val))
-#define os_atomicptr_xchnge(_ptr, _val) (OS_ASSERT(!"not implemented"))
+/* typical atomic buildins are not available for msp430-gcc, we have to
+ * implement them by macros */
+#define os_atomicptr_load(_ptr) \
+   ({ \
+      typeof(_ptr) __ptr = (_ptr); \
+      typeof(*__ptr) _val; \
+      /* this will be removed durring optimization */ \
+      if (sizeof(__ptr) <= sizeof(uint16_t)) { \
+         /* concurent handling is not needed for values <= 16bit */ \
+         _val = *__ptr; \
+      } else { \
+         arch_criticalstate_t cristate; \
+         arch_critical_enter(cristate); \
+         _val = *__ptr; \
+         arch_critical_exit(cristate); \
+      } \
+      _val; /* return value */ \
+    })
+
+#define os_atomicptr_store(_ptr, _val) \
+   do { \
+      typeof(_ptr) __ptr = (_ptr); \
+      typeof(*__ptr) __val = (_val); \
+      /* this will be removed durring optimization */ \
+      if (sizeof(__ptr) <= sizeof(uint16_t)) { \
+         /* concurent handling is not needed for values <= 16bit */ \
+         *__ptr = __val; \
+      } else { \
+         arch_criticalstate_t cristate; \
+         arch_critical_enter(cristate); \
+         *__ptr = __val; \
+         arch_critical_exit(cristate); \
+      } \
+   } while (0)
+
+#define os_atomicptr_exch(_ptr, _val) \
+   ({ \
+      typeof(_ptr) __ptr = (_ptr); \
+      typeof(*__ptr) _tmp_widereg; \
+      arch_criticalstate_t cristate; \
+      arch_critical_enter(cristate); \
+      _tmp_widereg = *__ptr; \
+      *__ptr = (_val); \
+      arch_critical_exit(cristate); \
+      _tmp_widereg; /* return value */ \
+    })
+
+#define os_atomicptr_cmp_exch(_ptr, _exp_ref, _val) \
+   ({ \
+      typeof(_ptr) __ptr = (_ptr); \
+      typeof(*__ptr) _tmp_widereg; \
+      typeof(_exp_ref) __exp_ref = (_exp_ref); \
+      (void) (&__exp_ref == &__ptr); \
+      bool success; \
+      arch_criticalstate_t cristate; \
+      arch_critical_enter(cristate); \
+      _tmp_widereg = *__ptr; \
+      if (_tmp_widereg == *__exp_ref) { \
+         *__ptr = (_val); \
+         success = true; \
+      } else { \
+         *__exp_ref = _tmp_widereg; \
+         success = false; \
+      } \
+      arch_critical_exit(cristate); \
+      !success; /* return value */ \
+    })
 
 #define arch_ticks_atomiccpy(_dst, _src) \
    do { \

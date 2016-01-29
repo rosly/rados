@@ -36,6 +36,11 @@ Performance:
                                               and top prio task dequeue
 
 Features:
+- (waitqueue)      HARD   - os_waitqueue_prepare() should be able to suspend the
+                            task in case task with higher priority is already
+                            waiting on the same waitqueue. This will sole one
+                            TODO which aleady describe unfair scheduling inside
+                            os_waitquue_wakeup()
 - (msg_queues)     MEDIUM - lock-free message queues in form of library similar
                             to work done on wip_message_box branch
 - (MSP430 & AVR)   MEDIUM - CPU sleep states for arch_idle(), best in MCU
@@ -43,6 +48,9 @@ Features:
 - (scheduler)      HARD   - Proto-threads (task's that share the same stack)
 
 Mics:
+- (various places) EASY   - Change numeric defines into enum typedefs, fix the
+                            sync parameter type (check which type is used for
+                            packet enums)
 - (various places) HARD   - Full support for Doxygen
 - (various places) HARD   - Fix TODO's in code
 - (various places) EASY   - Remove code redundancy (double deffinition of macros

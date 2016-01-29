@@ -12,6 +12,8 @@
 :syntax on
 :nnoremap <F5> :buffers<CR>:buffer<Space>
 
+:set makeprg=ARCH=linux\ make\ test
+
 if has("cscope")
  set csprg=/usr/bin/cscope
 " modify the stabdard tag feature to use cscope

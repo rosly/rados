@@ -223,14 +223,6 @@ do { \
       !success; /* return value */ \
     })
 
-#define arch_ticks_atomiccpy(_dst, _src) \
-   do { \
-      arch_criticalstate_t cristate; \
-      arch_critical_enter(cristate); \
-      *(_dst) = *(_src); \
-      arch_critical_exit(cristate); \
-   } while (0)
-
 #if 0
 do { \
    uint8_t _tmp_reg2; \

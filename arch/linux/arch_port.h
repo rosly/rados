@@ -126,11 +126,6 @@ typedef uint8_t arch_bitmask_t;
 			       __ATOMIC_ACQ_REL, \
 			       __ATOMIC_RELAXED)
 
-#define arch_ticks_atomiccpy(_dst, _src) \
-   do { \
-      *(_dst) = *(_src); /* simple copy, arch >= 32bit */ \
-   } while (0)
-
 #define arch_bitmask_set(_bitfield, _bit) \
    do { \
       (_bitfield) |= 1 << (_bit); \

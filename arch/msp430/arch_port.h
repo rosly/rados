@@ -178,12 +178,6 @@ typedef uint8_t arch_bitmask_t;
       !success; /* return value */ \
     })
 
-#define arch_ticks_atomiccpy(_dst, _src) \
-   do { \
-      /* we can copy as val since MSP430 is 16bit */ \
-      *(_dst) = *(_src); \
-   } while (0)
-
 #define arch_bitmask_set(_bitfield, _bit) \
    do { \
       (_bitfield) |= 1 << (_bit); \

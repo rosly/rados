@@ -33,6 +33,13 @@
 
 #ifdef OS_CONFIG_WAITQUEUE
 
+/** Pointer to wait_queue on which task_current prepared to suspend.
+ * Set in os_waitqueue_prepare(). After this call preemption is also disabled.
+ * If this pointer is != NULL we say that task_current is in 'prepared' state
+ * (prepared for suspend).
+ */
+os_waitqueue_t *waitqueue_current = NULL;
+
 /* private function forward declarations */
 static void os_waitqueue_timerclbck(void *param);
 
@@ -78,7 +85,8 @@ void os_waitqueue_prepare(os_waitqueue_t *queue)
 {
    OS_ASSERT(0 == isr_nesting); /* cannot call from ISR */
    OS_ASSERT(task_current != &task_idle); /* IDLE task cannot block */
-   OS_ASSERT(true == list_is_empty(&task_current->mtx_list)); /* calling of blocking function while holding mtx will cause priority inversion */
+   /* calling of blocking function while holding mtx will cause priority inversion */
+   OS_ASSERT(list_is_empty(&task_current->mtx_list));
 
    /* disable preemption */
    os_scheduler_intlock();
@@ -98,7 +106,7 @@ void os_waitqueue_break(void)
 {
    OS_ASSERT(0 == isr_nesting); /* cannot call os_waitqueue_finish() from ISR */
 
-   os_atomicptr_store(&waitqueue_current, NULL);
+   os_atomicptr_store(&waitqueue_current, (os_waitqueue_t*)NULL);
    os_scheduler_intunlock(false); /* false = nosync, unlock scheduler and
                                    * schedule() to higher prio READY task
                                    * immediately */
@@ -114,7 +122,8 @@ os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(os_ticks_t timeout_ticks)
    OS_ASSERT(0 == isr_nesting); /* cannot call form ISR */
    OS_ASSERT(task_current != &task_idle); /* IDLE task cannot block */
    OS_ASSERT(timeout_ticks > OS_TIMEOUT_TRY); /* timeout must be either specific or infinite */
-   OS_ASSERT(true == list_is_empty(&task_current->mtx_list)); /* calling of blocking function while holding mtx will cause priority inversion */
+   /* calling of blocking function while holding mtx will cause priority inversion */
+   OS_ASSERT(list_is_empty(&task_current->mtx_list));
 
    /* we need to disable the interrupts since wait_queue may be signalized from
     * ISR (we need to add task to wait_queue->task_queue in atomic manner) there
@@ -154,11 +163,12 @@ os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(os_ticks_t timeout_ticks)
 
 void os_waitqueue_wakeup_sync(
    os_waitqueue_t *queue,
-   uint_fast8_t nbr,
+   uint_fast8_t wakeup_cnt,
    bool sync)
 {
    arch_criticalstate_t cristate;
    os_task_t *task;
+   bool awoken = false;
 
    /* tasks cannot call any OS functions if they are are 'prepared' to suspend
     * on wait_queue, with exception to ISR's which can interrupt task_current.
@@ -167,7 +177,7 @@ void os_waitqueue_wakeup_sync(
    OS_ASSERT((isr_nesting > 0) || (!waitqueue_current));
    /* sync must be == false in case we are called from ISR */
    OS_ASSERT((isr_nesting == 0) || (sync == false));
-   OS_ASSERT(nbr > 0); /* number of tasks to wake up must be > 0 */
+   OS_ASSERT(wakeup_cnt > 0); /* number of tasks to wake up must be > 0 */
 
    arch_critical_enter(cristate);
 
@@ -183,22 +193,22 @@ void os_waitqueue_wakeup_sync(
 
       /* since we theoretically prevented from sleep one task, now we have one
        * task less to wake up */
-      if (OS_WAITQUEUE_ALL != nbr)
-         --nbr;
+      if (OS_WAITQUEUE_ALL != wakeup_cnt)
+         --wakeup_cnt;
 
       /* \TODO \FIXME consider that task_current may be less prioritized than
        * tasks in wait_queue->task_queue, so preventing it from sleep is not
        * fair in scope of scheduling (to some degree). There may be some more
        * prioritized task which should be woken up first, while this task maybe
        * should go to sleep. This is even more important in case parameter
-       * nbr = 1.
+       * wakeup_cnt = 1.
        * The most fair approach would be to peek the wait_queue->task_queue and
        * compare the priorities. In case peeked task would be higher prioritized
        * then we should allow task_current to suspend on wait_queue->task_queue
        * and wakeup the most prioritized one */
    }
 
-   while ((OS_WAITQUEUE_ALL == nbr) || ((nbr--) > 0)) {
+   while ((OS_WAITQUEUE_ALL == wakeup_cnt) || (wakeup_cnt-- > 0)) {
       /* chose most prioritized task from wait_queue->task_queue (for task with
        * equal priority threat them in FIFO manner) */
       task = os_taskqueue_dequeue(&(queue->task_queue));
@@ -213,6 +223,7 @@ void os_waitqueue_wakeup_sync(
 
       task->block_code = OS_OK; /* set the block code to NORMAL WAKEUP */
       os_task_makeready(task);
+      awoken = true;
    }
 
    /* To wake up all task exactly once, we have to schedule() out of wakeup
@@ -220,7 +231,7 @@ void os_waitqueue_wakeup_sync(
     * User code may call some other OS function right away which will trigger
     * the os_schedule(). Parameter 'sync' is used for such optimization
     * request */
-   if (!sync) {
+   if (!sync && awoken) {
       /* switch to more prioritized READY task, if there is such (1 as param
        * in os_schedule() means just that */
       os_schedule(1);

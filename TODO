@@ -54,6 +54,10 @@ Mics:
 - (integation)     MEDIUM - Intergation with Arduino IDE for easy use by less
                             expirenced users
 
+Other:
+- check if we can eliminate wait_queue[0] since idle_task never sleeps (only
+  idle_task has prio = 0)
+
 New platforms:
 - ARM Cortex M0 and M3
 

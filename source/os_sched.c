@@ -66,15 +66,6 @@ volatile os_atomic_t isr_nesting = 0;
  * Used to explicitly lock the scheduler for any reason */
 volatile os_atomic_t sched_lock = 0;
 
-#ifdef OS_CONFIG_WAITQUEUE
-/** Pointer to wait_queue on which task_current prepared to suspend.
- * Set in os_waitqueue_prepare(). After this call preemption is also disabled.
- * If this pointer is != NULL we say that task_current is in 'prepared' state
- * (prepared for suspend).
- */
-os_waitqueue_t *waitqueue_current = NULL;
-#endif
-
 /* --- forward declaration of private functions --- */
 
 #ifdef OS_CONFIG_CHECKSTACK

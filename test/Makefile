@@ -89,7 +89,7 @@ all: $(LIBFILE) $(TARGETS)
 
 $(BUILDDIR)/%.elf: $(BUILDDIR)/%.o $(LIBFILE)
 	@$(ECHO) "[LN]\t$@"
-	@$(CC) $< -L$(LIBDIR) -o $@ $(addprefix -l, $(LIBS)) $(CFLAGS) $(LDFLAGS) 
+	@$(CC) $< -L$(LIBDIR) -o $@ $(addprefix -l, $(LIBS)) $(CFLAGS) $(LDFLAGS)
 
 $(BUILDDIR)/%.o: %.c
 	@$(ECHO) "[CC]\t$<"

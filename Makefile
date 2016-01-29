@@ -53,7 +53,8 @@ KERNELSOURCES = \
 	os_sem.c \
 	os_mtx.c \
 	os_waitqueue.c \
-	os_timer.c
+	os_timer.c \
+	os_test.c
 SOURCES = \
    $(KERNELSOURCES) \
 	$(ARCHSOURCES)

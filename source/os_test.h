@@ -32,6 +32,9 @@
 #ifndef __OS_TEST_
 #define __OS_TEST_
 
+/* This file should be included only by unit test as they are compiled
+ * separately. Do not include any other headers from this file */
+
 /**
  * Macro __FILENAME__ should contain the name of the file without directory
  * path. This macro could be set at makefile target level as part of compiler
@@ -51,6 +54,14 @@
    test_debug_printf( \
       OS_PROGMEM_STR(__DEB_FILENAME__ ":" OS_STR(__LINE__) " " format "\r\n"), \
       ## __VA_ARGS__)
+
+#ifdef OS_CONFIG_VERBOSE_TEST_DEBUG
+/* print verbose debugs as normal debugs */
+#define test_verbose_debug test_debug
+#else
+/* instead of verbose debugs, print some scrolling marks */
+void test_verbose_debug(const OS_PROGMEM char *format, ...);
+#endif
 
 typedef void (*test_tick_clbck_t)(void);
 

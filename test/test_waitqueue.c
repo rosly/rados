@@ -41,23 +41,6 @@
 
 #define TEST_TASKS ((unsigned)10)
 
-#if 0
-#define test_verbose_debug test_debug
-//#define test_verbose_debug(format, ...)
-
-#else
-static uint_fast8_t test_debug_idx = 0;
-static const char test_debug_star[] = { '-', '\\', '|', '/' };
-
-#include <stdio.h>
-#define test_verbose_debug(format, ...) \
-{ \
-  test_debug_idx = (test_debug_idx + 1u > sizeof(test_debug_star) ? 0 : test_debug_idx + 1u); \
-  printf("\b%c", test_debug_star[test_debug_idx]); \
-  fflush(stdout); \
-}
-#endif
-
 static volatile unsigned global_tick_cnt = 0;
 static volatile unsigned irq_trigger_tick = 0;
 static os_waitqueue_t *irq_trigger_waitqueue = NULL;

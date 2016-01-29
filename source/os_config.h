@@ -32,6 +32,13 @@
 #ifndef __OS_CONFIG_
 #define __OS_CONFIG_
 
+/** Define OS_CONFIG_VERBOSE_TEST_DEBUG if you would like to see more debug
+ * messages from inside of the tests. This is usefull for bugfixing of arch
+ * dependent code which is failing durring tests. For clear output this is
+ * dissabled by default and instead of verbose messages the progress patern will
+ * be displayed */
+//#define OS_CONFIG_VERBOSE_TEST_DEBUG (1)
+
 /** Define OS_CONFIG_CHECKSTACK if you would like to check the tasks stack
  * integrity. This requires a few additional resources (memory in os_task_t
  * structure and CU at each stack check operation (may be quite expensive)),

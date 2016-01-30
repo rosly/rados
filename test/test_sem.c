@@ -41,7 +41,7 @@
 #include "os_private.h" /* for os_min() */
 
 #define TEST_TASKS ((unsigned)10)
-#define TEST_CYCLES ((os_atomic_t)1000)
+#define TEST_CYCLES ((arch_atomic_t)1000)
 
 typedef struct {
    os_task_t task;

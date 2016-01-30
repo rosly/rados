@@ -46,7 +46,7 @@
 extern os_task_t *task_current;
 
 /* needs to be visible to user because of arch_contextstore_i macros */
-extern volatile os_atomic_t isr_nesting;
+extern volatile arch_atomic_t isr_nesting;
 
 #endif
 

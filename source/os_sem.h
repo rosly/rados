@@ -66,7 +66,7 @@ typedef struct os_sem_tag {
    os_taskqueue_t task_queue;
 
    /* Semaphore value, os_atomit_c since semaphores can be incremented from ISR */
-   os_atomic_t value;
+   arch_atomic_t value;
 
 } os_sem_t;
 
@@ -79,11 +79,11 @@ typedef struct os_sem_tag {
  *
  * @param sem pointer to semaphore
  * @param init_value initial value of semaphore
- *        must be >= 0 and < OS_ATOMIC_MAX
+ *        must be >= 0 and < ARCH_ATOMIC_MAX (arch_atomic_t type enforce that)
  */
 void os_sem_create(
    os_sem_t *sem,
-   os_atomic_t init_value);
+   arch_atomic_t init_value);
 
 /**
  * Function destroys the semaphore

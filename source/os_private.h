@@ -127,7 +127,7 @@
 
 /* Variables visible only for OS files, not for user */
 extern os_taskqueue_t ready_queue;
-extern volatile os_atomic_t sched_lock;
+extern volatile arch_atomic_t sched_lock;
 #ifdef OS_CONFIG_WAITQUEUE
 extern os_waitqueue_t *waitqueue_current;
 #endif

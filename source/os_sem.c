@@ -39,9 +39,9 @@ static void os_sem_timerclbck(void *param);
 
 void os_sem_create(
    os_sem_t *sem,
-   os_atomic_t init_value)
+   arch_atomic_t init_value)
 {
-   OS_ASSERT(init_value < OS_ATOMIC_MAX);
+   OS_ASSERT(init_value < ARCH_ATOMIC_MAX);
    OS_ASSERT(!waitqueue_current); /* cannot call after os_waitqueue_prepare() */
 
    memset(sem, 0, sizeof(os_sem_t));
@@ -164,7 +164,7 @@ void os_sem_up_sync(
    arch_critical_enter(cristate);
 
    /* check if semaphore value would overflow */
-   OS_ASSERT(sem->value < (OS_ATOMIC_MAX - 1));
+   OS_ASSERT(sem->value < (ARCH_ATOMIC_MAX - 1));
 
    /* check if there are some suspended tasks on this sem */
    task = os_taskqueue_dequeue(&(sem->task_queue));

@@ -60,11 +60,11 @@ os_task_t task_idle;
  * dump/restore on ISR enter/exit. Also used for locking the preemption Can be
  * also used to check if OS function was called by user or ISR since
  * isr_nesting > 0 means that we were called from ISR */
-volatile os_atomic_t isr_nesting = 0;
+volatile arch_atomic_t isr_nesting = 0;
 
 /** Preemption lock bitflag
  * Used to explicitly lock the scheduler for any reason */
-volatile os_atomic_t sched_lock = 0;
+volatile arch_atomic_t sched_lock = 0;
 
 /* --- forward declaration of private functions --- */
 

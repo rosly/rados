@@ -47,7 +47,8 @@
 #define OS_CONCAT(a, b) OS_XCONCAT(a, b)
 
 #define OS_STATIC_ASSERT(_e) \
-   enum { OS_CONCAT(static_assert_, __LINE__) = 1 / (!!(_e)) }
+   _Static_assert (_e, OS_STR(_e))
+//enum { OS_CONCAT(static_assert_, __LINE__) = 1 / (!!(_e)) }
 //char OS_CONCAT(static_assert_, __LINE__)[0 - 1*!(_e)];
 
 /** Definition of system atomic value, it need to at least 8bits wide, unsigned

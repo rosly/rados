@@ -65,8 +65,11 @@ ifneq ($(DEBUG),)
 CFLAGS += -g
 endif
 #regardles architecture we use highest warning level
-CFLAGS += -Wall -Wextra -Werror
-LDFLAGS +=
+CFLAGS += -Wall -Wextra -Werror -ffunction-sections -fdata-sections
+#we only produce library in this Makefile, but this is default LDFLAGS which can
+#be used in executables
+#LDFLAGS += -Wl,--gc-sections
+#if you encounter problem with stripong data or code, check following -Wl,--print-gc-sections
 
 vpath %.c $(KERNELSOURCEDIR) $(ARCHDIR)
 vpath %.o $(BUILDDIR)

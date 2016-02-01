@@ -73,8 +73,9 @@ ifneq ($(DEBUG),)
 CFLAGS += -g
 endif
 #regardles architecture we use highest warning level
-CFLAGS += -Wall -Wextra -Werror
-LDFLAGS +=
+CFLAGS += -Wall -Wextra -Werror -ffunction-sections -fdata-sections
+LDFLAGS += -Wl,--gc-sections
+#if you encounter problem with stripong data or code, check following -Wl,--print-gc-sections
 
 vpath %.c $(SOURCEDIR)
 vpath %.o $(BUILDDIR)

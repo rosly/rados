@@ -47,7 +47,7 @@ READELF  = avr-readelf
 #MAKETXT  = srec_cat
 
 CFLAGS   = -mmcu=$(MCU) -DF_CPU=$(FCPU) -D__FILENAME__=$(notdir $<) \
-           -ffunction-sections -fdata-sections # -std=gnu99 commented out cause __flash extension
+#          -std=gnu99 commented out cause __flash extension
 ifeq ($(DEBUG),)
 CFLAGS   += -Os -g
 else

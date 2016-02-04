@@ -92,7 +92,7 @@
 #define os_min(_x, _y) ({ \
    typeof(_x) _min1 = (_x); \
    typeof(_y) _min2 = (_y); \
-   (void) (&_min1 == &_min2); \
+   OS_STATIC_ASSERT(__builtin_types_compatible_p(typeof(_min1), typeof(_min2))); \
    _min1 < _min2 ? _min1 : _min2; })
 
 /*
@@ -112,7 +112,7 @@
 #define os_max(_x, _y) ({ \
    typeof(_x) _max1 = (_x); \
    typeof(_y) _max2 = (_y); \
-   (void) (&_max1 == &_max2); \
+   OS_STATIC_ASSERT(__builtin_types_compatible_p(typeof(_max1), typeof(_max2))); \
    _max1 > _max2 ? _max1 : _max2; })
 
 /**
@@ -122,6 +122,16 @@
  * @return Number of table elements, the return type is size_t
  */
 #define os_element_cnt(_table) (sizeof((_table)) / sizeof((_table)[0]))
+
+/**
+ * Macro return bool 'true' in case _x is power of 2
+ *
+ * @param _x value for checking aginst beeing power of 2
+ * @return 'true' in case _x is power of 2, 'fase' otherwise
+ */
+#define os_power_of_2(_x) ({ \
+   typeof(_x) __x = (_x); \
+   ((((__x) - 1) & (__x)) == 0); })
 
 /* --- Scheduler section --- */
 

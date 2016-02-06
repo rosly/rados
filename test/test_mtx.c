@@ -42,7 +42,7 @@
 #include "os_test.h"
 #include "os_private.h" /* for container_of() */
 
-#define TEST_LOOPS ((unsigned)1000)
+#define TEST_LOOPS ((uint16_t)1000)
 
 static os_task_t task_worker[4];
 static OS_TASKSTACK task_stack[4][OS_STACK_MINSIZE];
@@ -66,8 +66,8 @@ void test_idle(void)
 int test_scen1_worker(void *param)
 {
    int ret;
-   unsigned i;
-   long task_idx = (long)param;
+   uint16_t i;
+   uintptr_t task_idx = (uintptr_t)param;
 
    for (i = 0; i < TEST_LOOPS; i++) {
       ret = os_mtx_lock(&test_mtx[0]);
@@ -86,7 +86,7 @@ int test_scen1_worker(void *param)
 
       /* verify if nobody entered the critical section */
       test_assert(1 == test_atomic[0]);
-      test_assert(task_idx == test_atomic[1]);
+      test_assert(task_idx == (uintptr_t)(test_atomic[1]));
 
       /* reset the magic numbers in protected variables for another task */
       --test_atomic[0];
@@ -712,7 +712,7 @@ int test_scen6_workerL(void *OS_UNUSED(param))
  */
 int test_coordinator(void *OS_UNUSED(param))
 {
-   unsigned i;
+   uint16_t i;
 
 /* scenario 1 */
    os_mtx_create(&test_mtx[0]);
@@ -724,7 +724,7 @@ int test_coordinator(void *OS_UNUSED(param))
       os_task_create(
          &task_worker[i], 1,
          task_stack[i], sizeof(task_stack[i]),
-         test_scen1_worker, (void*)(long)i);
+         test_scen1_worker, (void*)(uintptr_t)i);
    }
    /* scheduler will kick in after following call */
    for (i = 0; i < 4; i++)
@@ -742,7 +742,7 @@ int test_coordinator(void *OS_UNUSED(param))
       os_task_create(
          &task_worker[i], 3 - i,
          task_stack[i], sizeof(task_stack[i]),
-         scen2_worker_proc[i], (void*)(long)i);
+         scen2_worker_proc[i], (void*)(uintptr_t)i);
    }
    /* scheduler will kick in after following call */
    for (i = 0; i < 3; i++)
@@ -766,7 +766,7 @@ int test_coordinator(void *OS_UNUSED(param))
       os_task_create(
          &task_worker[i], OS_CONFIG_PRIOCNT - 1 - i,
          task_stack[i], sizeof(task_stack[i]),
-         scen3_worker_proc[i], (void*)(long)i);
+         scen3_worker_proc[i], (void*)(uintptr_t)i);
    }
    /* scheduler will kick in after following call */
    for (i = 0; i < 4; i++)
@@ -793,7 +793,7 @@ int test_coordinator(void *OS_UNUSED(param))
       os_task_create(
          &task_worker[i], OS_CONFIG_PRIOCNT - 1 - i,
          task_stack[i], sizeof(task_stack[i]),
-         scen4_worker_proc[i], (void*)(long)i);
+         scen4_worker_proc[i], (void*)(uintptr_t)i);
    }
    /* scheduler will kick in after following call */
    for (i = 0; i < 4; i++)
@@ -817,7 +817,7 @@ int test_coordinator(void *OS_UNUSED(param))
       os_task_create(
          &task_worker[i], OS_CONFIG_PRIOCNT - 1 - i,
          task_stack[i], sizeof(task_stack[i]),
-         scen5_worker_proc[i], (void*)(long)i);
+         scen5_worker_proc[i], (void*)(uintptr_t)i);
    }
    /* scheduler will kick in after following call */
    for (i = 0; i < 3; i++)
@@ -841,7 +841,7 @@ int test_coordinator(void *OS_UNUSED(param))
       os_task_create(
          &task_worker[i], OS_CONFIG_PRIOCNT - 1 - i,
          task_stack[i], sizeof(task_stack[i]),
-         scen6_worker_proc[i], (void*)(long)i);
+         scen6_worker_proc[i], (void*)(uintptr_t)i);
    }
    /* scheduler will kick in after following call */
    for (i = 0; i < 3; i++)

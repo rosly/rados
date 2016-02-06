@@ -39,10 +39,8 @@
 #include "os.h"
 #include "os_test.h"
 
-#define TEST_TASKS ((unsigned)10)
-
-static volatile unsigned global_tick_cnt = 0;
-static volatile unsigned irq_trigger_tick = 0;
+static volatile uint8_t global_tick_cnt = 0;
+static volatile uint8_t irq_trigger_tick = 0;
 static os_waitqueue_t *irq_trigger_waitqueue = NULL;
 static bool sleeper_wokenup = false;
 
@@ -174,7 +172,7 @@ int testcase_isr_wakeup_impl(
    bool wait,
    bool timeout)
 {
-   unsigned local_tick_cnt = 0;
+   uint8_t local_tick_cnt = 0;
    os_retcode_t ret;
 
    main = main; /* to silence compilation warning in case of suppressed debugs */

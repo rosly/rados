@@ -40,14 +40,14 @@
 #include "os_test.h"
 #include "os_private.h" /* for os_min() */
 
-#define TEST_TASKS ((unsigned)10)
+#define TEST_TASKS ((uint8_t)10)
 #define TEST_CYCLES ((arch_atomic_t)1000)
 
 typedef struct {
    os_task_t task;
    os_sem_t sem;
    OS_TASKSTACK task1_stack[OS_STACK_MINSIZE];
-   unsigned idx;
+   uint8_t idx;
    bool result;
 } task_data_t;
 
@@ -115,7 +115,7 @@ int test1_task_proc2(void *OS_UNUSED(param))
 int testcase_1(void)
 {
    int ret;
-   unsigned i;
+   uint8_t i;
 
    /* clear out memory */
    memset(worker_tasks, 0, sizeof(worker_tasks));

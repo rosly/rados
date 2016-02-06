@@ -67,7 +67,7 @@
  * is because number of priorities significantly increase the memory consumption
  * (by increasing the task buckets count). Each synchronization primitive such
  * as mutex, semaphore etc. uses os_taskqueue_t which require task buckets */
-#define OS_CONFIG_PRIOCNT ((unsigned)5)
+#define OS_CONFIG_PRIOCNT ((uint_fast8_t)5)
 
 /** Define to enable preemption. Disabling preemption can make kernel less
  * responsive but should make it faster, this can be beneficial for some very

@@ -66,7 +66,7 @@ void test_setupmain(const char *OS_UNUSED(name))
 /* for documentation check os_test.h */
 void test_setuptick(
    test_tick_clbck_t OS_UNUSED(clbck),
-   unsigned long OS_UNUSED(nsec))
+   uint32_t OS_UNUSED(nsec))
 {
    test_assert(0); /* missing implementation */
 }

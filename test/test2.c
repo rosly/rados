@@ -48,11 +48,11 @@
 #include "os.h"
 #include "os_test.h"
 
-#define TEST_CYCLES ((unsigned)100)
+#define TEST_CYCLES ((uint_fast8_t)100)
 
 typedef struct {
    os_sem_t sem;
-   unsigned loop;
+   uint_fast8_t loop;
 } task_data_t;
 
 static os_task_t task1;
@@ -73,7 +73,7 @@ void test_idle(void)
 int task_proc(void *param)
 {
    int ret;
-   unsigned idx = (unsigned)(size_t)param;
+   uint_fast8_t idx = (uint_fast8_t)(uintptr_t)param;
 
    while (task_data[idx].loop < TEST_CYCLES) {
       ++(task_data[idx].loop);

@@ -102,7 +102,7 @@ void test_setupmain(const OS_PROGMEM char *test_name);
  */
 void test_setuptick(
    test_tick_clbck_t clbck,
-   unsigned long nsec);
+   uint32_t nsec);
 
 /**
  * Function forces manual tick

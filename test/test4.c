@@ -48,18 +48,18 @@
 #include "os.h"
 #include "os_test.h"
 
-#define TEST_CYCLES ((unsigned)100)
-#define TEST_TASK_CNT ((uint8_t)3)
+#define TEST_CYCLES ((uint16_t)100)
+#define TEST_TASK_CNT ((uint16_t)3)
 
 typedef struct {
    os_task_t task;
    OS_TASKSTACK stack[OS_STACK_MINSIZE];
-   volatile unsigned cnt;
+   volatile uint16_t cnt;
 } task_def_t;
 
 static task_def_t task_def[TEST_TASK_CNT];
 os_waitqueue_t wq;
-volatile unsigned glob_cnt;
+volatile uint16_t glob_cnt;
 
 void tick_clbck(void)
 {
@@ -68,7 +68,7 @@ void tick_clbck(void)
 
 void test_idle(void)
 {
-   uint8_t i;
+   uint16_t i;
 
    for (i = 0; i < TEST_TASK_CNT; i++) {
       if (task_def[i].cnt < TEST_CYCLES)
@@ -85,7 +85,7 @@ void test_idle(void)
 int task_proc(void *param)
 {
    int ret;
-   volatile unsigned *cnt = (volatile unsigned*)param;
+   volatile uint16_t *cnt = (volatile uint16_t*)param;
 
    while (*cnt < TEST_CYCLES) {
       os_waitqueue_prepare(&wq);
@@ -101,7 +101,7 @@ int task_proc(void *param)
 
 void test_init(void)
 {
-   uint8_t i;
+   uint16_t i;
 
    os_waitqueue_create(&wq);
    for (i = 0; i < TEST_TASK_CNT; i++) {

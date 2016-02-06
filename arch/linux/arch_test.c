@@ -114,7 +114,7 @@ void test_setupmain(const char *name)
 /* for documentation check os_test.h */
 void test_setuptick(
    test_tick_clbck_t clbck,
-   unsigned long nsec)
+   uint32_t nsec)
 {
    int ret;
    struct sigevent sev = {

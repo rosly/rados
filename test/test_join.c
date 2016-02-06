@@ -43,7 +43,7 @@
 #include "os.h"
 #include "os_test.h"
 
-#define TEST_TASKS ((unsigned)10)
+#define TEST_TASKS ((uint8_t)10)
 #define TEST_CYCLES ((arch_atomic_t)1000)
 
 static os_task_t task_worker1;

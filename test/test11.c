@@ -46,7 +46,7 @@
 #include "os.h"
 #include "os_test.h"
 
-#define TEST_CYCLES ((unsigned)100)
+#define TEST_CYCLES ((uint8_t)100)
 
 static os_task_t task1;
 static os_task_t task2;

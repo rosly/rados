@@ -66,7 +66,7 @@ static void uart_init(void)
 #if 0
 static void uart_tx_progmem(const OS_PROGMEM char *str)
 {
-   unsigned i;
+   uint16_t i;
 
    for (i = 0; pgm_read_byte_near(&str[i]) != '\0'; i++) {
       while (!(UCSR0A & (1 << UDRE0))) ;
@@ -77,7 +77,7 @@ static void uart_tx_progmem(const OS_PROGMEM char *str)
 
 static void uart_tx_rammem(const char *str)
 {
-   unsigned i = 0;
+   uint16_t i = 0;
    char val;
 
    while ((val = str[i]) != '\0') {
@@ -104,12 +104,12 @@ void test_debug_printf(
    uart_tx_rammem(buff);
 }
 
-/* for documentation check os_test.h */
 #define TEST_BLINK
+/* for documentation check os_test.h */
 void test_result(int result)
 {
    result_store = result;
-   unsigned i = 0;
+   uint16_t i = 0;
 
    if (0 == result)
       test_debug("Test PASSED");
@@ -127,7 +127,7 @@ void test_result(int result)
       PORTB &= ~_BV(PORTB5);
       _delay_ms(1000);
 
-      test_debug("Result loop %u", i++);
+      test_debug("Result loop %"PRIu16, i++);
    }
 #endif
 }
@@ -151,7 +151,7 @@ void test_setupmain(const OS_PROGMEM char *test_name)
 /* for documentation check os_test.h */
 void test_setuptick(
    test_tick_clbck_t clbck,
-   unsigned long nsec)
+   uin32_t nsec)
 {
    /* stop compare match 1A interrupt */
 #ifdef TIMSK

@@ -33,6 +33,9 @@
 
 #include <sched.h> /* sched_yield used only here */
 
+/* this port is compatible only with 64bit Linux */
+OS_STATIC_ASSERT(sizeof(unsigned long) == sizeof(uint64_t));
+
 /** Signal set, which is masked during critical sections, we use global variable
  *  to set/unset the signal mask in fast way */
 sigset_t arch_crit_signals;
@@ -163,12 +166,13 @@ void arch_task_init(
    os_taskproc_t proc,
    void *param)
 {
-   unsigned long *stack = (unsigned long*)stack_param;
+   uint64_t *stack = (uint64_t*)stack_param;
 
-   /* in Linux stack has to be aligned to unsigned long */
-   OS_ASSERT(0 == ((unsigned long)stack_param & 1));
+   /* in this Linux port, stack has to be aligned to 64bit */
+   OS_ASSERT(0 == ((uintptr_t)stack_param & (sizeof(uint64_t) - 1)));
 
-   if (getcontext(&(task->ctx.context))) OS_ASSERT(0);
+   if (getcontext(&(task->ctx.context)))
+      arch_halt(); /* unrecoverable error */
    task->ctx.context.uc_stack.ss_sp = ((char*)stack);
    task->ctx.context.uc_stack.ss_size = stack_size;
    task->ctx.context.uc_link = NULL;

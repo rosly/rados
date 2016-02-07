@@ -58,6 +58,9 @@ OS_STATIC_ASSERT(sizeof(os_ticks_t) >= sizeof(uint16_t));
 OS_STATIC_ASSERT(ARCH_TICKS_MAX >= (UINT16_MAX - 1));
 #define OS_TICKS_MAX ARCH_TICKS_MAX
 
+/** Global monotonic counter of system ticks */
+extern os_ticks_t ticks_current;
+
 /* check if requested number of priorities is suppoeted by arch platform */
 OS_STATIC_ASSERT(OS_CONFIG_PRIOCNT <= ARCH_BITFIELD_MAX);
 

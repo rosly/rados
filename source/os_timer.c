@@ -45,7 +45,7 @@
 #define OS_TIMER_MAGIC2 ((uint_fast16_t)0xCCDD)
 
 /** Global monotonic counter of system ticks */
-os_ticks_t ticks_cnt = 0;
+os_ticks_t ticks_current = 0;
 
 /** Global list of all timers. Timers are sorted by time which remain until
  *  burnoff */
@@ -228,7 +228,7 @@ void OS_HOT os_tick(void)
    /* Increment system global monotonic ticks counter.
     * Overflow scenario for this counter are handled by usage os_ticks_now()
     * and os_ticks_diff() */
-   ++ticks_cnt;
+   ++ticks_current;
 
    if (!list_is_empty(&timer_list)) {
 
@@ -255,7 +255,7 @@ void OS_HOT os_tick(void)
 
 os_ticks_t os_ticks_now(void)
 {
-   return os_atomicptr_load(&ticks_cnt);
+   return os_atomicptr_load(&ticks_current);
 }
 
 /* \TODO unit test missing */

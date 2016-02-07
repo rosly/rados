@@ -84,13 +84,13 @@ int sleeper_task_proc(void *param)
    sleeper_task_param_t *p = (sleeper_task_param_t*)param;
    os_retcode_t ret;
 
-   test_verbose_debug("sleeper os_waitqueue_prepare()");
-   os_waitqueue_prepare(p->waitqueue);
    test_verbose_debug(
-      "sleeper os_waitqueue_wait(%s)",
+      "sleeper os_waitqueue_prep(%s)",
       p->timeout == OS_TIMEOUT_INFINITE ? "TIMEOUT_INFINITE" :
       "some_timeout_val");
-   ret = os_waitqueue_wait(p->timeout);
+   os_waitqueue_prep(p->waitqueue, p->timeout);
+   test_verbose_debug( "sleeper os_waitqueue_wait()");
+   ret = os_waitqueue_wait();
    sleeper_wokenup = true;
    test_assert(ret == (p->timeouted ? OS_TIMEOUT : OS_OK));
 
@@ -179,7 +179,8 @@ int testcase_isr_wakeup_impl(
 
    main = main; /* to silence compilation warning in case of suppressed debugs */
 
-   os_waitqueue_prepare(waitqueue);
+   ret = os_waitqueue_prep(waitqueue, 5);
+   test_assert(ret == OS_OK);
 
    while (1) {
       if (local_tick_cnt != global_tick_cnt) {
@@ -198,7 +199,7 @@ int testcase_isr_wakeup_impl(
    if (wait) {
       test_verbose_debug("%s calling os_waitqueue_wait()",
                          main ? "main" : "helper");
-      ret = os_waitqueue_wait(5);
+      ret = os_waitqueue_wait();
       test_assert(ret == (timeout ? OS_TIMEOUT : OS_OK));
       test_verbose_debug("%s returned from os_waitqueue_wait() -> %s",
                          main ? "main" : "helper",
@@ -228,7 +229,7 @@ int testcase_isr_wakeup_impl(
     * be properly cleared */
    test_verbose_debug("%s verify results",
                       main ? "main" : "helper");
-   os_waitqueue_prepare(waitqueue);
+   os_waitqueue_prep(waitqueue, OS_TIMEOUT_INFINITE);
    os_waitqueue_break();
    test_assert(!task_current->timer);
 
@@ -363,10 +364,11 @@ int victim_task_proc(void *param)
    victim_task_param_t *p = (victim_task_param_t*)param;
    os_retcode_t ret;
 
-   test_verbose_debug("victim[%zu] os_waitqueue_prepare()", p->idx);
-   os_waitqueue_prepare(p->waitqueue);
+   test_verbose_debug("victim[%zu] os_waitqueue_prep()", p->idx);
+   ret = os_waitqueue_prep(p->waitqueue, OS_TIMEOUT_INFINITE);
+   test_assert(ret == OS_OK);
    test_verbose_debug("victim[%zu] os_waitqueue_wait(TIMEOUT_INFINITE)", p->idx);
-   ret = os_waitqueue_wait(OS_TIMEOUT_INFINITE);
+   ret = os_waitqueue_wait();
    p->wokenup = true;
    test_assert(ret == OS_DESTROYED);
 
@@ -425,10 +427,11 @@ int hiprio_task_proc(void *param)
    os_retcode_t ret;
 
    do {
-      test_verbose_debug("hiprio[%zu] os_waitqueue_prepare()", p->idx);
-      os_waitqueue_prepare(p->waitqueue);
-      test_verbose_debug("hiprio[%zu] os_waitqueue_wait(TIMEOUT_INFINITE)", p->idx);
-      ret = os_waitqueue_wait(OS_TIMEOUT_INFINITE);
+      test_verbose_debug("hiprio[%zu] os_waitqueue_prep(OS_TIMEOUT_INFINITE)", p->idx);
+      ret = os_waitqueue_prep(p->waitqueue, OS_TIMEOUT_INFINITE);
+      test_assert(ret == OS_OK);
+      test_verbose_debug("hiprio[%zu] os_waitqueue_wait()", p->idx);
+      ret = os_waitqueue_wait();
       p->wokenup = true;
       test_assert(ret == OS_OK);
    } while (p->repeat);
@@ -485,6 +488,92 @@ int testcase_wakeup_hiprio(void)
    return 0;
 }
 
+int lowprio_task_proc(void *param)
+{
+   victim_task_param_t *p = (victim_task_param_t*)param;
+   os_retcode_t ret;
+
+   do {
+      test_verbose_debug("lowprio[%zu] os_waitqueue_prep()", p->idx);
+      ret = os_waitqueue_prep(p->waitqueue, OS_TIMEOUT_INFINITE);
+      test_assert(ret == OS_OK);
+
+      /* spin until tick */
+      while (global_tick_cnt < 2);
+
+      test_verbose_debug("lowprio[%zu] os_waitqueue_wait()", p->idx);
+      ret = os_waitqueue_wait();
+   } while (p->repeat);
+
+   return 0;
+}
+
+/* in this test we check if waitqueue provides the fair scheduling policy
+ * when hiprio task is already waiting on waitqueue while in the same time
+ * waitqueue is notified from IRQ and the lowprio task is checking the
+ * assosiated condition */
+int testcase_lowprio_prepare(void)
+{
+   os_waitqueue_t waitqueue;
+   uint8_t i;
+   int ret;
+   victim_task_param_t param[3];
+
+   os_waitqueue_create(&waitqueue);
+
+   global_tick_cnt = 0; /* reset tickcnt's */
+   irq_trigger_waitqueue = &waitqueue;
+   irq_trigger_tick = 1;
+
+   test_verbose_debug("creating hiprio task");
+   param[0].waitqueue = &waitqueue;
+   param[0].idx = 0;
+   param[0].wokenup = false;
+   param[0].repeat = false;
+   os_task_create(
+      &task_victim[0], OS_CONFIG_PRIOCNT - 1,
+      task_victim_stack[0], sizeof(task_victim_stack[0]),
+      hiprio_task_proc, &param[0]);
+
+   test_verbose_debug("creating lowprio task");
+   param[1].waitqueue = &waitqueue;
+   param[1].idx = 0;
+   param[1].wokenup = false;
+   param[1].repeat = false;
+   os_task_create(
+      &task_victim[1], OS_CONFIG_PRIOCNT - 2,
+      task_victim_stack[1], sizeof(task_victim_stack[1]),
+      lowprio_task_proc, &param[1]);
+
+   /* if we get here this means that hiprio task has ended while lowprio task is
+    * suspended, disable the IRQ wakeup */
+   irq_trigger_waitqueue = NULL;
+   irq_trigger_tick = 0;
+
+   /* we should be now in tick 3, the hiprio should be wokenup while the lowprio
+    * should be in os_waitqueue_wait. Thos would mean that lowprio didnt stole
+    * the notification from nose of hiprio even if it was running while ISR
+    * notified the waitqueue */
+   test_assert(param[0].wokenup);
+   test_assert(!(param[1].wokenup));
+
+   test_verbose_debug("waking up lowprio");
+   os_waitqueue_wakeup_sync(&waitqueue, 1, false);
+
+   test_assert(param[0].wokenup);
+   test_assert(param[1].wokenup);
+
+   test_verbose_debug("joining tasks");
+   for (i = 0; i < 2; i++) {
+      ret = os_task_join(&task_victim[i]);
+      test_assert(0 == ret);
+   }
+
+   os_waitqueue_destroy(&waitqueue);
+
+   return 0;
+}
+
 /* \TODO write bit banging on two threads and waitqueue as test5
  * this will be the stress proff of concept */
 
@@ -497,8 +586,10 @@ int mastertask_proc(void *OS_UNUSED(param))
 
    retv = testcase_task_wakeup();
    test_debug("wakeup from task OK");
+#if 0
    retv |= testcase_isr_wakeup();
    test_debug("wakeup from ISR OK");
+#endif
    retv |= testcase_destroy();
    test_debug("wakeup from destroy() OK");
    retv |= testcase_wakeup_hiprio();

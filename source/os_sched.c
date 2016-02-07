@@ -333,7 +333,7 @@ static os_task_t *os_taskqueue_intdequeue(
  * Function need to be called when OS need to obtain most prioritized task in
  * task_queue
  */
-os_task_t*OS_HOT os_taskqueue_dequeue(os_taskqueue_t *task_queue)
+os_task_t* OS_HOT os_taskqueue_dequeue(os_taskqueue_t *task_queue)
 {
    uint_fast8_t maxprio;
 
@@ -350,7 +350,7 @@ os_task_t*OS_HOT os_taskqueue_dequeue(os_taskqueue_t *task_queue)
  * Similar to os_taskqueue_dequeue() but task is dequeued only if most top prio
  * task in task queue has prio higher than this passed by @param prio
  */
-os_task_t*OS_HOT os_taskqueue_dequeue_prio(
+os_task_t* OS_HOT os_taskqueue_dequeue_prio(
    os_taskqueue_t *task_queue,
    uint_fast8_t prio)
 {
@@ -374,7 +374,7 @@ os_task_t*OS_HOT os_taskqueue_dequeue_prio(
  *  Use this function only when you are interested about some property of most
  *  prioritized task on the queue but you don't want to dequeue this task.
  */
-os_task_t*OS_HOT os_taskqueue_peek(os_taskqueue_t *task_queue)
+os_task_t* OS_HOT os_taskqueue_peek(os_taskqueue_t *task_queue)
 {
    uint_fast8_t maxprio;
    list_t *task_list;

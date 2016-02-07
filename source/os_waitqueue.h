@@ -37,18 +37,21 @@
 /**
  * Wait_queue is synchronization primitive used for all variety of
  * notifier-receiver scenarios including those that involve data exchange like
- * producer-consumer and those where signals cannot stack-up.
+ * producer-consumer and those where notification signals cannot stack-up.
  *
  * Following template of code is used on receiver side:
- * 0: uint32_t test_condition; does not have to be atomic type
+ * 0: uint32_t test_condition; does not have to be atomic type, it only cannot
+ *                             give false positives
  *
  * 1: while(1) {
- * 2:   os_waitqueue_prepare(&waitqueue);
- * 3:   if(test_condition) {
- * 4:      os_waitqueue_break();
- * 5:      break;
- * 6:   }
- * 7:   ret = os_waitqueue_wait(timeout);
+ * 2:   ret = os_waitqueue_prep(&waitqueue, timeout);
+ *      if (OS_OK == ret) {
+ * 3:      if(test_condition) {
+ * 4:         os_waitqueue_break();
+ * 5:         break;
+ * 6:      }
+ * 7:      ret = os_waitqueue_wait();
+ *      }
  * 8: }
  *
  * Following template is used on notifier side:
@@ -63,62 +66,87 @@
  *   data exchange scheme.
  * - the notifier side calls os_waitqueue_wakeup() in order to notify the
  *   receiver.
- * - the receiver side calls two functions in row, os_waitqueue_prepare() and
+ * - the receiver side calls two functions in row, os_waitqueue_prep() and
  *   than os_waitqueue_wait() in order to suspend for event or
  *   os_waitqueue_break() in order to break from suspend loop if it detects that
  *   the initial assumption for suspend was false
- * - wait_queue does not accumulate notifications. In other words any
+ * - wait_queue does not accumulate notification signals. In other words any
  *   notification posted when no receiver is waiting on wait_queue will be lost.
  *   It means that notification will not make any effects on future of receiver
  *   actions in case notifier calls os_waitqueue_wakeup() before receiver enter
- *   to os_waitqueue_prepare() or already exit from os_waitqueue_wait().  But if
+ *   to os_waitqueue_prep() or already exit from os_waitqueue_wait().  But if
  *   notifier calls os_waitqueue_wakeup() after receiver entered to
- *   os_waitqueue_prepare() and before return from os_waitqueue_wait() it is
+ *   os_waitqueue_prep() and before return from os_waitqueue_wait() it is
  *   guarantied to wake up the receiver task (is is guarantied that
- *   os_waitqueue_wait() will force receiver to return).
+ *   os_waitqueue_wait() will return without blocking receiver).
  * - usage of work_queues eliminates the race condition which may arise between
  *   receiver check the test_condition and suspend on os_waitqueue_wait().
  * - it also means that condition in line 3 does not have to be atomic. It only
  *   cannot give false positives. There is guarantee that after calling
- *   os_waitqueue_prepare() the receiver task will either see the condition_test
+ *   os_waitqueue_prep() the receiver task will either see the condition_test
  *   to be true or it will be woken up to check the condition_test again.
- * - os_waitqueue_prepare() disables scheduler (and therefore preemption).
+ * - os_waitqueue_prep() disables scheduler (and therefore preemption).
  *   Interrupts remain unaffected. It means that the mentioned condition (in
  *   line 3 of the example) has to be short as possible (in terms of CPU time).
  *   This is because receiver will own CPU until it calls os_waitqueue_wait() or
  *   os_waitqueue_break(). Keeping the condition code small will prevent from
- *   severe priority inversion scheme.
- * - wait_queue does not disable interrupts in case receiver does not have to
- *   suspend. os_waitqueue_prepare() nor os_waitqueue_break() does not disable
- *   interrupts. Such approach mitigate adding of unnecessary jitter to
- *   interrupt service delay.
- * - if task_current will call os_waitqueue_prepare() and then ISR will wakeup
- *   some other task with higher priority, than return from interrupt will not
- *   cause preemption to higher prio task. Instead higher prio task will be
- *   executed only after task_current call os_waitqueue_wait() or
- *   os_waitqueue_break()
- * - the notifier wakeups all suspended tasks before allowing for schedule().
- *   As opposite to semaphore usage this guaranties that suspended tasks will be
- *   scheduled() exactly once per each suspend-wakeup pair. (For semaphores if
- *   the receiver task has higher priority than notifier, it may preempt it and
- *   return to suspend point, then "consume" the signal which was intended to
- *   wakeup different task).
+ *   consequences of possible priority inversion periods until scheduler will be
+ *   enabled again.
+ * - the main advantage of wait_queues over other synchronization mechanism is
+ *   that for most platforms, it does not disable interrupts for fast path (in
+ *   case receiver does not have to suspend). os_waitqueue_prep() nor
+ *   os_waitqueue_break() does not disable interrupts for platforms that suport
+ *   atomic operations as CPU opcode. For simple 8bit CPU's which does not
+ *   support such CPU opcodes, the interrupts has to be dissabled but for much
+ *   shorter periods of time than in other synchronizaion mechanisms. Such
+ *   approach mitigate adding of unnecessary jitter to interrupt service delay.
+ * - keep in mind that waitqueue afets the reaction time, since in case task
+ *   calls os_waitqueue_prep() and then ISR will wakeup some other task with
+ *   higher priority, than return from interrupt will not cause imidiate
+ *   preemption to higher prio task. Instead higher prio task will be executed
+ *   only after task_current call os_waitqueue_wait() or os_waitqueue_break()
+ * - with nbr parameter of os_waitqueue_wakeup(), the notifier is able to wakeup
+ *   all suspended tasks, without knoledge how many of the task is waiting on
+ *   waitqueue.
+ *   Moreover, all of those tasks will be woken up before notifier will call
+ *   schedule(). This guaranties that suspended tasks will be scheduled()
+ *   exactly once per each suspend-wakeup pair. For semaphores if the
+ *   receiver task has higher priority than notifier, it may preempt it and
+ *   return to suspend point, then "consume" the signal which was intended
+ *   to wakeup different task. With waitqueue this will never happen.
+ * - Waitqueue follows the fair scheduling policy. os_waitqueue_prep() can
+ *   block the caller task in case task with higher priority is already waiting
+ *   on the same waitqueue.
+ *   The explanation is following. Lets imagine that os_waitqueue_prep()
+ *   never block any task. We have following scenario: two task, with low and
+ *   high priority. High priority task is already suspended on waitqueue. Low
+ *   priority task is about to synchronize using the same waitqueue as high prio
+ *   task. In case notification will happen just after low prio task return from
+ *   os_waiqueue_prepare(), the assosiated condition will allow low prio task to
+ *   call os_waitqueue_break().
+ *   Fair scheduling policy guaranties that from all task which uses the same
+ *   waitqueue, notification will be delivered to most priritized task. In our
+ *   example, the low prio task was woken up only because the notificaion cames
+ *   betwen it calls os_waitqueue_prep() and the asosiated condition. Fair
+ *   scheduling policy cannot allow fo such race conditions and thats the reason
+ *   why os_waitqueue_prep() has to be able to block the calling task.
  *
  * - wait_queue is usable in following scenarios:
  *   - when receiver-like task would just like to know if there was any
- *     notification not how many of them before it enters the suspend point (we
- *     don't want to accumulate the notifications)
+ *     notification (not how many of them) before it enters the suspend point
+ *     (we don't want to accumulate the notifications)
  *   - when we would like to wakeup multiple receiver-like tasks without prior
- *     knowledge how many of them currently wait on the waitqueue (between
- *     consecutive wakeup, potentially not all receiver tasks will be able to
- *     return to the suspend point before time of next wakeup notification).
+ *     knowledge how many of them currently wait on the waitqueue. This is very
+ *     usefull in scenarios where between consecutive wakeup, potentially not
+ *     all receiver tasks will be able to return to the suspend point before
+ *     time of next wakeup notification and we do not whant to stack/accumulate
+ *     notification signals for them.
  *   - when we would like to build custom communication primitives, like for
  *     synchronization of asynchronous event with suspend condition where there
  *     is possibility of race between checking of the suspend condition and the
  *     asynchronous wakeup event. Also using of semaphore or message box is not
  *     a feasible solution because either of communication scheme, wakeup
  *     preemption of notifier or data passing/acquisition requirements.
- *
  */
 
 /**
@@ -131,7 +159,6 @@
 typedef struct os_waitqueue_tag {
    /** Queue of tasks suspended on this wait_queue. */
    os_taskqueue_t task_queue;
-
 } os_waitqueue_t;
 
 /**
@@ -178,31 +205,56 @@ void os_waitqueue_destroy(os_waitqueue_t *queue);
  * will cause that future call to os_waitqueue_wait() will return immediately.
  * In other words such construction prevents from race conditions which would
  * lead to loosing the wakeup notification.
+ * This function might also suspend the calling task in case higher priority
+ * task is already waiting on the same waitqueue. This is because notification
+ * signals should be at first provided to high priority tasks. By conforming to
+ * this scheme, waitqueue are priority inversion safe mechanism.
  *
  * Following code sniplet shows proper usage of wait_queue API
  * 1: while(1) {
- * 2:   os_waitqueue_prepare(&waitqueue);
- * 3:   if(test_condition) {
- * 4:      os_waitqueue_break();
- * 5:      break;
- * 6:   }
- * 7:   ret = os_waitqueue_wait(timeout);
+ * 2:   ret = os_waitqueue_prep(&waitqueue, timeout);
+ *      if (OS_OK == ret) {
+ * 3:      if(test_condition) {
+ * 4:         os_waitqueue_break();
+ * 5:         break;
+ * 6:      }
+ * 7:      ret = os_waitqueue_wait();
+ *      }
  * 8: }
  *
  * @param queue pointer to wait_queue
+ * @param timeout_ticks number of jiffies (os_tick() call count) before
+ *        operation will time out. The timeout apply to cumulative time spend in
+ *        both os_waitqueue_prep() and os_waitqueue_wait(). If user would
+ *        like to not use of timeout, than @param timeout should be
+ *        OS_TIMEOUT_INFINITE. If timeout will burn off before task would be
+ *        woken up than os_waitqueue_prep() or os_waitqueue_wait() will
+ *        immediately return with OS_TIMEOUT return code.
  *
  * @pre wait_queue must be initialized prior call of this function (please look
  *      at description of possible race conditions with os_waitqueue_destroy()
  * @pre this function cannot be used from ISR nor idle task
  *
  * @post Function disables the scheduler. After return from
- *       os_waitqueue_prepare(), task MUST either call os_waitqueue_break() or
+ *       os_waitqueue_prep(), task MUST either call os_waitqueue_break() or
  *       os_waitqueue_wait(). Until mentioned calls scheduler is disabled.
- * @post Calling of other OS function betwen os_waitqueue_prepare() and
+ * @post Calling of other OS function betwen os_waitqueue_prep() and
  *       os_waitqueue_wait()/os_waitqueue_break() is forbidden (results are
  *       undefined).
+ * @post Function might suspend calling task. The cumulative suspend time for
+ *       both os_waitqueue_prep() and os_waitqueue_wait() is alvays less than
+ *       timeout parameter.
+ *
+ * @return OS_OK in case of no errors
+ *         OS_DESTROYED in case wait_queue was destroyed while task was
+ *         suspended on wait_queue. Please read about race condition while
+ *         destroying wait_queue described at documentation of
+ *         os_waitqueue_destroy()
+ *         OS_TIMEOUT in case operation timeout expired
  */
-void os_waitqueue_prepare(os_waitqueue_t *queue);
+os_retcode_t os_waitqueue_prep(
+   os_waitqueue_t *queue,
+   os_ticks_t timeout_ticks);
 
 /**
  * Function breaks the suspend loop for wait_queue. Call to this function is
@@ -221,15 +273,9 @@ void os_waitqueue_break(void);
  * Function suspends task on wait_queue, until another task or ISR would wake it
  * up by os_waitqueue_wakeup() or until timeout burns off.
  * The wait_queue on which task will suspend is defined by queue param of
- * os_waitqueue_prepare().
+ * os_waitqueue_prep().
  *
- * @param timeout_ticks number of jiffies (os_tick() call count) before
- *        operation will time out. If user would like to not use of timeout,
- *        than @param timeout should be OS_TIMEOUT_INFINITE. If timeout will
- *        burn off before task would be woken up than os_waitqueue_wait() will
- *        immediately return with OS_TIMEOUT return code.
- *
- * @pre os_waitqueue_prepare() must be called prior this function.
+ * @pre os_waitqueue_prep() must be called prior this function.
  *      Results are undefined if task does not follow this rule.
  * @pre this function cannot be used from ISR nor idle task
  *
@@ -246,7 +292,7 @@ void os_waitqueue_break(void);
  *
  * @note user code should always check the return code of os_waitqueue_wait()
  */
-os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(os_ticks_t timeout_ticks);
+os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait();
 
 /**
  * Function wakes up tasks suspended on wait_queue.

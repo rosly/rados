@@ -88,10 +88,11 @@ int task_proc(void *param)
    volatile unsigned *cnt = (volatile unsigned*)param;
 
    while (*cnt < TEST_CYCLES) {
-      os_waitqueue_prepare(&wq);
+      ret = os_waitqueue_prep(&wq, OS_TIMEOUT_INFINITE);
+      test_assert(OS_OK == ret);
       /* only ticks that trigger exacly here will wakeup the task */
       glob_cnt++;
-      ret = os_waitqueue_wait(OS_TIMEOUT_INFINITE);
+      ret = os_waitqueue_wait();
       test_assert(OS_OK == ret);
       (*cnt)++;
    }

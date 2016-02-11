@@ -52,7 +52,10 @@ TESTSOURCE = \
 	test2.c \
 	test3.c \
 	test4.c \
-	test_timer.c
+	test_timer.c \
+	test_mbox.c \
+	test_mqueue.c \
+	test_ring.c
 ifeq ("$(ARCH)", "linux")
 TESTSOURCE += \
 	test_join.c \
@@ -63,7 +66,7 @@ endif
 
 SOURCEDIR = .
 BUILDDIR ?= ../build/$(ARCH)
-INCLUDEDIR = . ../arch/$(ARCH) ../source
+INCLUDEDIR = . ../arch/$(ARCH) ../source ../lib
 LIBDIR = ../build/$(ARCH)
 LIBS = kernel
 

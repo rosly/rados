@@ -105,6 +105,9 @@ void os_waitqueue_break(void)
 {
    OS_ASSERT(0 == isr_nesting); /* cannot call os_waitqueue_finish() from ISR */
 
+   /* just keep in mind that in case we where signalized by ISR than
+    * waitqueue_current == NULL */
+
    os_atomic_store(&waitqueue_current, (os_waitqueue_t*)NULL);
    /* unlock scheduler with NOSYNC, means schedule() to higher prio READY task
     * (if pressent) immediately */
@@ -123,6 +126,9 @@ os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(os_ticks_t timeout_ticks)
    OS_ASSERT(timeout_ticks > OS_TIMEOUT_TRY); /* timeout must be either specific or infinite */
    /* calling of blocking function while holding mtx will cause priority inversion */
    OS_ASSERT(list_is_empty(&task_current->mtx_list));
+
+   /* just keep in mind that in case we where signalized by ISR than
+    * waitqueue_current == NULL */
 
    /* we need to disable the interrupts since wait_queue may be signalized from
     * ISR (we need to add task to wait_queue->task_queue in atomic manner) there

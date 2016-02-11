@@ -45,18 +45,23 @@ include $(CONFIGDIR)/arch/$(ARCH)/target.mk
 include arch/$(ARCH)/source.mk
 
 KERNELSOURCEDIR = source
+LIBSOURCEDIR = lib
 BUILDDIR ?= build/$(ARCH)
 ARCHDIR = arch/$(ARCH)
-INCLUDEDIR = $(ARCHDIR) $(KERNELSOURCEDIR)
+INCLUDEDIR = $(ARCHDIR) $(KERNELSOURCEDIR) $(LIBSOURCEDIR)
 KERNELSOURCES = \
 	os_sched.c \
 	os_sem.c \
 	os_mtx.c \
 	os_waitqueue.c \
 	os_timer.c \
+	os_mbox.c \
 	os_test.c
+LIBSOURCES = \
+	ring.c
 SOURCES = \
    $(KERNELSOURCES) \
+   $(LIBSOURCES) \
 	$(ARCHSOURCES)
 
 #in target.mk for each source the optimal optimization level (CFLAGS = -Ox) is defined
@@ -71,12 +76,14 @@ CFLAGS += -Wall -Wextra -Werror -ffunction-sections -fdata-sections
 #LDFLAGS += -Wl,--gc-sections
 #if you encounter problem with stripong data or code, check following -Wl,--print-gc-sections
 
-vpath %.c $(KERNELSOURCEDIR) $(ARCHDIR)
+vpath %.c $(KERNELSOURCEDIR) $(LIBSOURCEDIR) $(ARCHDIR)
 vpath %.o $(BUILDDIR)
 vpath %.elf $(BUILDDIR)
 STYLESOURCES = \
    $(addprefix $(KERNELSOURCEDIR)/, $(KERNELSOURCES:.c=.c)) \
    $(addprefix $(KERNELSOURCEDIR)/, $(KERNELSOURCES:.c=.h)) \
+   $(addprefix $(LIBSOURCEDIR)/, $(LIBSOURCES:.c=.c)) \
+   $(addprefix $(LIBSOURCEDIR)/, $(LIBSOURCES:.c=.h)) \
    $(addprefix $(ARCHDIR)/, $(ARCHSOURCES:.c=.c)) \
    $(addprefix $(ARCHDIR)/, $(ARCHSOURCES:.c=.h)) 
 DEPEND = $(addprefix $(BUILDDIR)/, $(SOURCES:.c=.d))

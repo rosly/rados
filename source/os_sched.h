@@ -66,8 +66,14 @@ typedef enum {
    OS_WOULDBLOCK, /**< Operation would block */
    OS_TIMEOUT,    /**< operation timeouted */
    OS_DESTROYED,  /**< Operation failed due resource was destroyed in flight */
+   OS_BUSY,       /**< Operation cannot complete due busy resource */
    OS_INVALID     /**< Invalid operation */
 } os_retcode_t;
+
+typedef enum {
+   OS_NOSYNC = 0, /**< Perform operation and allow for schedule */
+   OS_SYNC   = 1, /**< Perform operation but prevent schedule */
+} os_sync_t;
 
 /* --- forward declarations --- */
 struct os_taskqueue_tag;

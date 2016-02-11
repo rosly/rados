@@ -34,6 +34,7 @@
 
 #include "arch_port.h"
 #include "list.h"
+#include "ring.h"
 #include "os_config.h"
 #include "os_protected.h"
 #include "os_timer.h"
@@ -41,6 +42,7 @@
 #include "os_sem.h"
 #include "os_mtx.h"
 #include "os_waitqueue.h"
+#include "os_mbox.h"
 
 /* needs to be visible to user because of arch_contextstore_i macros */
 extern os_task_t *task_current;

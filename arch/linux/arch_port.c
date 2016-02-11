@@ -195,3 +195,17 @@ void arch_idle(void)
    (void)sched_yield();
 }
 
+bool arch_is_dint(void)
+{
+   int ret;
+   sigset_t current_mask;
+
+   /* only few first signals (bits) are used by sigprocmask(), so we set all
+    * remaining to 1 to be able to compare with arch_crit_signals */
+   ret = sigfillset(&current_mask);
+   OS_SELFCHECK_ASSERT(0 == ret);
+   ret = sigprocmask(SIG_SETMASK, NULL, &current_mask);
+   OS_SELFCHECK_ASSERT(0 == ret);
+   return !memcmp(&current_mask, &arch_crit_signals, sizeof(sigset_t));
+}
+

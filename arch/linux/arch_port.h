@@ -183,6 +183,10 @@ static inline uint_fast8_t arch_bitmask_fls(arch_bitmask_t bitfield)
       (void)sigprocmask(SIG_UNBLOCK, &arch_crit_signals, NULL); \
    } while (0)
 
+/* that's quite heavy function in this arch, since we need to call several
+ * functions. Decided not to make it inline */
+bool arch_is_dint(void);
+
 /* This function has to:
  *  - if necessary, disable interrupts to block the nesting
  *  - store all registers (power control bits do not have to be necessarily

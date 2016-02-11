@@ -330,6 +330,7 @@ uint_fast8_t arch_bitmask_fls(arch_bitmask_t bitfield);
  * */
 #define arch_dint() __asm__ __volatile__ ( "cli\n\t" :: )
 #define arch_eint() __asm__ __volatile__ ( "sei\n\t" :: )
+#define arch_is_dint() ({ !(SREG & (1 << SREG_I)); })
 
 /* format of the context pushed on stack for AVR port
  *  hi adress

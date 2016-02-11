@@ -323,6 +323,7 @@ uint_fast8_t arch_bitmask_fls(arch_bitmask_t bitfield);
 
 #define arch_dint() dint()
 #define arch_eint() eint()
+#define arch_is_dint() ({ !(__read_status_register() & GIE); })
 
 /* format of the context pushed on stack for MSP430 port
  * low address

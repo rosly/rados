@@ -177,7 +177,7 @@ void OS_NORETURN OS_COLD os_task_exit(int retv);
  * In general this function will be empty for most platforms, since all
  * necessary preparations are usually done in main, before calling os_start()
  */
-void arch_os_start(void);
+void arch_os_init(void);
 
 /* \note we don't mark arch_context_switch() as OS_NAKED since not all arch use
  *       that */
@@ -227,22 +227,6 @@ static inline void os_blocktimer_destroy(os_task_t *task)
    if (task->timer) {
       os_timer_destroy(task->timer);
       task->timer = NULL;
-   }
-}
-
-static inline void os_scheduler_intlock(void)
-{
-   os_atomic_inc(sched_lock);
-}
-
-static inline void os_scheduler_intunlock(bool sync)
-{
-   os_atomic_dec(sched_lock);
-
-   if (!sync) {
-      /* switch to more prioritized READY task, if there is such (1 as param
-       * in os_schedule() means just that */
-      os_schedule(1);
    }
 }
 

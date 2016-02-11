@@ -221,9 +221,13 @@ void os_timer_destroy(os_timer_t *timer)
 
 void OS_HOT os_tick(void)
 {
+   arch_criticalstate_t cristate;
    os_timer_t *head_timer;
 
-   OS_ASSERT(isr_nesting > 0);   /* this function may be called only form ISR */
+   OS_ASSERT(isr_nesting > 0);   /* this function may be called only from ISR */
+
+   /* we cannot allow other interrupt to mess around with timers and ready_queue */
+   arch_critical_enter(cristate);
 
    /* Increment system global monotonic ticks counter.
     * Overflow scenario for this counter are handled by usage os_ticks_now()
@@ -251,6 +255,8 @@ void OS_HOT os_tick(void)
    /* switch to other READY task which has the same or greater priority (0 as
     * param of os_schedule() means just that) */
    os_schedule(0);
+
+   arch_critical_exit(cristate);
 }
 
 os_ticks_t os_ticks_now(void)

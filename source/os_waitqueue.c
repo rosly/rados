@@ -87,14 +87,13 @@ void os_waitqueue_prepare(os_waitqueue_t *queue)
    OS_ASSERT(task_current != &task_idle); /* IDLE task cannot block */
    /* calling of blocking function while holding mtx will cause priority inversion */
    OS_ASSERT(list_is_empty(&task_current->mtx_list));
-
-   /* disable preemption */
-   os_scheduler_intlock();
-
    /* check if task is not already subscribed on other wait_queue
     * currently we do not support waiting on multiple wait queues
     * Warning: only test, due race condition this may not always work */
    OS_ASSERT(!waitqueue_current);
+
+   /* disable preemption */
+   os_scheduler_lock();
 
    /* mark that we are prepared to suspend on wait_queue
     * some CPU platforms might not have atomic pointer association ops so we use
@@ -107,9 +106,9 @@ void os_waitqueue_break(void)
    OS_ASSERT(0 == isr_nesting); /* cannot call os_waitqueue_finish() from ISR */
 
    os_atomic_store(&waitqueue_current, (os_waitqueue_t*)NULL);
-   os_scheduler_intunlock(false); /* false = nosync, unlock scheduler and
-                                   * schedule() to higher prio READY task
-                                   * immediately */
+   /* unlock scheduler with NOSYNC, means schedule() to higher prio READY task
+    * (if pressent) immediately */
+   os_scheduler_unlock(false);
 }
 
 os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(os_ticks_t timeout_ticks)
@@ -119,7 +118,7 @@ os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(os_ticks_t timeout_ticks)
    os_waitqueue_t *wait_queue;
    arch_criticalstate_t cristate;
 
-   OS_ASSERT(0 == isr_nesting); /* cannot call form ISR */
+   OS_ASSERT(0 == isr_nesting); /* cannot call from ISR */
    OS_ASSERT(task_current != &task_idle); /* IDLE task cannot block */
    OS_ASSERT(timeout_ticks > OS_TIMEOUT_TRY); /* timeout must be either specific or infinite */
    /* calling of blocking function while holding mtx will cause priority inversion */
@@ -131,8 +130,8 @@ os_retcode_t OS_WARN_UNUSEDRET os_waitqueue_wait(os_ticks_t timeout_ticks)
     * slow patch function (task decided to suspend) */
    arch_critical_enter(cristate);
 
-   os_scheduler_intunlock(true); /* true = sync, unlock scheduler but do not
-                                  * schedule() yet */
+   /* unlock scheduler without schedule() after that */
+   sched_lock--;
 
    /* check if we are still in 'prepared' state
     * if not than it means that we were woken up by ISR in the mean time */

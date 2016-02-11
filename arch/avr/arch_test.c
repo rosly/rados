@@ -35,9 +35,12 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <avr/io.h>
-#include <util/delay.h>
 
+//#define TEST_BLINK
+#ifdef TEST_BLINK
+#include <util/delay.h>
 #define BLINK_DELAY_MS 500
+#endif
 
 static test_tick_clbck_t test_tick_clbck = NULL;
 static int result_store;
@@ -104,12 +107,10 @@ void test_debug_printf(
    uart_tx_rammem(buff);
 }
 
-#define TEST_BLINK
 /* for documentation check os_test.h */
 void test_result(int result)
 {
    result_store = result;
-   uint16_t i = 0;
 
    if (0 == result)
       test_debug("Test PASSED");
@@ -121,6 +122,7 @@ void test_result(int result)
 #else
    /* instead of arch_halt() blik the led */
    while (1) {
+      uint16_t i = 0;
 
       PORTB |= _BV(PORTB5);
       _delay_ms(1000);
@@ -151,7 +153,7 @@ void test_setupmain(const OS_PROGMEM char *test_name)
 /* for documentation check os_test.h */
 void test_setuptick(
    test_tick_clbck_t clbck,
-   uin32_t nsec)
+   uint32_t nsec)
 {
    /* stop compare match 1A interrupt */
 #ifdef TIMSK

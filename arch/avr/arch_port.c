@@ -185,7 +185,7 @@ void OS_NAKED OS_HOT arch_context_switch(os_task_t *new_task)
 #endif
 
 /** Arch dependent os_start() routine, for description look at os_private.h */
-void arch_os_start(void)
+void arch_os_init(void)
 {
    /* nothing to do */
 }

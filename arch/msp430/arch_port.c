@@ -78,7 +78,7 @@ void OS_NAKED OS_HOT arch_context_switch(os_task_t *new_task)
           [powerbits] "i" (SCG1 + SCG0 + OSCOFF + CPUOFF));
 }
 
-void arch_os_start(void)
+void arch_os_init(void)
 {
    /* nothing to do */
 }

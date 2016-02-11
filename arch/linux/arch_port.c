@@ -69,15 +69,38 @@ void OS_ISR arch_sig_switch(
       sizeof(task_current->ctx.context.uc_sigmask));
 }
 
-void arch_os_start(void)
+void arch_os_init(void)
 {
    int ret;
-   sigset_t sigmask_all;
+   sigset_t prev_sigmask;
+
+   /* prepare the global set for signals masked during critical sections
+    * we cannot be interrupted by any signal, beside SIGUSR1 used as a helper
+    * for context switching */
+   ret = sigfillset(&arch_crit_signals);
+   OS_SELFCHECK_ASSERT(0 == ret);
+   ret = sigdelset(&arch_crit_signals, SIGUSR1);
+   OS_SELFCHECK_ASSERT(0 == ret);
+   /* now we have the signal mask which we would like to use for critical
+    * sections, but not all of signals can be masked out (SIGKILL or SIGSTOP
+    * cannot be masked out). So to get the set which could be used for compare
+    * operations in arch_is_dint(), we need to see which signals kernel will
+    * accept. For that we set and than fetch the signal mask */
+   ret = sigprocmask(SIG_SETMASK, &arch_crit_signals, &prev_sigmask);
+   OS_SELFCHECK_ASSERT(0 == ret);
+   ret = sigprocmask(SIG_SETMASK, NULL, &arch_crit_signals);
+   OS_SELFCHECK_ASSERT(0 == ret);
+   ret = sigprocmask(SIG_SETMASK, &prev_sigmask, NULL);
+   OS_SELFCHECK_ASSERT(0 == ret);
+
+   /* setup the signal disposition for SIGUSR1, to call arch_sig_switch */
+   /* we forbid the signal nesting while handling SIGUSR1, we cannot be
+    * interrupted while handling SIGUSR1 or it will break everything */
    struct sigaction switch_sigaction = {
       .sa_sigaction  = arch_sig_switch,
-      .sa_mask       = { { 0 } },      /* additional (beside the current signal)
-                                        * mask (they will be added to the mask
-                                        * instead of set) */
+      .sa_mask       = arch_crit_signals, /* additional (beside the current
+					   * signal) mask (they will be added to
+					   * the mask instead of set) */
       .sa_flags      = SA_SIGINFO,     /* use sa_sigaction instead of old
                                         * sa_handler */
       /* SA_NODEFER could be used if we would like to have the nesting enabled
@@ -85,24 +108,8 @@ void arch_os_start(void)
       /* SA_ONSTACK could be used if we would like to use the signal stack
        * instead of thread stack */
    };
-
-   /* prepare the global set for signals masked during critical sections
-    * we cannot be interrupted by any signal, beside SIGUSR1 used as a helper
-    * for context switching */
-   ret = sigfillset(&arch_crit_signals);           /* blocking all signals */
-   OS_ASSERT(0 == ret);
-   ret = sigdelset(&arch_crit_signals, SIGUSR1);   /* without SIGUSR1 used for
-                                                    * context switching */
-   OS_ASSERT(0 == ret);
-
-   /* setup the signal disposition for SIGUSR1, to call arch_sig_switch */
-   /* we forbid the signal nesting while handling SIGUSR1, we cannot be
-    * interrupted while handling SIGUSR1 or it will break everything */
-   ret = sigfillset(&sigmask_all);
-   OS_ASSERT(0 == ret);
-   switch_sigaction.sa_mask = sigmask_all;
    ret = sigaction(SIGUSR1, &switch_sigaction, NULL);
-   OS_ASSERT(0 == ret);
+   OS_SELFCHECK_ASSERT(0 == ret);
 }
 
 /*

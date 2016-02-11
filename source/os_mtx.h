@@ -72,7 +72,7 @@ typedef struct {
 
    /** Recursive lock count
     * (it does not need to be sig_atomic_t since only the owner task can change
-    * this value and using of mtx form ISR is forbidden */
+    * this value and using of mtx from ISR is forbidden */
    uint_fast8_t recur;
 
 } os_mtx_t;

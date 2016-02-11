@@ -95,9 +95,9 @@ void test_setupmain(const char *name)
    int ret;
    struct sigaction tick_sigaction = {
       .sa_sigaction  = sig_alrm,
-      .sa_mask       = { { 0 } },   /* additional (beside the current signal)
-                                     * mask (they will be added to the mask
-                                     * instead of set) */
+      .sa_mask       = arch_crit_signals, /* additional (beside the current
+					   * signal) mask (they will be added to
+					   * the mask instead of set) */
       .sa_flags      = SA_SIGINFO,  /* use sa_sigaction instead of old
                                      * sa_handler */
       /* SA_NODEFER could be used if we would like to have the nesting enabled

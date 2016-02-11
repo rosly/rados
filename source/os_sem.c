@@ -90,8 +90,8 @@ os_retcode_t OS_WARN_UNUSEDRET os_sem_down(
    /* calling of blocking function while holding mtx will cause priority inversion */
    OS_ASSERT(list_is_empty(&task_current->mtx_list));
 
-   /* critical section needed because: timers, ISR sem_up(), operating on
-    * sem->task_queue */
+   /* critical section needed because of timers and other ISRs which might call
+    * sem_up() while we operate on sem->task_queue and task_queue */
    arch_critical_enter(cristate);
    do {
       if (sem->value > 0) {

@@ -246,7 +246,8 @@ void os_scheduler_unlock(bool sync);
  * @pre after return from this function CPU is in state that represent
  *      task_idle execution. Therefore, stack pointer prior call to this
  *      function should point to memory which should be a task_idle stack
- * @post after return from this function, interrupts will be disabled
+ * @post after return from this function, interrupts will be disabled. They must
+ *       be keept disabled until os_start()
  * @post scheduler will remain blocked after return from this function
  * @post after return from this function, user code may call any of OS API
  *       functions (this includes creating OS additional tasks)
@@ -274,6 +275,8 @@ void os_init(void);
  *        functions.
  *
  * @pre os_start() call is needed prior this function call
+ * @pre interrupts must be keept disabled prior this call (os_init() disables
+ *      interrupts)
  * @post this function does not return. It is used as starting point for
  *       task_idle
  */

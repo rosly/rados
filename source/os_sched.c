@@ -86,28 +86,45 @@ void os_scheduler_lock(void)
    OS_ASSERT(0 == isr_nesting);     /* cannot call from ISR */
    OS_ASSERT(!waitqueue_current);   /* cannot call after os_waitqueue_prepare() */
 
-   os_scheduler_intlock();
+   os_atomic_inc(&sched_lock);       /* atomicaly lock the scheduler */
 }
 
 void os_scheduler_unlock(bool sync)
 {
+   arch_criticalstate_t cristate;
+   arch_atomic_t lock_curr;
+
    OS_ASSERT(0 == isr_nesting);     /* cannot call from ISR */
    OS_ASSERT(!waitqueue_current);   /* cannot call after os_waitqueue_prepare() */
 
-   os_scheduler_intunlock(sync);
+   lock_curr = os_atomic_dec_load(&sched_lock); /* atomicaly unlock scheduler */
+   if (!sync && (0 == lock_curr)) {
+      /* in case OS_NOSYNC and removal of last sched lock switch to more
+       * prioritized READY task, if there is such (1 as param in os_schedule()
+       * means just that.
+       * internaly os_schedule() will verify again if sched_lock == 0, so no
+       * wories about race conditions */
+
+      arch_critical_enter(cristate);
+      os_schedule(1);
+      arch_critical_exit(cristate);
+   }
 }
 
 void os_init(void)
 {
-   /* disable the interrupts, needed to make critical section */
+   /* architecture dependent initialization. Perform this before any other step
+    * so arch can initialize neccessary structures and hw before we perform any
+    * generic initialization which may base on those */
+   arch_os_init();
+
+   /* disable the interrupts, needed to enter critical section for
+    * initialization of OS internals */
    arch_dint();
 
    /* initialize OS subsystem and variables */
    os_taskqueue_init(&ready_queue);
    os_timers_init();
-
-   /* architecture dependent initialization */
-   arch_os_start();
 
    /* create and switch to idle task */
    os_task_init(&task_idle, 0);
@@ -117,7 +134,7 @@ void os_init(void)
    /* lock the scheduler to prevent context switch to newly created tasks by
     * application. After return, user code should initialize system interrupts
     * (tick and others). Therefore we keep interrupts dissabled. */
-   os_scheduler_intlock();
+   sched_lock = 1;
 }
 
 void OS_NORETURN os_start(os_idleproc_t app_idle)
@@ -126,10 +143,12 @@ void OS_NORETURN os_start(os_idleproc_t app_idle)
 
    /* should be called from the same context as os_init() */
    OS_ASSERT(task_current == &task_idle);
+   /* interrupts must be keep disabled before this call */
+   OS_ASSERT(arch_is_dint());
 
    /* we are ready for scheduling actions, enable the all interrupts, enable
-    * scheduler but do not schedule yet (use sync == true) */
-   os_scheduler_intunlock(true);
+    * scheduler (remove the sched_lock) */
+   sched_lock = 0;
    arch_eint();
 
    /* perform first context switch (if possible) form task_idle to user task */
@@ -171,7 +190,7 @@ void os_task_create(
    arch_critical_enter(cristate);
    os_taskqueue_enqueue(&ready_queue, task);
    /* 1 as a param allows context switch only if created task has higher
-    * priority than task_curernt */
+    * priority than task_current */
    os_schedule(1);
    arch_critical_exit(cristate);
 }
@@ -238,8 +257,8 @@ void os_task_check(os_task_t *OS_UNUSED(task))
 
 void OS_COLD os_halt(void)
 {
-   os_scheduler_intlock();
-   arch_dint();
+   arch_dint(); /* disable interrupt = permanently enter OS critical section */
+   sched_lock = 1; /* permanently lock scheduler */
    arch_halt();
 }
 
@@ -429,11 +448,14 @@ void os_taskqueue_init(os_taskqueue_t *task_queue)
  *  required for instance when execution of current task is no longer possible,
  *  like in case of blocking code (look at os_sem.c code)
  *
- *  /note this function can be called only from critical section
+ *  /note this function can be called only from OS critical section
  */
 void OS_HOT os_schedule(uint_fast8_t higher_prio)
 {
    os_task_t *new_task;
+
+   /* this function can be called only from OS critical section */
+   OS_SELFCHECK_ASSERT(arch_is_dint());
 
    /* Check the nesting level or if scheduler is locked.
     * Do not switch tasks in case of nested ISR or in case we explicitly locked
@@ -506,6 +528,9 @@ void OS_NORETURN OS_COLD os_task_exit(int retv)
    /* we remove current task from system and going for endless sleep. We need
     * to block the preemption, we never leave this state in this task, when we
     * switch to other task interrupts will be enabled again */
+   /* \TODO we only want to disable interrupts until we finish with this task.
+    * we might change arch_critical_enter() into arch_dint() as well. Review
+    * that. */
    arch_critical_enter(cristate);
 
    task_current->ret_value = retv; /* store the return value for future join() */
@@ -515,36 +540,25 @@ void OS_NORETURN OS_COLD os_task_exit(int retv)
     * This will wake up the waiting task in os_task_join() */
    if (task_current->join_sem) {
 
-      /* since after join, master task will probably remove the current task
-       * stack and task structure, we cannot use os_sem_up().
-       * We simply avoiding this by locking the scheduler. (keep in mind that
-       * critical section is different thing than scheduler lock)
-       *
-       * \TODO after adding os_sem_up_sync() implementation blocking of
-       * scheduler seems to be unnecessary, since we do not call schedule().
-       * review this again and if really unnecessary remove scheduler locking
-       * in below code */
-      os_scheduler_intlock();
+      /* we need to sygnalize the master task. Master task usually remove the
+       * current task stack and task structure right after signalization and
+       * context switch, so we prevent context switch by SYNCH flag for
+       * os_sem_up_sync() */
       os_sem_up_sync(task_current->join_sem, true);
-      os_scheduler_intunlock(true); /* true = sync, re-enable scheduler but not
-                                     * schedule() yet */
    }
 
    /* Chose any READY task and switch to it - at least idle task is in READY
-    * state (ready_queue) so we will never get the NULL there
-    * Since we not pushing current_task anywhere it will disappear from
-    *scheduling
-    */
+    * state (ready_queue) (os_taskqueue_dequeue(&ready_queue) never returns
+    * NULL.  We're not pushing current_task anywhere, so it will disappear from
+    * scheduling. Afer that OS no longer manage this task structure */
    arch_context_switch(os_taskqueue_dequeue(&ready_queue));
 
    /* we should never reach this point, there is no chance that scheduler picked
     * up this code again since we dropped the task */
    OS_ASSERT(0);
-   arch_critical_exit(cristate); /* just to silence warning about unused
-                                  *variable */
-   /* \TODO since by critical section we only want to disable interrupts we
-    * might change arch_critical_enter call in this function into arch_dint().
-    * Review that. */
+
+   /* just to silence warning about unused variable */
+   arch_critical_exit(cristate);
    while (1) ; /* just to silence warning about return from function */
 }
 

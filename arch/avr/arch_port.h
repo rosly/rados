@@ -145,6 +145,16 @@ typedef uint16_t arch_ridx_t;
  *   condition and than emits one of two code branches
  */
 
+/* enforce calculation of _expr before entering critical section by influencing
+ * on register manager. This will prevent from relocation of _val calculation
+ * inside critical section which would uneccessarly extend time while IRQ are
+ * dissabled */
+#define assign_register(_expr) \
+   ({ if (!__builtin_constant_p(_expr)) { \
+         __asm__ __volatile__ ( "" :: "r" (_expr)); \
+      } \
+   })
+
 /* AVR does not support direct memory operations (LOAD-STORE architecture)
  * we must disable interrupts to achieve atomicity */
 
@@ -245,6 +255,8 @@ typedef uint16_t arch_ridx_t;
          uint16_t *__ptr = (uint16_t*)(_ptr); \
          uint16_t __val = (uint16_t)(_val); \
          arch_criticalstate_t cristate; \
+         \
+         assign_register(__val); \
          arch_critical_enter(cristate); \
          *(volatile uint16_t*)__ptr = __val; \
          arch_critical_exit(cristate); \
@@ -260,6 +272,8 @@ typedef uint16_t arch_ridx_t;
             uint16_t __val = (uint16_t)(_val); \
             uint16_t __tmp; \
             arch_criticalstate_t cristate; \
+            \
+            assign_register(__val); \
             arch_critical_enter(cristate); \
             __tmp = *(volatile uint16_t*)__ptr; \
             *(volatile uint16_t*)__ptr = __val; \
@@ -276,25 +290,28 @@ typedef uint16_t arch_ridx_t;
  * OS_STATIC_ASSERT( \
  *    __builtin_types_compatible_p(typeof(*(_ptr)), typeof(_val))); \
  */
-#define os_atomic_cmp_exch(_ptr, _exp_val, _val) \
+#define os_atomic_cmp_exch(_ptr, _ptr_exp_val, _val) \
    ({ \
       bool fail; \
       if (sizeof(typeof(*(_ptr))) == 2) { \
          uint16_t *__ptr = (uint16_t*)(_ptr); \
-         uint16_t *__exp_val = (uint16_t*)(_exp_val); \
+         uint16_t *__ptr_exp_val = (uint16_t*)(_ptr_exp_val); \
+         uint16_t __exp_val = *__ptr_exp_val; \
          uint16_t __val = (uint16_t)(_val); \
          uint16_t __tmp; \
          arch_criticalstate_t cristate; \
+         \
+         assign_register(__val); \
          arch_critical_enter(cristate); \
          __tmp = *(volatile uint16_t*)__ptr; \
-         if (__tmp == *__exp_val) { \
+         if (__tmp == __exp_val) { \
             *(volatile uint16_t*)__ptr = __val; \
+            arch_critical_exit(cristate); \
             fail = false; \
-            arch_critical_exit(cristate); \
          } else { \
-            *__exp_val = __tmp; \
-            fail = true; \
             arch_critical_exit(cristate); \
+            *__ptr_exp_val = __tmp; \
+            fail = true; \
          } \
       } \
       fail; /* return value */ \
@@ -323,9 +340,11 @@ uint_fast8_t arch_bitmask_fls(arch_bitmask_t bitfield);
       SREG = (_critical_state); \
    } while (0)
 
-/* do not mark memory as clobbered, since this will destroy all compiler
- * optimizations for memory access and not add any beneficial value to generated
- * code. For more info look at:
+/* We are not using "memory" as clobbered list in following macro
+ * Using "memory" for clobber list is not usefull at all. Any shared value need
+ * to be volatile of exchanged by atomic macros. Adding "memory" for clobber
+ * list will not help stupid code while it removes all other (intentional)
+ * compiler optimizations for memory access.
  * http://www.atmel.com/webdoc/AVRLibcReferenceManual/optimization_1optim_code_reorder.html
  * */
 #define arch_dint() __asm__ __volatile__ ( "cli\n\t" :: )

@@ -115,7 +115,7 @@ $(BUILDDIR)/%.d: %.c
 
 ifeq ("$(ARCH)", "linux")
 testrun: all
-	@$(addsuffix ;, $(TARGETS))
+	@for test in $(TARGETS); do $(ECHO) "[TEST] $$test"; $$test; $(ECHO); done;
 
 testloop:
 	@while { for test in $(TARGETS); do if $$test; then true; else break 2; fi; done; }; do echo "All tests OK"; done;

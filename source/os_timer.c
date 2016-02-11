@@ -255,7 +255,7 @@ void OS_HOT os_tick(void)
 
 os_ticks_t os_ticks_now(void)
 {
-   return os_atomicptr_load(&ticks_cnt);
+   return os_atomic_load(&ticks_cnt);
 }
 
 /* \TODO unit test missing */

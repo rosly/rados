@@ -99,14 +99,14 @@ void os_waitqueue_prepare(os_waitqueue_t *queue)
    /* mark that we are prepared to suspend on wait_queue
     * some CPU platforms might not have atomic pointer association ops so we use
     * platform macro */
-   os_atomicptr_store(&waitqueue_current, queue);
+   os_atomic_store(&waitqueue_current, queue);
 }
 
 void os_waitqueue_break(void)
 {
    OS_ASSERT(0 == isr_nesting); /* cannot call os_waitqueue_finish() from ISR */
 
-   os_atomicptr_store(&waitqueue_current, (os_waitqueue_t*)NULL);
+   os_atomic_store(&waitqueue_current, (os_waitqueue_t*)NULL);
    os_scheduler_intunlock(false); /* false = nosync, unlock scheduler and
                                    * schedule() to higher prio READY task
                                    * immediately */

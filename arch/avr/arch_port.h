@@ -72,15 +72,17 @@ typedef uint8_t arch_atomic_t;
 typedef uint16_t arch_ticks_t;
 #define ARCH_TICKS_MAX ((arch_ticks_t)UINT16_MAX)
 
-/** we use 8bit to allow fast HW multiply on AVR CPU */
-typedef uint8_t arch_tickshz_t;
-
 typedef uint8_t arch_criticalstate_t; /* size of AVR status register */
 
 /* the largest sane type for bit field operations on 8bit CPU. We could try
  * extend that */
 typedef uint8_t arch_bitmask_t;
 #define ARCH_BITFIELD_MAX ((size_t)((sizeof(arch_bitmask_t) * 8)))
+
+/* since even for 8 bit we need to disable the interrupt for atomic load/store,
+ * there is no reason to limit this type to 8 bit (256 mqueue depth) */
+typedef uint16_t arch_ridx_t;
+#define ARCH_RIDX_MAX UINT16_MAX
 
 /* for ISR we use following attributes:
  * - naked - since we provide own register save-restore macros
@@ -111,134 +113,192 @@ typedef uint8_t arch_bitmask_t;
 #define OS_STACK_DESCENDING
 #define OS_STACK_MINSIZE ((size_t)(35 * 4)) /* four times of context size */
 
+/** Typical atomic buildins are not available for avr-gcc, we have to implement
+ * them by hand written macros.
+ * On AVR there is no instruction to load whole X, Y, or whole Z at once, we
+ * need to disable interrupts if we want to do it atomically
+ *
+ * Following macros might seem to be complicated, AND IN FACT IT IS BY REASON:
+ * - to prevent from macro parameters side effects, and allow to accept any type
+ *   of argument (8/16/32bit), we could use following construction typeof(_ptr)
+ *   __ptr = (_ptr).
+ * - unfortunately typeof() reuse top level modifiers such as const and volatile
+ * - we need to use some local variables which will be removed/optimized by
+ *   compiler. But since those variables has to have the same type as _ptr, in
+ *   case _ptr is volatile this creates very inefficient code, since compiler
+ *   will use stack for temporary variables of volatile type. In other words
+ *   this would be opposite to what we want to achieve.
+ * - if we want to use temporary variables without additional penalty, we need
+ *   to strip of volatile modifier from pointer type.
+ * - as a alternative, we could use in-line assembly but then, compiler is
+ *   constrained with optimizations. Assembler macros will force compiler to use
+ *   concrete register pairs (eg Y,Z) and addressing modes and/or prevent jump
+ *   optimizations etc).
+ * - OK, we know that we have to stick to C
+ * - and we need strict control over the temporary variable types
+ * - the only way to do this is to check the size of input variable and recreate
+ *   the desired pointer type by copy of pointer address. This way we also
+ *   prevent from macro parameters side effects
+ * - then right before the access we need to add the volatile modifier to
+ *   prevent constant propagation optimizations
+ * - for type detection we use __builtin_choose_expr() which checks for constant
+ *   condition and than emits one of two code branches
+ */
+
 /* AVR does not support direct memory operations (LOAD-STORE architecture)
- * we must disable interrupts to ensure atomicity */
-#define os_atomic_inc(_atomic) \
-   do { \
-      arch_criticalstate_t cristate; \
-      arch_critical_enter(cristate); \
-      (_atomic)++; \
-      arch_critical_exit(cristate); \
-   } while (0)
+ * we must disable interrupts to achieve atomicity */
 
-#if 0
-/* \TODO following two instructions can be exchanged, since on AVR always one
- * more instruction is executed after enabling interrupts
- * "out __SREG__, %0\n\t"
- * "st %[atomic], __tmp_reg__\n\t" */
-do { \
-   uint8_t _tmp_reg2; \
-   __asm__ __volatile__ ( \
-      "in %0, __SREG__\n\t" \
-      "cli\n\t" \
-      "ld __tmp_reg__, %[atomic]\n\t" \
-      "inc __tmp_reg__\n\t" \
-      "st %[atomic], __tmp_reg__\n\t" \
-      "out __SREG__, %0\n\t" \
-      : "=&r" (_tmp_reg2) \
-      : [atomic] "e" (_atomic) \
-      : "memory" ); \
-} while (0)
-#endif
-
-/* AVR does not support direct memory operations (LOAD-STORE architecture)
- * we must disable interrupts to ensure atomicity */
-#define os_atomic_dec(_atomic) \
-   do { \
-      arch_criticalstate_t cristate; \
-      arch_critical_enter(cristate); \
-      --(_atomic); \
-      arch_critical_exit(cristate); \
-   } while (0)
-
-#if 0
-do { \
-   uint8_t _tmp_reg2; \
-   __asm__ __volatile__ ( \
-      "in %0, __SREG__\n\t" \
-      "cli\n\t" \
-      "ld __tmp_reg__, %[atomic]\n\t" \
-      "dec __tmp_reg__\n\t" \
-      "st %[atomic], __tmp_reg__\n\t" \
-      "out __SREG__, %0\n\t" \
-      : "=&r" (_tmp_reg2) \
-      : [atomic] "e" (_atomic) \
-      : "memory" ); \
-} while (0)
-#endif
-
-/* typical atomic buildins are not available for avr-gcc, we have to implement
- * them by macros */
-
-/* on AVR there is no instruction to load whole X, Y, or whole Z at once, we
- * need to disable interrupts if we want to do it atomically */
-#define os_atomicptr_load(_ptr) \
+#define os_atomic_inc_load(_ptr) \
    ({ \
-       typeof(*(_ptr)) _tmp_widereg; \
-       arch_criticalstate_t cristate; \
-       arch_critical_enter(cristate); \
-       _tmp_widereg = *(_ptr); \
-       arch_critical_exit(cristate); \
-       _tmp_widereg; /* return loaded value */ \
+      (typeof(*(_ptr)))__builtin_choose_expr(sizeof(typeof(*(_ptr))) == 1, \
+         ({ \
+            uint8_t *__ptr = (uint8_t*)(_ptr); \
+            uint8_t __val; \
+            arch_criticalstate_t cristate; \
+            arch_critical_enter(cristate); \
+            __val = ++(*(volatile uint8_t*)__ptr); \
+            arch_critical_exit(cristate); \
+            __val; \
+         }), \
+         ({ \
+            (typeof(*(_ptr)))__builtin_choose_expr(sizeof(typeof(*(_ptr))) == 2, \
+               ({ \
+                  uint16_t *__ptr = (uint16_t*)(_ptr); \
+                  uint16_t __val; \
+                  arch_criticalstate_t cristate; \
+                  arch_critical_enter(cristate); \
+                  __val = ++(*(volatile uint16_t*)__ptr); \
+                  arch_critical_exit(cristate); \
+                  __val; \
+               }), \
+            ({ \
+               arch_halt(); /* not implemented type of atomic access */ \
+               -1; /* this branch is evaluated than optimized, return something */ \
+	     }) ); \
+         }) ); \
     })
 
-#define os_atomicptr_store(_ptr, _val) \
-   do { \
-      arch_criticalstate_t cristate; \
-      arch_critical_enter(cristate); \
-      *(_ptr) = (_val); \
-      arch_critical_exit(cristate); \
-   } while (0)
-
-#define os_atomicptr_exch(_ptr, _val) \
+#define os_atomic_dec_load(_ptr) \
    ({ \
-      typeof(_ptr) __ptr = (_ptr); \
-      typeof(*__ptr) _tmp_widereg; \
-      arch_criticalstate_t cristate; \
-      arch_critical_enter(cristate); \
-      _tmp_widereg = *__ptr; \
-      *__ptr = (_val); \
-      arch_critical_exit(cristate); \
-      _tmp_widereg; /* return value */ \
+      (typeof(*(_ptr)))__builtin_choose_expr(sizeof(typeof(*(_ptr))) == 1, \
+         ({ \
+            uint8_t *__ptr = (uint8_t*)(_ptr); \
+            uint8_t __val; \
+            arch_criticalstate_t cristate; \
+            arch_critical_enter(cristate); \
+            __val = --(*(volatile uint8_t*)__ptr); \
+            arch_critical_exit(cristate); \
+            __val; \
+         }), \
+         ({ \
+            (typeof(*(_ptr)))__builtin_choose_expr(sizeof(typeof(*(_ptr))) == 2, \
+               ({ \
+                  uint16_t *__ptr = (uint16_t*)(_ptr); \
+                  uint16_t __val; \
+                  arch_criticalstate_t cristate; \
+                  arch_critical_enter(cristate); \
+                  __val = --(*(volatile uint16_t*)__ptr); \
+                  arch_critical_exit(cristate); \
+                  __val; \
+               }), \
+            ({ \
+               arch_halt(); /* not implemented type of atomic access */ \
+               -1; /* this branch is evaluated than optimized, return something */ \
+	     }) ); \
+         }) ); \
     })
 
-#define os_atomicptr_cmp_exch(_ptr, _exp_ref, _val) \
+#define os_atomic_inc(_ptr) \
+   do { \
+      /* we cannot do anything smarter so just ignore the return value from \
+       * previous macro */ \
+      os_atomic_inc_load(_ptr); \
+   } while (0)
+
+#define os_atomic_dec(_ptr) \
+   do { \
+      /* we cannot do anything smarter so just ignore the return value from \
+       * previous macro */ \
+      os_atomic_dec_load(_ptr); \
+   } while (0)
+
+#define os_atomic_load(_ptr) \
    ({ \
-      typeof(_ptr) __ptr = (_ptr); \
-      typeof(*__ptr) _tmp_widereg; \
-      typeof(_exp_ref) __exp_ref = (_exp_ref); \
-      (void) (&__exp_ref == &__ptr); \
-      bool success; \
-      arch_criticalstate_t cristate; \
-      arch_critical_enter(cristate); \
-      _tmp_widereg = *__ptr; \
-      if (_tmp_widereg == *__exp_ref) { \
-         *__ptr = (_val); \
-         success = true; \
-      } else { \
-         *__exp_ref = _tmp_widereg; \
-         success = false; \
+      (typeof(*(_ptr)))__builtin_choose_expr(sizeof(typeof(*(_ptr))) == 2, \
+         ({ \
+            uint16_t *__ptr = (uint16_t*)(_ptr); \
+            uint16_t __val; \
+            arch_criticalstate_t cristate; \
+            arch_critical_enter(cristate); \
+            __val = *(volatile uint16_t*)__ptr; \
+            arch_critical_exit(cristate); \
+            __val; \
+         }), \
+         /* will give following error error: control reaches end of non-void function */ \
+         ({ }) ); \
+    })
+
+#define os_atomic_store(_ptr, _val) \
+   do { \
+      OS_STATIC_ASSERT(__builtin_types_compatible_p(typeof(*(_ptr)), typeof(_val))); \
+      if (sizeof(typeof(*(_ptr))) == 2) { \
+         uint16_t *__ptr = (uint16_t*)(_ptr); \
+         uint16_t __val = (uint16_t)(_val); \
+         arch_criticalstate_t cristate; \
+         arch_critical_enter(cristate); \
+         *(volatile uint16_t*)__ptr = __val; \
+         arch_critical_exit(cristate); \
       } \
-      arch_critical_exit(cristate); \
-      !success; /* return value */ \
+   } while (0)
+
+#define os_atomic_exch(_ptr, _val) \
+   ({ \
+      OS_STATIC_ASSERT(__builtin_types_compatible_p(typeof(*(_ptr)), typeof(_val))); \
+      (typeof(*(_ptr)))__builtin_choose_expr(sizeof(typeof(*(_ptr))) == 2, \
+         ({ \
+            uint16_t *__ptr = (uint16_t*)(_ptr); \
+            uint16_t __val = (uint16_t)(_val); \
+            uint16_t __tmp; \
+            arch_criticalstate_t cristate; \
+            arch_critical_enter(cristate); \
+            __tmp = *(volatile uint16_t*)__ptr; \
+            *(volatile uint16_t*)__ptr = __val; \
+            arch_critical_exit(cristate); \
+            __tmp; /* return value */ \
+         }), \
+         /* will give following error error: control reaches end of non-void function */ \
+         ({ }) ); \
     })
 
-#if 0
-do { \
-   uint8_t _tmp_reg2; \
-   __asm__ __volatile__ ( \
-      "in __tmp_reg__, __SREG__\n\t" \
-      "cli\n\t" \
-      "ld %[_tmp_reg2], %[_src]+\n\t" \
-      "st %[_dst]+, %[_tmp_reg2]\n\t" \
-      "ld %[_tmp_reg2], %[_src]+\n\t" \
-      "st %[_dst]+, %[_tmp_reg2]\n\t" \
-      "out __SREG__, __tmp_reg__\n\t" \
-      : [_tmp_reg2] "+r" (_tmp_reg2) \
-      : [_src] "e" (_src), [_dst] "e" (_dst) \
-      : "0" (_src), "1" (_dst), "memory" ); \
-} while (0)
-#endif
+/* \TODO got some errors while trying following
+ * OS_STATIC_ASSERT( \
+ *    __builtin_types_compatible_p(typeof(_ptr), typeof(_exp_val))); \
+ * OS_STATIC_ASSERT( \
+ *    __builtin_types_compatible_p(typeof(*(_ptr)), typeof(_val))); \
+ */
+#define os_atomic_cmp_exch(_ptr, _exp_val, _val) \
+   ({ \
+      bool fail; \
+      if (sizeof(typeof(*(_ptr))) == 2) { \
+         uint16_t *__ptr = (uint16_t*)(_ptr); \
+         uint16_t *__exp_val = (uint16_t*)(_exp_val); \
+         uint16_t __val = (uint16_t)(_val); \
+         uint16_t __tmp; \
+         arch_criticalstate_t cristate; \
+         arch_critical_enter(cristate); \
+         __tmp = *(volatile uint16_t*)__ptr; \
+         if (__tmp == *__exp_val) { \
+            *(volatile uint16_t*)__ptr = __val; \
+            fail = false; \
+            arch_critical_exit(cristate); \
+         } else { \
+            *__exp_val = __tmp; \
+            fail = true; \
+            arch_critical_exit(cristate); \
+         } \
+      } \
+      fail; /* return value */ \
+    })
 
 #define arch_bitmask_set(_bitfield, _bit) \
    do { \
@@ -265,7 +325,9 @@ uint_fast8_t arch_bitmask_fls(arch_bitmask_t bitfield);
 
 /* do not mark memory as clobbered, since this will destroy all compiler
  * optimizations for memory access and not add any beneficial value to generated
- * code */
+ * code. For more info look at:
+ * http://www.atmel.com/webdoc/AVRLibcReferenceManual/optimization_1optim_code_reorder.html
+ * */
 #define arch_dint() __asm__ __volatile__ ( "cli\n\t" :: )
 #define arch_eint() __asm__ __volatile__ ( "sei\n\t" :: )
 

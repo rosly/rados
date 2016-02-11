@@ -19,7 +19,7 @@ ifeq ($(DEBUG),)
 #on MSP430 even in DEBUG build -Os is most resonable
 CFLAGS   += -Os -g
 else
-CFLAGS   += -Os -g
+CFLAGS   += -Os
 endif
 LDFLAGS  = -mmcu=$(MCU) -mdisable-watchdog
 

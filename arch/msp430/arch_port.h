@@ -32,21 +32,19 @@
 #ifndef __OS_PORT_
 #define __OS_PORT_
 
-/* #define __CC430F6137__ similar deffine should be automaticly added by
- * compiler
- * when it will read the -mcu=cc430f6137, this define is required for
- * legacymsp430.h */
-
+/* before we include legacymsp30.h we need defines like __CC430F6137__. Those
+ * should be automatically added by compiler, because makefiles supply the
+ * -mcu=xxx option. */
 #include <legacymsp430.h>
-#include <stdint.h>  /* for patform specific types definitions like uint16_t */
+#include <stdint.h>  /* for platform specific types definitions like uint16_t */
 #include <limits.h>  /* for UINT_MAX etc */
 #include <stddef.h>
 #include <string.h>  /* for memcpy */
 
-/* missing stdbool.h for this platform */
+/* missing stdbool.h for this platform, defining bool by hand */
 typedef uint8_t bool;
 #define false ((uint8_t)0)
-/* I also considered also !false but finaly decided to be more strict */
+/* I also considered also !false but finally decided to be more strict */
 #define true  ((uint8_t)1)
 
 /* Within an interrupt handler, set the given bits in the value of SR
@@ -78,8 +76,16 @@ typedef uint16_t arch_ticks_t;         /* exactly 16 bits */
 #define ARCH_TICKS_MAX ((arch_ticks_t)UINT16_MAX)
 typedef uint16_t arch_criticalstate_t; /* size of CPU status register */
 
+/* msp430 does not support cpu op for ffs */
 typedef uint8_t arch_bitmask_t;
 #define ARCH_BITFIELD_MAX ((size_t)((sizeof(arch_bitmask_t) * 8)))
+
+/* 16bit is the native register size of msp430. Additionally it offers direct
+ * operations on memory. If we use 16bit for ring indexes we would not have to
+ * disable the interrupts (look at run time code optimizations generated in
+ * os_atomic_*() */
+typedef uint16_t arch_ridx_t;
+#define ARCH_RIDX_MAX UINT16_MAX
 
 #define OS_ISR __attribute__((naked)) ISR
 #define OS_NAKED __attribute__((naked))
@@ -100,82 +106,192 @@ typedef uint8_t arch_bitmask_t;
 #define OS_STACK_DESCENDING
 #define OS_STACK_MINSIZE ((size_t)28 * 4) /* four times of context dump size */
 
-#define os_atomic_inc(_atomic) \
-   __asm__ __volatile__ ( \
-      "inc %[atomic]\n\t" \
-      ::  [atomic] "m" (_atomic))
-
-#define os_atomic_dec(_atomic) \
-   __asm__ __volatile__ ( \
-      "dec %[atomic]\n\t" \
-      ::  [atomic] "m" (_atomic))
-
 /* typical atomic buildins are not available for msp430-gcc, we have to
- * implement them by macros */
-#define os_atomicptr_load(_ptr) \
+ * implement them by macros
+ * Following macro might seem to be complicated, AND IN FACT IT IS BY REASON:
+ * - to prevent from macro parameters side effects, and allow to accept any type
+ *   of argument (8/16/32bit), we could use following construction typeof(_ptr)
+ *   __ptr = (_ptr).
+ * - unfortunately typeof() reuse top level modifiers such as const and volatile
+ * - we need to use some local variables which will be removed/optimized by
+ *   compiler. But since those variables has to have the same type as _ptr, in
+ *   case _ptr is volatile this creates very inefficient code, since compiler
+ *   will use stack for temporary variables of volatile type. In other words
+ *   this would be opposite to what we want to achieve.
+ * - if we want to use temporary variables without additional penalty, we need
+ *   to strip of volatile modifier from pointer type.
+ * - as a alternative, we could use in-line assembly but then, compiler is
+ *   constrained with optimizations. Assembler macros will force compiler to use
+ *   concrete register pairs (eg Y,Z) and addressing modes and/or prevent jump
+ *   optimizations etc).
+ * - OK, we know that we have to stick to C
+ * - and we need strict control over the temporary variable types
+ * - the only way to do this is to check the size of input variable and recreate
+ *   the desired pointer type by copy of pointer address. This way we also
+ *   prevent from macro parameters side effects
+ * - then right before the access we need to add the volatile modifier to
+ *   prevent constant propagation optimizations
+ * - for type detection we use __builtin_choose_expr() which checks for constant
+ *   condition and than emits one of two code branches
+ */
+
+/* there is no way to atomicaly increment and fetch the value from memory, so
+ * interrupts must be dissabled. We could only atomicaly increment/decrement
+ * directly on memory but futher load will not be atomic */
+#define os_atomic_inc_load(_ptr) \
    ({ \
-      typeof(_ptr) __ptr = (_ptr); \
-      typeof(*__ptr) _val; \
-      /* this will be removed durring optimization */ \
-      if (sizeof(__ptr) <= sizeof(uint16_t)) { \
-         /* concurent handling is not needed for values <= 16bit */ \
-         _val = *__ptr; \
-      } else { \
-         arch_criticalstate_t cristate; \
-         arch_critical_enter(cristate); \
-         _val = *__ptr; \
-         arch_critical_exit(cristate); \
-      } \
-      _val; /* return value */ \
+      (typeof(*(_ptr)))__builtin_choose_expr(sizeof(typeof(*(_ptr))) == 1, \
+         ({ \
+            uint8_t *__ptr = (uint8_t*)(_ptr); \
+            uint8_t __val; \
+            arch_criticalstate_t cristate; \
+            arch_critical_enter(cristate); \
+            __val = ++(*(volatile uint8_t*)__ptr); \
+            arch_critical_exit(cristate); \
+            __val; \
+         }), \
+         ({ \
+            (typeof(*(_ptr)))__builtin_choose_expr(sizeof(typeof(*(_ptr))) == 2, \
+               ({ \
+                  uint16_t *__ptr = (uint16_t*)(_ptr); \
+                  uint16_t __val; \
+                  arch_criticalstate_t cristate; \
+                  arch_critical_enter(cristate); \
+                  __val = ++(*(volatile uint16_t*)__ptr); \
+                  arch_critical_exit(cristate); \
+                  __val; \
+               }), \
+            ({ \
+               arch_halt(); /* not implemented type of atomic access */ \
+               -1; /* this branch is evaluated than optimized, return something */ \
+	     }) ); \
+         }) ); \
     })
 
-#define os_atomicptr_store(_ptr, _val) \
+#define os_atomic_dec_load(_ptr) \
+   ({ \
+      (typeof(*(_ptr)))__builtin_choose_expr(sizeof(typeof(*(_ptr))) == 1, \
+         ({ \
+            uint8_t *__ptr = (uint8_t*)(_ptr); \
+            uint8_t __val; \
+            arch_criticalstate_t cristate; \
+            arch_critical_enter(cristate); \
+            __val = --(*(volatile uint8_t*)__ptr); \
+            arch_critical_exit(cristate); \
+            __val; \
+         }), \
+         ({ \
+            (typeof(*(_ptr)))__builtin_choose_expr(sizeof(typeof(*(_ptr))) == 2, \
+               ({ \
+                  uint16_t *__ptr = (uint16_t*)(_ptr); \
+                  uint16_t __val; \
+                  arch_criticalstate_t cristate; \
+                  arch_critical_enter(cristate); \
+                  __val = --(*(volatile uint16_t*)__ptr); \
+                  arch_critical_exit(cristate); \
+                  __val; \
+               }), \
+            ({ \
+               arch_halt(); /* not implemented type of atomic access */ \
+               -1; /* this branch is evaluated than optimized, return something */ \
+	     }) ); \
+         }) ); \
+    })
+
+/* simple increment can be done atomicaly directly on memory thanks to MSP430
+ * ortogonal instruction set */
+#define os_atomic_inc(_ptr) \
    do { \
-      typeof(_ptr) __ptr = (_ptr); \
-      typeof(*__ptr) __val = (_val); \
-      /* this will be removed durring optimization */ \
-      if (sizeof(__ptr) <= sizeof(uint16_t)) { \
-         /* concurent handling is not needed for values <= 16bit */ \
-         *__ptr = __val; \
-      } else { \
-         arch_criticalstate_t cristate; \
-         arch_critical_enter(cristate); \
-         *__ptr = __val; \
-         arch_critical_exit(cristate); \
+      if (sizeof(typeof(*(_ptr))) == 2) { \
+         __asm__ __volatile__ ( \
+            "inc %[atomic]\n\t" \
+            ::  [atomic] "m" (*(_ptr))); \
       } \
    } while (0)
 
-#define os_atomicptr_exch(_ptr, _val) \
+#define os_atomic_dec(_ptr) \
+   do { \
+      if (sizeof(typeof(*(_ptr))) == 2) { \
+         __asm__ __volatile__ ( \
+            "dec %[atomic]\n\t" \
+            ::  [atomic] "m" (*(_ptr))); \
+      } \
+   } while (0)
+
+#define os_atomic_load(_ptr) \
    ({ \
-      typeof(_ptr) __ptr = (_ptr); \
-      typeof(*__ptr) _tmp_widereg; \
-      arch_criticalstate_t cristate; \
-      arch_critical_enter(cristate); \
-      _tmp_widereg = *__ptr; \
-      *__ptr = (_val); \
-      arch_critical_exit(cristate); \
-      _tmp_widereg; /* return value */ \
+      (typeof(*(_ptr)))__builtin_choose_expr(sizeof(typeof(*(_ptr))) == 2, \
+         ({ \
+            uint16_t *__ptr = (uint16_t*)(_ptr); \
+            /* concurrent handling is not needed for values <= 16bit, but \
+             * double check that */ \
+            /* OS_STATIC_ASSERT(__atomic_always_lock_free(sizeof(uint16_t), __ptr)); */ \
+            *(volatile uint16_t*)__ptr; \
+         }), \
+         /* will give following error error: control reaches end of non-void function */ \
+         ({ }) ); \
     })
 
-#define os_atomicptr_cmp_exch(_ptr, _exp_ref, _val) \
-   ({ \
-      typeof(_ptr) __ptr = (_ptr); \
-      typeof(*__ptr) _tmp_widereg; \
-      typeof(_exp_ref) __exp_ref = (_exp_ref); \
-      (void) (&__exp_ref == &__ptr); \
-      bool success; \
-      arch_criticalstate_t cristate; \
-      arch_critical_enter(cristate); \
-      _tmp_widereg = *__ptr; \
-      if (_tmp_widereg == *__exp_ref) { \
-         *__ptr = (_val); \
-         success = true; \
-      } else { \
-         *__exp_ref = _tmp_widereg; \
-         success = false; \
+#define os_atomic_store(_ptr, _val) \
+   do { \
+      OS_STATIC_ASSERT(__builtin_types_compatible_p(typeof(*(_ptr)), typeof(_val))); \
+      if (sizeof(typeof(*(_ptr))) == 2) { \
+         uint16_t *__ptr = (uint16_t*)(_ptr); \
+         uint16_t __val = (uint16_t)(_val); \
+         /* concurrent handling is not needed for values <= 16bit, but \
+          * double check that */ \
+         /* OS_STATIC_ASSERT(__atomic_always_lock_free(sizeof(uint16_t), __ptr)); */ \
+         *(volatile uint16_t*)__ptr = __val; \
       } \
-      arch_critical_exit(cristate); \
-      !success; /* return value */ \
+   } while (0)
+
+#define os_atomic_exch(_ptr, _val) \
+   ({ \
+      OS_STATIC_ASSERT(__builtin_types_compatible_p(typeof(*(_ptr)), typeof(_val))); \
+      (typeof(*(_ptr)))__builtin_choose_expr(sizeof(typeof(*(_ptr))) == 2, \
+         ({ \
+            uint16_t *__ptr = (uint16_t*)(_ptr); \
+            uint16_t __val = (uint16_t)(_val); \
+            uint16_t __tmp; \
+            arch_criticalstate_t cristate; \
+            arch_critical_enter(cristate); \
+            __tmp = *(volatile uint16_t*)__ptr; \
+            *(volatile uint16_t*)__ptr = __val; \
+            arch_critical_exit(cristate); \
+            __tmp; /* return value */ \
+         }), \
+         /* will give following error error: control reaches end of non-void function */ \
+         ({ }) ); \
+    })
+
+/* \TODO got some errors while trying following
+ * OS_STATIC_ASSERT( \
+ *    __builtin_types_compatible_p(typeof(_ptr), typeof(_exp_val))); \
+ * OS_STATIC_ASSERT( \
+ *    __builtin_types_compatible_p(typeof(*(_ptr)), typeof(_val))); \
+ */
+#define os_atomic_cmp_exch(_ptr, _exp_val, _val) \
+   ({ \
+      bool fail; \
+      if (sizeof(typeof(*(_ptr))) == 2) { \
+         uint16_t *__ptr = (uint16_t*)(_ptr); \
+         uint16_t *__exp_val = (uint16_t*)(_exp_val); \
+         uint16_t __val = (uint16_t)(_val); \
+         uint16_t __tmp; \
+         arch_criticalstate_t cristate; \
+         arch_critical_enter(cristate); \
+         __tmp = *(volatile uint16_t*)__ptr; \
+         if (__tmp == *__exp_val) { \
+            *(volatile uint16_t*)__ptr = __val; \
+            fail = false; \
+            arch_critical_exit(cristate); \
+         } else { \
+            *__exp_val = __tmp; \
+            fail = true; \
+            arch_critical_exit(cristate); \
+         } \
+      } \
+      fail; /* return value */ \
     })
 
 #define arch_bitmask_set(_bitfield, _bit) \
@@ -198,10 +314,10 @@ uint_fast8_t arch_bitmask_fls(arch_bitmask_t bitfield);
 
 #define arch_critical_exit(_critical_state) \
    do { \
-      /* __bis_status_register(GIE & (_critical_state)); modify only the IE \
-       * flag, while remain rest untouched */ \
-      /* overwrite all flags, since previously we run proram then power bits \
-       * were set (no risk) */ \
+      /* overwrite all flags, previously power bits must been enabled so \
+       * we will not suspend CPU (no risk) */ \
+      /* \TODO instead try ? __bis_status_register(GIE & (_critical_state)); \
+       * modify only the IE flag, while remain rest untouched */ \
       __write_status_register(_critical_state); \
    } while (0)
 
@@ -209,21 +325,21 @@ uint_fast8_t arch_bitmask_fls(arch_bitmask_t bitfield);
 #define arch_eint() eint()
 
 /* format of the context pushed on stack for MSP430 port
- * low adress
- *   PC - pushed frst
- *   R3(SR) - pushed automaticly on ISR enter
- *            (manualy durring schedule form user)
- *   R4 - R15 - pusched last
+ * low address
+ *   PC - pushed first
+ *   R3(SR) - pushed automatically on ISR enter
+ *            (manually during schedule form user)
+ *   R4 - R15 - pushed last
  *  hi address
  */
 
 /* This function have to:
- *  - if neecessary, disable interrupts to block the neesting
- *  - store all registers (power control bits does not have to be necessarly
+ *  - if necessary, disable interrupts to block the nesting
+ *  - store all registers (power control bits does not have to be necessarily
  * stored)
  *  - increment the isr_nesting
  *  - if isr_nesting is = 1 then
- *   - store the context curr_tcb->ctx (may take benfit from already stored
+ *   - store the context curr_tcb->ctx (may take benefit from already stored
  *     registers by storing only the stack pointer)
  *  - end
  *
@@ -231,26 +347,26 @@ uint_fast8_t arch_bitmask_fls(arch_bitmask_t bitfield);
  *    nesting interrupts
  *
  * Because ISR was called it means that interrupts was enabled. On some arch
- * like MPS430 they may be automaticly disabled durring the enter to ISR
+ * like MPS430 they may be automatically disabled during the enter to ISR
  * On those architectures interrupts may be enabled when ISR will mask pending
  * interrupt.
- * In general disabling interrupt is usualy needed because we touch the
- * task_current (usualy need 2 asm instructions) and we cannot be preempted by
+ * In general disabling interrupt is usually needed because we touch the
+ * task_current (usually need 2 asm instructions) and we cannot be preempted by
  * another interrupt.
  * From other hand enabling the interrupts again as soon as possible is needed
- * for realtime constrains.
- * If your code does not need to be realtime constrained, it is not needed to
+ * for real-time constrains.
+ * If your code does not need to be real-time constrained, it is not needed to
  * enable the interrupts in ISR, also the nesting interrupt code can be disabled
  *
- * The reason why we skip the stack pointer storage in case of nesing is
- * obvous. In case of nesting we was not in task but in other ISR. So the SP
+ * The reason why we skip the stack pointer storage in case of nesting is
+ * obvious. In case of nesting we was not in task but in other ISR. So the SP
  * will not be the task SP.
  * But we have to store all registers anyway. This is why we store all
- * registers and then optionaly store the SP in context of tcb */
+ * registers and then optionally store the SP in context of tcb */
 #define arch_contextstore_i(_isrName) \
    __asm__ __volatile__ ( \
       /* on MSP430 interrupts are disabled when entering ISR */ \
-      /* increment isr_nesting, here we destroy *orginal SR but it already lay \
+      /* increment isr_nesting, here we destroy original SR but it already lay \
        * on stack*/ \
       "inc %[isr_nesting]\n\t" \
       "pushm 12,r15\n\t"            /* pushing R4 -R15 */ \
@@ -264,7 +380,7 @@ uint_fast8_t arch_bitmask_fls(arch_bitmask_t bitfield);
 
 /**
  * This function have to:
- *  - disable IE (in case we achritecture allows for nesting)
+ *  - disable IE (in case we architecture allows for nesting)
  *  - decrement the isr_nesting
  *  - if isr_nesting = 0 then
  *    - restore context from curr_tcb->ctx
@@ -290,15 +406,15 @@ uint_fast8_t arch_bitmask_fls(arch_bitmask_t bitfield);
       "jnz " # _isrName "_contexRestoreIsr_Nested\n\t" \
                         "mov %[ctx], r1\n\t" \
                         "mov @r1, r1\n\t" \
-                        "popm 12,r15\n\t"             /* poping R4 -R15 */ \
-      /* enable full power mode in SR that will be poped */ \
+                        "popm 12,r15\n\t"             /* popping R4 -R15 */ \
+      /* enable full power mode in SR that will be popped */ \
                         "bic %[powerbits], @r1 \n\t" \
                         "jmp " # _isrName "_contexRestoreIsr_Done\n\t" \
       # _isrName "_contexRestoreIsr_Nested:\n\t" \
                  "mov.b   #0x80,  &0x0a20\n\t" \
-                 "popm 12,r15\n\t"           /* poping R4 -R15 */ \
+                 "popm 12,r15\n\t"           /* popping R4 -R15 */ \
       # _isrName "_contexRestoreIsr_Done:\n\t" \
-      /* enable interrupts in SR that will be poped */ \
+      /* enable interrupts in SR that will be popped */ \
                  "bis %[iebits], @r1 \n\t" \
                  "reti\n\t" \
       ::  [ctx] "m" (task_current), \

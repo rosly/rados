@@ -75,10 +75,17 @@ typedef sigset_t arch_criticalstate_t;
  */
 extern sigset_t arch_crit_signals;
 
-/* since linux support only arch with > 32 bits we could easly use uint32_t
+/* since linux support only arch with > 32 bits we could use uint32_t.
  * but since we did not use more than 8 prios we stick to uint8_t */
 typedef uint8_t arch_bitmask_t;
 #define ARCH_BITFIELD_MAX ((size_t)(sizeof(arch_bitmask_t) * 8))
+
+/* 16bits is enough for ring indexes - we have 64bit port so atomic operations
+ * will perform as needed. But keeping 16bit will allow us to test/verify the
+ * corner cases of ring implementation when indexes are overflowing
+ * linux port is used mainly as a test/verification platform */
+typedef uint16_t arch_ridx_t;
+#define ARCH_RIDX_MAX UINT16_MAX
 
 /* OS_ISR does not define functions as naked in linux, since signals in linux
  * are handling the context registers via parameter. Signal handler always sees
@@ -102,25 +109,38 @@ typedef uint8_t arch_bitmask_t;
 #define OS_STACK_DESCENDING
 #define OS_STACK_MINSIZE ((size_t)SIGSTKSZ) /* one 4k page */
 
-#define os_atomic_inc(_atomic) \
-   __asm__ __volatile__ ( \
-      "incq %[atomic]\n\t" \
-      ::  [atomic] "m" (_atomic))
-
-#define os_atomic_dec(_atomic) \
-   __asm__ __volatile__ ( \
-      "decq %[atomic]\n\t" \
-      ::  [atomic] "m" (_atomic))
-
 /* due to x64 reordering we have to use atomic builtins from gcc to make sure
- * that proper bariers within code sequence will be used */
-#define os_atomicptr_load(_ptr) \
+ * that proper memory barriers and model within code sequence will be used */
+#define os_atomic_inc_load(_ptr) \
+   __atomic_add_fetch(_ptr, 1,  __ATOMIC_ACQ_REL)
+
+#define os_atomic_dec_load(_ptr) \
+   __atomic_sub_fetch(_ptr, 1,  __ATOMIC_ACQ_REL)
+
+#define os_atomic_inc(_ptr) \
+   do { \
+      /* we cannot do anything smarter so just ignore the return value from \
+       * previous macro */ \
+      os_atomic_inc_load(_ptr); \
+   } while (0)
+
+#define os_atomic_dec(_ptr) \
+   do { \
+      /* we cannot do anything smarter so just ignore the return value from \
+       * previous macro */ \
+      os_atomic_dec_load(_ptr); \
+   } while (0)
+
+#define os_atomic_load(_ptr) \
    __atomic_load_n(_ptr, __ATOMIC_ACQUIRE)
-#define os_atomicptr_store(_ptr, _val) \
+
+#define os_atomic_store(_ptr, _val) \
    __atomic_store_n(_ptr, _val, __ATOMIC_RELEASE)
-#define os_atomicptr_exch(_ptr, _val) \
+
+#define os_atomic_exch(_ptr, _val) \
    __atomic_exchange_n(_ptr, _val, __ATOMIC_ACQ_REL)
-#define os_atomicptr_cmp_exch(_ptr, _exp_ref, _val) \
+
+#define os_atomic_cmp_exch(_ptr, _exp_ref, _val) \
    !__atomic_compare_exchange_n(_ptr, _exp_ref, _val, \
 			       false /*strong*/, \
 			       __ATOMIC_ACQ_REL, \

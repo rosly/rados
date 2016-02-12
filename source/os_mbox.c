@@ -55,12 +55,14 @@ void os_mbox_destroy(os_mbox_t *mbox)
 
 os_retcode_t OS_WARN_UNUSEDRET os_mbox_pop(
    os_mbox_t *mbox,
-   void **msg,
+   void **msg_out,
    uint_fast16_t timeout_ticks)
 {
+   void *msg;
    os_retcode_t retc;
 
-   OS_ASSERT(0 == isr_nesting); /* cannot call from ISR */
+   /* call from ISR alowed only with non-blocking mode */
+   OS_ASSERT((0 == isr_nesting) || (timeout_ticks == OS_TIMEOUT_TRY));
    /* idle task cannot call blocking functions (will crash OS) */
    OS_ASSERT(task_current->prio_current > 0);
    /* cannot call after os_waitqueue_prepare() */
@@ -68,17 +70,29 @@ os_retcode_t OS_WARN_UNUSEDRET os_mbox_pop(
 
    do
    {
-      os_waitqueue_prepare(&mbox->wait_queue);
-      /* try to atomically fetch the message */
-      if ((*msg = os_atomic_exch(&mbox->msg, NULL)))
-      {
-         /* got the message */
-         os_waitqueue_break();
-         retc = OS_OK;
-         break;
+      if (timeout_ticks == OS_TIMEOUT_TRY) {
+         msg = os_atomic_exch(&mbox->msg, NULL);
+	 if (!msg) {
+            retc = OS_OK;
+	    *msg_out = msg;
+	 } else {
+            retc = OS_WOULDBLOCK;
+	 }
+	 break;
+      } else {
+         os_waitqueue_prepare(&mbox->wait_queue);
+         /* try to atomically fetch the message */
+         if ((msg = os_atomic_exch(&mbox->msg, NULL)))
+         {
+            /* got the message */
+            os_waitqueue_break();
+            retc = OS_OK;
+	    *msg_out = msg;
+            break;
+         }
+         /* no message in mbox, wait for message post */
+         retc = os_waitqueue_wait(timeout_ticks);
       }
-      /* no message in mbox, wait for message post */
-      retc = os_waitqueue_wait(timeout_ticks);
    } while (retc == OS_OK); /* wakeup code ? */
 
    return retc;
@@ -167,7 +181,8 @@ os_retcode_t OS_WARN_UNUSEDRET os_mqueue_pop(
    os_retcode_t retc;
    arch_ridx_t deq;
 
-   OS_ASSERT(0 == isr_nesting); /* cannot call from ISR */
+   /* call from ISR alowed only with non-blocking mode */
+   OS_ASSERT((0 == isr_nesting) || (timeout_ticks == OS_TIMEOUT_TRY));
    /* idle task cannot call blocking functions (will crash OS) */
    OS_ASSERT(task_current->prio_current > 0);
    /* cannot call after os_waitqueue_prepare() */
@@ -176,19 +191,30 @@ os_retcode_t OS_WARN_UNUSEDRET os_mqueue_pop(
 
    do
    {
-      os_waitqueue_prepare(&mqueue->wait_queue);
+      if (timeout_ticks == OS_TIMEOUT_TRY) {
+         deq = mqueue->deq(&mqueue->ring, msg, *cnt);
+         if (deq)
+         {
+            retc = OS_OK;
+            *cnt = deq;
+	 } else {
+            retc = OS_WOULDBLOCK;
+	 }
+	 break;
+      } else {
+         os_waitqueue_prepare(&mqueue->wait_queue);
 
-      deq = mqueue->deq(&mqueue->ring, msg, *cnt);
-      if (deq)
-      {
-         /* got the messages */
-         os_waitqueue_break();
-         retc = OS_OK;
-         *cnt = deq;
-         break;
-      }
-      /* no message in mqueue, wait for message post */
-      retc = os_waitqueue_wait(timeout_ticks);
+         deq = mqueue->deq(&mqueue->ring, msg, *cnt);
+         if (deq)
+         {
+            /* got the messages */
+            os_waitqueue_break();
+            retc = OS_OK;
+            *cnt = deq;
+            break;
+         }
+         /* no message in mqueue, wait for message post */
+         retc = os_waitqueue_wait(timeout_ticks);
    } while (retc == OS_OK); /* wakeup code ? */
 
    return retc;

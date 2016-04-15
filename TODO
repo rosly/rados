@@ -46,6 +46,12 @@ Features:
 - (MSP430 & AVR)   MEDIUM - CPU sleep states for arch_idle(), best in MCU
                             agnostic way
 - (scheduler)      HARD   - Proto-threads (task's that share the same stack)
+- (interrupts)     HARD   - Sofrirq based on the same concept as in Linux. Wi
+                            enable development of low latency and high throughput 
+                            device drivers based on top and bottom half's. Softirq 
+                            should be run in context of least prioritized Irq for
+                            proper co-existence with nested interrupt handling. For
+                            platforms like ARM M this should be the SVC. 
 
 Mics:
 - (various places) EASY   - Change numeric defines into enum typedefs, fix the

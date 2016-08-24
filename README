@@ -6,9 +6,12 @@ License:      BSD Revised
 
 --------------------------------------------------------------------------------
 
-RadOs is a free RTOS for embedded systems, released under the flexible, open
-source BSD license and is free to use for commercial or educational purposes
-without restriction.
+"It seems that perfection is attained not when there is nothing more to add, 
+but when there is nothing more to remove." - Antoine de Saint Exupéry
+
+RadOs is a free RTOS for embedded systems focused on minimalism.
+It is released under the flexible, open source BSD license and is free to use 
+for commercial or educational purposes without restriction.
 
 It is targeted for systems which need only a lightweight scheduler and the most
 typical RTOS primitives. No file system, IP stack or device drivers are
